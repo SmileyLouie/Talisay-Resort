@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Review;
-use App\Models\Package;
+use App\Models\AccommodationUnit;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -27,31 +27,23 @@ class ReportController extends Controller
             $query->where('created_at', '<=', $request->date_to);
         }
 
-        // Calculate total successful revenue
         $totalRevenue = $query->clone()->sum('amount');
         
-        // Detect database connection driver type (MySQL vs SQLite)
         $driver = \Illuminate\Support\Facades\DB::getDriverName();
         
-        // Define database-specific query format for grouping by month
         $select = $driver === 'sqlite' 
             ? "strftime('%Y-%m', created_at) as month, SUM(amount) as total"
             : "DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total";
 
-        // Query monthly revenue grouped by month labels
         $monthlyRevenue = $query->clone()
             ->selectRaw($select)
             ->groupBy('month')
             ->orderBy('month')
-            // Fetch the collection from database
             ->get();
 
-        // Calculate total pending payment amounts
         $pendingAmount = Payment::where('status', 'pending')->sum('amount');
-        // Calculate total refunded payment amounts
         $refundedAmount = Payment::where('status', 'refunded')->sum('amount');
 
-        // Return statistical payload array as JSON response
         return response()->json([
             'total_revenue' => $totalRevenue,
             'pending_amount' => $pendingAmount,
@@ -88,68 +80,52 @@ class ReportController extends Controller
         ]);
     }
 
-    public function popularPackages(Request $request)
+    public function popularAccommodations(Request $request)
     {
-        $packages = Package::withCount(['bookings' => function ($query) {
+        $accommodations = AccommodationUnit::withCount(['bookings' => function ($query) {
             $query->whereIn('status', ['paid', 'checked_in', 'completed']);
         }])
             ->orderBy('bookings_count', 'desc')
             ->take(10)
             ->get();
 
-        return response()->json($packages);
+        return response()->json($accommodations);
     }
 
     public function cancellations(Request $request)
     {
-        $request->validate([
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date',
-        ]);
-
-        $query = Booking::where('status', 'cancelled');
-
-        if ($request->date_from) {
-            $query->where('cancelled_at', '>=', $request->date_from);
-        }
-        if ($request->date_to) {
-            $query->where('cancelled_at', '<=', $request->date_to);
-        }
-
-        $totalCancellations = $query->count();
         $totalBookings = Booking::count();
-        $cancellationRate = $totalBookings > 0 ? round(($totalCancellations / $totalBookings) * 100, 1) : 0;
+        $cancelledBookings = Booking::where('status', 'cancelled')->count();
+        $cancellationRate = $totalBookings > 0 ? round(($cancelledBookings / $totalBookings) * 100, 2) : 0;
 
-        $reasons = $query->clone()
+        $reasons = Booking::where('status', 'cancelled')
+            ->whereNotNull('cancellation_reason')
             ->selectRaw('cancellation_reason, COUNT(*) as count')
             ->groupBy('cancellation_reason')
-            ->orderBy('count', 'desc')
-            ->get();
+            ->pluck('count', 'cancellation_reason');
 
         return response()->json([
-            'total_cancellations' => $totalCancellations,
-            'cancellation_rate' => $cancellationRate,
-            'reasons' => $reasons,
+            'total_bookings' => $totalBookings,
+            'cancelled_bookings' => $cancelledBookings,
+            'cancellation_rate_percent' => $cancellationRate,
+            'cancellation_reasons' => $reasons,
         ]);
     }
 
-    public function satisfaction()
+    public function satisfaction(Request $request)
     {
-        $reviews = Review::approved();
-        $totalReviews = $reviews->count();
-        $averageRating = $reviews->avg('rating') ?? 0;
+        $approvedReviews = Review::approved();
+        $avgRating = round($approvedReviews->avg('rating') ?? 0, 1);
+        $totalReviews = $approvedReviews->count();
 
         $ratingDistribution = Review::approved()
             ->selectRaw('rating, COUNT(*) as count')
             ->groupBy('rating')
-            ->orderBy('rating')
-            ->get()
-            ->pluck('count', 'rating')
-            ->toArray();
+            ->pluck('count', 'rating');
 
         return response()->json([
+            'average_rating' => $avgRating,
             'total_reviews' => $totalReviews,
-            'average_rating' => round($averageRating, 1),
             'rating_distribution' => $ratingDistribution,
         ]);
     }

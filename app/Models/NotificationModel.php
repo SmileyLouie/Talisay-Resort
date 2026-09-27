@@ -4,7 +4,7 @@
 // NotificationModel.php — Model for the 'notifications_table' Table
 // ============================================================
 // Stores in-app notifications for users (admins, staff, and tourists).
-// Types: booking, payment, emergency, review, system.
+// Types: booking, payment, review, system.
 // Supports read/unread state with a read_at timestamp.
 // Named 'NotificationModel' to avoid conflict with Laravel's built-in
 // Notification facade and Notifiable trait.
@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Model;
 // Declare mass-assignable columns for this model
 #[Fillable([
     'user_id', // FK — the user who should receive this notification
-    'type',    // Category: 'booking'|'payment'|'emergency'|'review'|'system'
+    'type',    // Category: 'booking'|'payment'|'review'|'system'
     'title',   // Short notification headline (e.g., 'New Booking Received')
     'message', // Full notification body text
     'data',    // JSON blob for extra data (e.g., booking_id, payment_id for deep links)
@@ -121,6 +121,59 @@ class NotificationModel extends Model
         if (is_null($this->read_at)) {
             // Set read_at to the current timestamp to mark it as read
             $this->update(['read_at' => now()]);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // STATIC DISPATCH HELPERS
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * Send an in-app notification to a specific user.
+     */
+    public static function notifyUser($userId, string $type, string $title, string $message, ?array $data = null): ?self
+    {
+        if (!$userId) return null;
+        return self::create([
+            'user_id' => $userId,
+            'type'    => $type,
+            'title'   => $title,
+            'message' => $message,
+            'data'    => $data,
+        ]);
+    }
+
+    /**
+     * Send an in-app notification to all Admin and Staff users.
+     */
+    public static function notifyAdminsAndStaff(string $type, string $title, string $message, ?array $data = null): void
+    {
+        $users = User::whereIn('role', ['admin', 'staff'])->where('is_active', true)->get();
+        foreach ($users as $user) {
+            self::create([
+                'user_id' => $user->id,
+                'type'    => $type,
+                'title'   => $title,
+                'message' => $message,
+                'data'    => $data,
+            ]);
+        }
+    }
+
+    /**
+     * Send an in-app notification to all Admin users only.
+     */
+    public static function notifyAdminsOnly(string $type, string $title, string $message, ?array $data = null): void
+    {
+        $users = User::where('role', 'admin')->where('is_active', true)->get();
+        foreach ($users as $user) {
+            self::create([
+                'user_id' => $user->id,
+                'type'    => $type,
+                'title'   => $title,
+                'message' => $message,
+                'data'    => $data,
+            ]);
         }
     }
 }

@@ -11,13 +11,22 @@ return new class extends Migration
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
             $table->string('reference_no')->unique();
+            $table->enum('booking_type', ['regular', 'special_resort'])->default('regular');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('package_id')->constrained()->onDelete('cascade');
+            $table->foreignId('accommodation_unit_id')->nullable()->constrained('accommodation_units')->onDelete('cascade');
+            $table->foreignId('original_accommodation_unit_id')->nullable()->constrained('accommodation_units')->nullOnDelete();
             $table->date('booking_date');
+            $table->date('check_in_date')->nullable();
+            $table->date('check_out_date')->nullable();
+            $table->integer('nights_count')->default(1);
             $table->string('time_slot')->nullable();
             $table->integer('guests_count')->default(1);
             $table->enum('status', ['pending', 'paid', 'checked_in', 'checked_out', 'cancelled', 'completed'])->default('pending');
+            $table->enum('admin_approval_status', ['not_required', 'pending', 'approved', 'rejected'])->default('not_required');
+            $table->foreignId('admin_approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->text('special_requests')->nullable();
+            $table->timestamp('modified_at')->nullable();
+            $table->text('modification_notes')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->string('cancellation_reason')->nullable();
             $table->decimal('total_amount', 10, 2)->default(0);
@@ -26,7 +35,7 @@ return new class extends Migration
 
             $table->index(['booking_date', 'status']);
             $table->index('user_id');
-            $table->index('package_id');
+            $table->index('accommodation_unit_id');
         });
 
         Schema::create('capacity_schedules', function (Blueprint $table) {

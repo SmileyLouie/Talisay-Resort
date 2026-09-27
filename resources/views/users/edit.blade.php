@@ -26,7 +26,7 @@
                         <p class="text-white/70 text-sm mb-0">{{ ucfirst($user->role) }} · {{ $user->email }}</p>
                     </div>
                     <span class="ms-auto badge bg-{{ $user->is_active ? 'white text-success' : 'white text-secondary' }} fs-6 px-3">
-                        {{ $user->is_active ? '✅ Active' : '⛔ Inactive' }}
+                        {{ $user->is_active ? 'Active' : 'Inactive' }}
                     </span>
                 </div>
             </div>
@@ -71,23 +71,26 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-medium text-sm">Phone Number</label>
                                 <input type="tel" name="phone" class="form-control @error('phone') is-invalid @enderror"
-                                       value="{{ old('phone', $user->phone) }}" placeholder="+63-9XX-XXX-XXXX">
+                                       value="{{ old('phone', $user->phone) }}" placeholder="Phone number">
                                 @error('phone') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-medium text-sm">Role <span class="text-danger">*</span></label>
                                 <select name="role" class="form-select @error('role') is-invalid @enderror" required>
-                                    <option value="admin" {{ old('role', $user->role) === 'admin' ? 'selected' : '' }}>🛡️ Admin</option>
-                                    <option value="staff" {{ old('role', $user->role) === 'staff' ? 'selected' : '' }}>🏷️ Staff</option>
-                                    <option value="tourist" {{ old('role', $user->role) === 'tourist' ? 'selected' : '' }}>🏖️ Tourist</option>
+                                    @if($user->isAdmin())
+                                        <option value="admin" selected>Admin (Primary Administrator)</option>
+                                    @else
+                                        <option value="staff" {{ old('role', $user->role) === 'staff' ? 'selected' : '' }}>Staff</option>
+                                        <option value="tourist" {{ old('role', $user->role) === 'tourist' ? 'selected' : '' }}>Tourist</option>
+                                    @endif
                                 </select>
                                 @error('role') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-medium text-sm">Account Status</label>
                                 <select name="is_active" class="form-select @error('is_active') is-invalid @enderror">
-                                    <option value="1" {{ old('is_active', $user->is_active) ? 'selected' : '' }}>✅ Active</option>
-                                    <option value="0" {{ !old('is_active', $user->is_active) ? 'selected' : '' }}>⛔ Inactive</option>
+                                    <option value="1" {{ old('is_active', $user->is_active) ? 'selected' : '' }}>Active</option>
+                                    <option value="0" {{ !old('is_active', $user->is_active) ? 'selected' : '' }}>Inactive</option>
                                 </select>
                                 @error('is_active') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>

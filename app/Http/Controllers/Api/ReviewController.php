@@ -31,15 +31,24 @@ class ReviewController extends Controller
             return response()->json(['error' => 'You have already reviewed this booking.'], 422);
         }
 
+        $hasProfanity = Review::containsProfanity($request->comment);
+
         $review = Review::create([
-            'user_id' => $request->user()->id,
-            'booking_id' => $request->booking_id,
-            'rating' => $request->rating,
-            'comment' => $request->comment,
-            'is_approved' => false,
+            'user_id'            => $request->user()->id,
+            'booking_id'         => $request->booking_id,
+            'rating'             => $request->rating,
+            'comment'            => $request->comment,
+            'is_approved'        => true,
+            'is_comment_blocked' => $hasProfanity,
+            'block_reason'       => $hasProfanity ? 'Automatically blocked: Inappropriate language / profanity detected' : null,
+            'comment_blocked_at' => $hasProfanity ? now() : null,
         ]);
 
-        return response()->json(['review' => $review, 'message' => 'Review submitted for approval.'], 201);
+        $message = $hasProfanity
+            ? 'Review rating published. Note: Your comment was hidden due to inappropriate words.'
+            : 'Review published successfully.';
+
+        return response()->json(['review' => $review, 'message' => $message], 201);
     }
 
     public function myReviews(Request $request)

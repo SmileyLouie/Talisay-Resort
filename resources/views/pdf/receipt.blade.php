@@ -37,11 +37,10 @@
     </div>
 
     <div class="info-grid">
-        <div class="info-item"><strong>Guest:</strong> {{ $booking->user->name }}</div>
-        <div class="info-item"><strong>Email:</strong> {{ $booking->user->email }}</div>
-        <div class="info-item"><strong>Phone:</strong> {{ $booking->user->phone ?? 'N/A' }}</div>
+        <div class="info-item"><strong>Guest:</strong> {{ $booking->guest_name }}</div>
+        <div class="info-item"><strong>Contact / Email:</strong> {{ $booking->guest_contact }}</div>
         <div class="info-item"><strong>Booking Date:</strong> {{ $booking->booking_date->format('F d, Y') }}</div>
-        <div class="info-item"><strong>Package:</strong> {{ $booking->package->name }}</div>
+        <div class="info-item"><strong>Room &amp; Cottage:</strong> {{ $booking->accommodationUnit->unit_number ?? 'Exclusive Full Resort' }}</div>
         <div class="info-item"><strong>Guests:</strong> {{ $booking->guests_count }}</div>
         @if($booking->payment)
         <div class="info-item"><strong>Payment Method:</strong> {{ ucfirst($booking->payment->gateway) }}</div>
@@ -55,9 +54,13 @@
         </thead>
         <tbody>
             <tr>
-                <td>{{ $booking->package->name }}</td>
-                <td>{{ $booking->guests_count }}</td>
-                <td style="text-align:right;">PHP {{ number_format($booking->package->price, 2) }}</td>
+                <td>{{ $booking->accommodationUnit->unit_number ?? 'Full Resort Exclusive' }}
+                    @if($booking->accommodationUnit)
+                    <br><small style="color:#64748b;">{{ $booking->accommodationUnit->variant_label }} {{ $booking->accommodationUnit->type_label }}</small>
+                    @endif
+                </td>
+                <td>{{ $booking->nights_count ?? 1 }} Night(s)</td>
+                <td style="text-align:right;">PHP {{ number_format($booking->accommodationUnit->price_per_night ?? $booking->total_amount, 2) }}/night</td>
                 <td style="text-align:right;">PHP {{ number_format($booking->total_amount, 2) }}</td>
             </tr>
         </tbody>

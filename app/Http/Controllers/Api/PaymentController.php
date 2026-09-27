@@ -151,7 +151,7 @@ class PaymentController extends Controller
 
     public function generateReceipt(Booking $booking)
     {
-        $booking->load(['user', 'package', 'payment']);
+        $booking->load(['user', 'accommodationUnit', 'payment']);
         $pdf = Pdf::loadView('pdf.receipt', compact('booking'));
 
         return $pdf->download("receipt-{$booking->reference_no}.pdf");

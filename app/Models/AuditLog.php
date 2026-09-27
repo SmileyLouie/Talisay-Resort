@@ -33,7 +33,7 @@ use Illuminate\Database\Eloquent\Model;
  * Class AuditLog
  *
  * Tracks administrative actions for accountability and security auditing.
- * Every significant change (payment approvals, emergency updates, etc.)
+ * Every significant change (payment approvals, booking updates, etc.)
  * should create an audit log entry using AuditLog::log().
  *
  * @property int         $id          Auto-incrementing primary key

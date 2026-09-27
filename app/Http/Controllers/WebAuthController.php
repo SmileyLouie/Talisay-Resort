@@ -13,6 +13,6 @@ class WebAuthController extends WebControllers
     public function logout(Request $request) { return parent::logout($request); }
     public function showForgotPassword() { return parent::showForgotPassword(); }
     public function sendResetLink(Request $request) { return parent::sendResetLink($request); }
-    public function showResetPassword(Request $request) { return parent::showResetPassword($request); }
+    public function showResetPassword(Request $request, string $token) { return parent::showResetPassword($request, $token); }
     public function resetPassword(Request $request) { return parent::resetPassword($request); }
 }

@@ -41,10 +41,6 @@ if (!function_exists('status_badge')) {
             'refunded'    => 'light',     // Light  — payment refunded
             'failed'      => 'danger',    // Red    — payment failed
             'success'     => 'success',   // Green  — payment succeeded
-            // Emergency statuses
-            'acknowledged'  => 'info',    // Blue   — staff acknowledged
-            'responding'    => 'warning', // Yellow — staff en-route
-            'resolved'      => 'success', // Green  — emergency resolved
         ];
 
         // Return the mapped color class, or 'secondary' if status is unknown
@@ -73,20 +69,25 @@ if (!function_exists('format_php')) {
 if (!function_exists('initials')) {
     function initials(string $name, int $limit = 2): string
     {
-        // Split the full name into individual words
-        $words = explode(' ', trim($name));
-
-        // Build the initials string by taking the first character of each word
+        $words    = explode(' ', trim($name));
         $initials = '';
         foreach ($words as $word) {
-            // Only proceed if the word is not empty
             if (!empty($word)) {
-                // Append the uppercase first character of this word
                 $initials .= strtoupper($word[0]);
             }
         }
-
-        // Return only up to the $limit number of initials (default 2)
         return substr($initials, 0, $limit);
+    }
+}
+
+// ── first_name() ──────────────────────────────────────────────
+// Returns the first word (first name) from a full name string.
+// Used by the chatbot to greet users personally.
+// Usage: first_name('Maria Santos') → 'Maria'
+// ─────────────────────────────────────────────────────────────
+if (!function_exists('first_name')) {
+    function first_name(string $name): string
+    {
+        return ucfirst(explode(' ', trim($name))[0] ?? $name);
     }
 }

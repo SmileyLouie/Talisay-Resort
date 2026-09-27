@@ -16,12 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         
         $middleware->alias([
-            'role' => \App\Http\Middleware\CheckRole::class,
+            'role'       => \App\Http\Middleware\CheckRole::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
         ]);
 
         $middleware->redirectTo(
             guests: '/login',
-            users: '/admin/dashboard',
+            users: '/',      // Routes through '/' which redirects by role: admin/staff/tourist
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {

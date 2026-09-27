@@ -1,159 +1,161 @@
 @extends('layouts.app')
+
 @section('title', 'Payment Detail — Talisay Smart Tourism')
 
 @section('content')
 
-<div class="mb-5">
-    <a href="{{ route('payments.index') }}" class="text-sky-600 hover:underline text-sm">
-        <i class="bi bi-arrow-left me-1"></i>Back to Payments
+<div class="mb-6">
+    <a href="{{ route('payments.index') }}" class="btn-secondary-clean text-xs">
+        <i class="bi bi-arrow-left"></i>
+        <span>Back to Payments</span>
     </a>
 </div>
 
-@if(session('success'))
-<div class="alert alert-success alert-dismissible fade show mb-4">
-    <i class="bi bi-check-circle me-1"></i>{{ session('success') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-@endif
-@if(session('error'))
-<div class="alert alert-danger alert-dismissible fade show mb-4">
-    <i class="bi bi-x-circle me-1"></i>{{ session('error') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-@endif
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-<div class="row g-4">
-
-    {{-- Payment Details Card --}}
-    <div class="col-lg-8">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800">Payment Details</h2>
+    {{-- Payment Details Main Card --}}
+    <div class="lg:col-span-8 space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+                <div>
+                    <h2 class="text-lg font-extrabold text-slate-900 tracking-tight mb-0.5">Transaction Overview</h2>
+                    <p class="text-xs text-slate-400 mb-0">Record logged in the resort payment gateway</p>
+                </div>
                 @php
-                    $sc = ['success' => 'success', 'pending' => 'warning', 'failed' => 'danger', 'refunded' => 'secondary'];
+                    $sc = [
+                        'success'  => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                        'pending'  => 'bg-amber-50 text-amber-700 border-amber-200',
+                        'failed'   => 'bg-rose-50 text-rose-700 border-rose-200',
+                        'refunded' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                    ];
                 @endphp
-                <span class="badge bg-{{ $sc[$payment->status] ?? 'secondary' }} fs-6 px-3 py-2">
-                    <i class="bi bi-{{ $payment->status === 'success' ? 'check-circle' : ($payment->status === 'failed' ? 'x-circle' : 'clock') }} me-1"></i>
+                <span class="px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 {{ $sc[$payment->status] ?? 'bg-slate-100 text-slate-700' }}">
+                    <i class="bi bi-{{ $payment->status === 'success' ? 'check-circle-fill text-emerald-500' : ($payment->status === 'failed' ? 'x-circle-fill text-rose-500' : 'clock-fill text-amber-500') }}"></i>
                     {{ ucfirst($payment->status) }}
                 </span>
             </div>
 
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Transaction ID</label>
-                    <p class="font-mono text-gray-700 mt-1">{{ $payment->transaction_id ?? 'N/A' }}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Transaction ID</span>
+                    <span class="font-mono text-xs font-extrabold text-slate-800">{{ $payment->transaction_id ?? 'N/A' }}</span>
                 </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Amount</label>
-                    <p class="text-xl font-bold text-green-600 mt-1">₱{{ number_format($payment->amount, 2) }}</p>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Amount Paid</span>
+                    <span class="text-xl font-extrabold text-emerald-600">₱{{ number_format($payment->amount, 2) }}</span>
                 </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Payment Gateway</label>
-                    <p class="text-gray-700 mt-1">
-                        <i class="bi bi-credit-card me-1"></i>{{ ucfirst($payment->gateway ?? 'N/A') }}
-                    </p>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Gateway Method</span>
+                    <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <i class="bi bi-credit-card text-sky-600"></i>
+                        {{ ucfirst(str_replace('_', ' ', $payment->gateway ?? 'N/A')) }}
+                    </span>
                 </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Payment Date</label>
-                    <p class="text-gray-700 mt-1">{{ $payment->created_at->format('M d, Y — h:i A') }}</p>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Timestamp</span>
+                    <span class="text-xs font-bold text-slate-800">{{ $payment->created_at->format('M d, Y • h:i A') }}</span>
                 </div>
             </div>
 
-            <hr class="my-4">
-
-            <h3 class="font-semibold text-gray-700 mb-3">Booking Information</h3>
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Booking Reference</label>
-                    <p class="font-mono text-sky-600 font-bold mt-1">{{ $payment->booking->reference_no ?? '—' }}</p>
-                </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Guest Name</label>
-                    <p class="text-gray-700 mt-1">{{ $payment->booking->user->name ?? '—' }}</p>
-                </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Package</label>
-                    <p class="text-gray-700 mt-1">{{ $payment->booking->package->name ?? '—' }}</p>
-                </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Booking Date</label>
-                    <p class="text-gray-700 mt-1">
-                        {{ $payment->booking->booking_date
-                            ? \Carbon\Carbon::parse($payment->booking->booking_date)->format('M d, Y')
-                            : '—' }}
-                    </p>
-                </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Guests</label>
-                    <p class="text-gray-700 mt-1">{{ $payment->booking->guests_count ?? '—' }} pax</p>
-                </div>
-                <div class="col-md-6">
-                    <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Booking Status</label>
-                    <p class="mt-1">
-                        <span class="badge bg-{{ $payment->booking->status === 'paid' ? 'success' : 'warning' }}">
-                            {{ ucfirst($payment->booking->status ?? '—') }}
+            {{-- Booking Details Group --}}
+            <div class="pt-4 border-t border-slate-100">
+                <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <i class="bi bi-calendar2-check text-sky-600"></i>
+                    <span>Linked Reservation</span>
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <span class="text-slate-400 block mb-0.5">Booking Reference</span>
+                        <span class="font-mono font-extrabold text-sky-600 text-sm">{{ $payment->booking->reference_no ?? '—' }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <span class="text-slate-400 block mb-0.5">Room &amp; Cottage</span>
+                        <span class="font-bold text-slate-800">{{ $payment->booking->accommodationUnit->unit_number ?? 'Exclusive Full Resort' }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <span class="text-slate-400 block mb-0.5">Scheduled Date</span>
+                        <span class="font-semibold text-slate-800">
+                            {{ $payment->booking->booking_date ? \Carbon\Carbon::parse($payment->booking->booking_date)->format('M d, Y') : '—' }}
                         </span>
-                    </p>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <span class="text-slate-400 block mb-0.5">Headcount</span>
+                        <span class="font-semibold text-slate-800">{{ $payment->booking->guests_count ?? '—' }} Guests</span>
+                    </div>
                 </div>
             </div>
 
-            {{-- Proof of Payment --}}
+            {{-- Proof of Payment Image --}}
             @if($payment->proof_path)
-            <hr class="my-4">
-            <h3 class="font-semibold text-gray-700 mb-3">Proof of Payment</h3>
-            <img src="{{ Storage::url($payment->proof_path) }}"
-                 class="img-fluid rounded-xl shadow-sm"
-                 style="max-height: 360px; object-fit: contain;"
-                 alt="Proof of Payment">
+            <div class="pt-6 border-t border-slate-100 mt-6">
+                <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <i class="bi bi-file-earmark-image text-emerald-600"></i>
+                    <span>Uploaded Proof of Payment</span>
+                </h3>
+                <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 inline-block">
+                    <img src="{{ Storage::url($payment->proof_path) }}"
+                         class="rounded-xl shadow-sm max-h-96 object-contain"
+                         alt="Proof of Payment">
+                </div>
+            </div>
             @endif
         </div>
     </div>
 
-    {{-- Actions Sidebar --}}
-    <div class="col-lg-4">
+    {{-- Side Column Actions & Guest --}}
+    <div class="lg:col-span-4 space-y-6">
 
-        {{-- Actions Card --}}
+        {{-- Verification Actions Card --}}
         @if($payment->status === 'pending')
-        <div class="bg-white rounded-xl shadow-sm p-5 mb-4">
-            <h3 class="font-semibold text-gray-700 mb-3"><i class="bi bi-sliders me-2"></i>Actions</h3>
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+            <h3 class="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
+                <i class="bi bi-shield-check text-amber-500"></i>
+                <span>Payment Verification</span>
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">Review proof of payment and verify funds transfer before confirming.</p>
 
-            <form method="POST" action="{{ route('payments.approve', $payment) }}" class="mb-3"
+            <form method="POST" action="{{ route('payments.approve', $payment) }}" class="mb-2"
                   onsubmit="return confirm('Approve this payment and mark the booking as paid?')">
                 @csrf
-                <button class="btn btn-success w-100">
-                    <i class="bi bi-check-lg me-1"></i>Approve Payment
+                <button type="submit" class="btn-ocean w-full justify-center text-xs py-2.5">
+                    <i class="bi bi-check2-circle text-base"></i>
+                    <span>Approve &amp; Confirm Booking</span>
                 </button>
             </form>
 
             <form method="POST" action="{{ route('payments.reject', $payment) }}"
                   onsubmit="return confirm('Reject this payment? The booking will remain pending.')">
                 @csrf
-                <button class="btn btn-outline-danger w-100">
-                    <i class="bi bi-x-lg me-1"></i>Reject Payment
+                <button type="submit" class="w-full btn btn-outline-danger btn-sm text-xs font-bold rounded-xl py-2">
+                    <i class="bi bi-x-circle me-1"></i> Decline Payment
                 </button>
             </form>
         </div>
         @endif
 
-        {{-- Guest Info Card --}}
-        <div class="bg-white rounded-xl shadow-sm p-5">
-            <h3 class="font-semibold text-gray-700 mb-3"><i class="bi bi-person-circle me-2"></i>Guest Info</h3>
+        {{-- Guest Profile Card --}}
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <i class="bi bi-person-circle text-sky-600"></i>
+                <span>Guest Information</span>
+            </h3>
             @php $guest = $payment->booking?->user; @endphp
             @if($guest)
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center">
-                    <span class="font-bold text-sky-600 text-lg">{{ strtoupper(substr($guest->name, 0, 1)) }}</span>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-sky-400 text-white font-black flex items-center justify-center text-base shadow-sm">
+                    {{ strtoupper(substr($guest->name, 0, 2)) }}
                 </div>
                 <div>
-                    <p class="font-semibold text-gray-800">{{ $guest->name }}</p>
-                    <p class="text-xs text-gray-400">{{ $guest->email }}</p>
+                    <h4 class="font-bold text-slate-800 text-sm mb-0.5">{{ $guest->name }}</h4>
+                    <p class="text-xs text-slate-400 mb-0">{{ $guest->email }}</p>
                 </div>
             </div>
-            <p class="text-sm text-gray-500">
-                <i class="bi bi-telephone me-1"></i>{{ $guest->phone ?? 'No phone on record' }}
-            </p>
+            <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <i class="bi bi-telephone-fill text-slate-400 me-1.5"></i>
+                <span>{{ $guest->phone ?? 'No phone recorded' }}</span>
+            </div>
             @else
-            <p class="text-sm text-gray-400">No guest data found.</p>
+            <p class="text-xs text-slate-400 mb-0">No registered guest record attached.</p>
             @endif
         </div>
 

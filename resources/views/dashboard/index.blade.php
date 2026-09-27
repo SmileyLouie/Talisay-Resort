@@ -7,276 +7,383 @@
 {{-- Defines the main content area section of the dashboard template --}}
 @section('content')
 
-{{-- Outer wrapper section for header title --}}
-<div class="mb-6">
-    {{-- Main dashboard header title --}}
-    <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
-    {{-- Subtitle containing name of logged-in user --}}
-    <p class="text-gray-500 text-sm">Welcome back, {{ auth()->user()->name }}</p>
-</div>
-
-{{-- Stat cards grid container displaying top high-level metrics --}}
-<div class="row g-4 mb-6">
-    
-    {{-- Card for today's total booking count --}}
-    <div class="col-md-6 col-lg-3">
-        {{-- Card element styled with white background and sky blue border --}}
-        <div class="stat-card bg-white rounded-xl p-5 shadow-sm border-l-4 border-sky-500">
-            {{-- Flex layout grouping labels and icons --}}
-            <div class="flex items-center justify-between">
-                <div>
-                    {{-- Text label indicating card category --}}
-                    <p class="text-sm text-gray-500">Today's Bookings</p>
-                    {{-- Large metric counter number --}}
-                    <h2 class="text-3xl font-bold text-gray-800 mt-1">{{ $todaysBookings }}</h2>
-                </div>
-                {{-- Decorative icon badge on the right --}}
-                <div class="w-12 h-12 rounded-lg bg-sky-100 flex items-center justify-center">
-                    {{-- Calendar check icon matching the category --}}
-                    <i class="bi bi-calendar-check text-sky-600 text-2xl"></i>
-                </div>
-            </div>
+{{-- ── Top Welcome & Overview Header ────────────────────────────────────────── --}}
+<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-2 mb-1">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
+                <i class="bi bi-clock-fill text-[10px] text-sky-600"></i>
+                {{ now()->format('l, F j, Y') }}
+            </span>
         </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
+            Dashboard Overview
+        </h1>
+        <p class="text-sm text-slate-500 mb-0">
+            Welcome back, <span class="font-semibold text-slate-700">{{ auth()->user()->name }}</span>. Here is the operational summary for Talisay Beach Resort today.
+        </p>
     </div>
 
-    {{-- Card for capacity utilisation state of the current date --}}
-    <div class="col-md-6 col-lg-3">
-        {{-- Card element styled with white background and teal border --}}
-        <div class="stat-card bg-white rounded-xl p-5 shadow-sm border-l-4 border-teal-500">
-            {{-- Flex layout grouping labels and progress indicator --}}
-            <div class="flex items-center justify-between">
-                <div>
-                    {{-- Text label indicating card category --}}
-                    <p class="text-sm text-gray-500">Current Capacity</p>
-                    {{-- Progress and values section --}}
-                    <div class="flex items-center gap-3 mt-1">
-                        {{-- Large percentage text dynamically colored by capacity utilization --}}
-                        <h2 class="text-3xl font-bold {{ $capacity->getUtilizationPercent() > 90 ? 'text-red-600' : ($capacity->getUtilizationPercent() > 70 ? 'text-orange-500' : 'text-teal-600') }}">
-                            {{ $capacity->getUtilizationPercent() }}%
-                        </h2>
-                        {{-- Fraction displaying booked slots versus total capacity --}}
-                        <span class="text-xs text-gray-400">{{ $capacity->current_count }}/{{ $capacity->max_capacity }}</span>
-                    </div>
-                </div>
-                {{-- Visual status circle representing the percentage utilization --}}
-                <div class="capacity-circle {{ $capacity->getUtilizationPercent() > 90 ? 'bg-red-100 text-red-600' : ($capacity->getUtilizationPercent() > 70 ? 'bg-orange-100 text-orange-500' : 'bg-teal-100 text-teal-600') }}">
-                    {{ $capacity->getUtilizationPercent() }}%
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Card for tracking current month's cumulative revenue --}}
-    <div class="col-md-6 col-lg-3">
-        {{-- Card element styled with white background and green border --}}
-        <div class="stat-card bg-white rounded-xl p-5 shadow-sm border-l-4 border-green-500">
-            {{-- Flex layout grouping labels and icons --}}
-            <div class="flex items-center justify-between">
-                <div>
-                    {{-- Text label indicating card category --}}
-                    <p class="text-sm text-gray-500">Revenue This Month</p>
-                    {{-- Large currency metric text --}}
-                    <h2 class="text-3xl font-bold text-green-600 mt-1">PHP {{ number_format($monthlyRevenue, 2) }}</h2>
-                </div>
-                {{-- Decorative icon badge on the right --}}
-                <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
-                    {{-- Peso/Dollar sign currency icon --}}
-                    <i class="bi bi-currency-dollar text-green-600 text-2xl"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Card for active emergencies check --}}
-    <div class="col-md-6 col-lg-3">
-        {{-- Card element styled with white background and dynamic warning border --}}
-        <div class="stat-card bg-white rounded-xl p-5 shadow-sm border-l-4 {{ $activeEmergencies > 0 ? 'border-red-500' : 'border-gray-300' }}">
-            {{-- Flex layout grouping labels and icons --}}
-            <div class="flex items-center justify-between">
-                <div>
-                    {{-- Text label indicating card category --}}
-                    <p class="text-sm text-gray-500">Active Emergencies</p>
-                    {{-- Large metric counter, highlighted in red if > 0 --}}
-                    <h2 class="text-3xl font-bold {{ $activeEmergencies > 0 ? 'text-red-600' : 'text-gray-400' }} mt-1">{{ $activeEmergencies }}</h2>
-                </div>
-                {{-- Decorative alarm badge, highlighted/animated in red if > 0 --}}
-                <div class="w-12 h-12 rounded-lg {{ $activeEmergencies > 0 ? 'bg-red-100' : 'bg-gray-100' }} flex items-center justify-center">
-                    {{-- Warning alert triangle icon --}}
-                    <i class="bi bi-exclamation-triangle {{ $activeEmergencies > 0 ? 'text-red-600' : 'text-gray-400' }} text-2xl {{ $activeEmergencies > 0 ? 'badge-emergency' : '' }}"></i>
-                </div>
-            </div>
-        </div>
+    {{-- Quick Action CTA Bar --}}
+    <div class="flex flex-wrap items-center gap-2.5">
+        <a href="{{ route('bookings.index') }}" class="btn-secondary-clean">
+            <i class="bi bi-calendar2-range text-slate-500"></i>
+            <span>All Bookings</span>
+        </a>
+        <a href="{{ route('accommodations.index') }}" class="btn-ocean">
+            <i class="bi bi-building"></i>
+            <span>Manage Units (20)</span>
+        </a>
     </div>
 </div>
 
-{{-- Analytics Dashboard Charts Section --}}
-<div class="row g-4 mb-6">
+{{-- ── 4 Main Operational Metric Cards ────────────────────────────────────────── --}}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
     
-    {{-- Column for Revenue Trends Line Chart --}}
-    <div class="col-lg-6">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">
-                <i class="bi bi-graph-up text-sky-500 me-2"></i>Revenue Trends (6 Months)
-            </h3>
-            <canvas id="revenueChart" height="220"></canvas>
+    {{-- Card 1: Today's Bookings --}}
+    <div class="stat-card-clean flex flex-col justify-between">
+        <div class="flex items-start justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Today's Bookings</p>
+                <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ $todaysBookings }}</h2>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center text-xl font-bold shadow-sm">
+                <i class="bi bi-calendar-check-fill"></i>
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span class="flex items-center gap-1 text-sky-600 font-semibold">
+                <i class="bi bi-arrow-up-right"></i> Active arrivals
+            </span>
+            <span class="text-slate-400">Today</span>
         </div>
     </div>
 
-    {{-- Column for Occupancy Bar Chart --}}
-    <div class="col-lg-6">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">
-                <i class="bi bi-bar-chart text-teal-500 me-2"></i>Occupancy (7 Days)
-            </h3>
-            <canvas id="occupancyChart" height="220"></canvas>
+    {{-- Card 2: Current Capacity --}}
+    <div class="stat-card-clean flex flex-col justify-between">
+        <div class="flex items-start justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Resort Capacity</p>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="text-3xl font-extrabold tracking-tight {{ $capacity->getUtilizationPercent() > 90 ? 'text-rose-600' : ($capacity->getUtilizationPercent() > 70 ? 'text-amber-500' : 'text-teal-600') }}">
+                        {{ $capacity->getUtilizationPercent() }}%
+                    </h2>
+                    <span class="text-xs font-semibold text-slate-400">
+                        {{ $capacity->current_count }}/{{ $capacity->max_capacity }}
+                    </span>
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl {{ $capacity->getUtilizationPercent() > 90 ? 'bg-rose-50 text-rose-600 border-rose-100' : ($capacity->getUtilizationPercent() > 70 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-teal-50 text-teal-600 border-teal-100') }} border flex items-center justify-center text-xl font-bold shadow-sm">
+                <i class="bi bi-pie-chart-fill"></i>
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100">
+            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div class="h-2 rounded-full transition-all duration-500 {{ $capacity->getUtilizationPercent() > 90 ? 'bg-rose-500' : ($capacity->getUtilizationPercent() > 70 ? 'bg-amber-500' : 'bg-teal-500') }}" style="width: {{ min($capacity->getUtilizationPercent(), 100) }}%"></div>
+            </div>
         </div>
     </div>
 
-    {{-- Column for Popular Packages Doughnut Chart --}}
-    <div class="col-lg-6">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">
-                <i class="bi bi-pie-chart text-orange-500 me-2"></i>Popular Packages
-            </h3>
-            <canvas id="packagesChart" height="220"></canvas>
+    {{-- Card 3: Monthly Revenue --}}
+    <div class="stat-card-clean flex flex-col justify-between">
+        <div class="flex items-start justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Monthly Revenue</p>
+                <h2 class="text-2xl sm:text-3xl font-extrabold text-emerald-600 tracking-tight">
+                    ₱{{ number_format($monthlyRevenue, 2) }}
+                </h2>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xl font-bold shadow-sm">
+                <i class="bi bi-wallet2"></i>
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span class="flex items-center gap-1 text-emerald-600 font-semibold">
+                <i class="bi bi-check-circle-fill text-[11px]"></i> Verified payments
+            </span>
+            <span class="text-slate-400">{{ now()->format('M Y') }}</span>
         </div>
     </div>
 
-    {{-- Column for Sentiment Analysis Pie Chart --}}
-    <div class="col-lg-6">
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">
-                <i class="bi bi-emoji-smile text-yellow-500 me-2"></i>Guest Sentiment Analysis
-            </h3>
-            <canvas id="sentimentChart" height="220"></canvas>
+    {{-- Card 4: Accommodations Units --}}
+    <div class="stat-card-clean flex flex-col justify-between">
+        <div class="flex items-start justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Room &amp; Cottage</p>
+                <div class="flex items-baseline gap-1.5">
+                    <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ $activeUnits }}</h2>
+                    <span class="text-sm font-semibold text-slate-400">/ {{ $totalUnits }} Available</span>
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-xl font-bold shadow-sm">
+                <i class="bi bi-house-door-fill"></i>
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span class="font-medium text-indigo-600">10 Rooms • 10 Cottages</span>
+            <a href="{{ route('accommodations.index') }}" class="text-sky-600 font-semibold hover:underline no-underline">View</a>
         </div>
     </div>
 </div>
 
-{{-- Main body row grid --}}
-<div class="row g-4">
+{{-- ── Feed & Side Actions Grid ───────────────────────────────────────────── --}}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
     
-    {{-- Left column carrying live booking feeds --}}
-    <div class="col-lg-8">
-        {{-- Booking table wrapper card --}}
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            {{-- Header within the booking card --}}
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">
-                    <i class="bi bi-broadcast text-sky-500 me-2"></i>Live Booking Feed
+    {{-- Booking Feed (2 cols) --}}
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 mb-0 flex items-center gap-2">
+                    <i class="bi bi-calendar-check-fill text-sky-500"></i>
+                    <span>Booking Feed</span>
                 </h3>
-                {{-- Small subtext label for feed update indicator --}}
-                <span class="text-xs text-gray-400">Auto-updates</span>
+                <p class="text-xs text-slate-400 mb-0">Incoming reservations and status changes</p>
             </div>
-            {{-- Table container for responsiveness --}}
-            <div class="table-responsive">
-                {{-- Feed data table styled with Bootstrap --}}
-                <table class="table table-hover text-sm" id="bookingFeedTable">
-                    {{-- Header columns of the feed --}}
-                    <thead class="table-light">
-                        <tr>
-                            <th>Ref #</th>
-                            <th>Guest</th>
-                            <th>Package</th>
-                            <th>Date</th>
-                            <th>Guests</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    {{-- Body block displaying loaded bookings --}}
-                    <tbody>
-                        {{-- Iterate through recent bookings --}}
-                        @foreach($recentBookings as $booking)
-                        {{-- Feed row styled with custom tracking class --}}
-                        <tr class="booking-row" data-id="{{ $booking->id }}">
-                            {{-- Unique reference string cell --}}
-                            <td class="font-mono text-sky-600">{{ $booking->reference_no }}</td>
-                            {{-- Guest name display cell --}}
-                            <td>{{ $booking->user->name }}</td>
-                            {{-- Booked package title cell --}}
-                            <td>{{ $booking->package->name }}</td>
-                            {{-- Booked date calendar text --}}
-                            <td>{{ $booking->booking_date->format('M d, Y') }}</td>
-                            {{-- Total guest headcount cell --}}
-                            <td>{{ $booking->guests_count }}</td>
-                            {{-- Status badges containing dynamic color labels --}}
-                            <td>
-                                @php
-                                    // Local map array matching statuses to Bootstrap colors
-                                    $colors = ['pending' => 'warning', 'paid' => 'success', 'checked_in' => 'info', 'checked_out' => 'secondary', 'cancelled' => 'danger', 'completed' => 'primary'];
-                                @endphp
-                                {{-- Styled status badge output --}}
-                                <span class="badge bg-{{ $colors[$booking->status] ?? 'secondary' }}">{{ ucfirst(str_replace('_', ' ', $booking->status)) }}</span>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+            <a href="{{ route('bookings.index') }}" class="text-xs font-bold text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1 no-underline">
+                View All <i class="bi bi-arrow-right text-[10px]"></i>
+            </a>
+        </div>
+
+        <div class="table-responsive flex-1">
+            <table class="table-clean" id="bookingFeedTable">
+                <thead>
+                    <tr>
+                        <th>Ref #</th>
+                        <th>Guest</th>
+                        <th>Room &amp; Cottage</th>
+                        <th>Date</th>
+                        <th>Guests</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($recentBookings as $booking)
+                    <tr class="booking-row" data-id="{{ $booking->id }}">
+                        <td>
+                            <span class="font-mono text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200/60">
+                                {{ $booking->reference_no }}
+                            </span>
+                            @if($booking->booking_type === 'special_resort')
+                            <div class="mt-1">
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                    <i class="bi bi-stars"></i> Exclusive
+                                </span>
+                            </div>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="font-semibold text-slate-800">{{ $booking->guest_name }}</div>
+                            <div class="text-[11px] text-slate-400">{{ $booking->guest_contact }}</div>
+                        </td>
+                        <td>
+                            <span class="font-medium text-slate-700">
+                                {{ $booking->booking_type === 'special_resort' ? 'All 20 Units (Full Resort)' : ($booking->accommodationUnit->unit_number ?? 'Room / Cottage') }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="text-xs font-medium text-slate-600">{{ $booking->booking_date->format('M d, Y') }}</span>
+                        </td>
+                        <td>
+                            <span class="text-xs font-semibold text-slate-700">{{ $booking->guests_count }}</span>
+                        </td>
+                        <td>
+                            @php
+                                $badgeStyles = [
+                                    'pending'     => 'bg-amber-50 text-amber-700 border-amber-200',
+                                    'paid'        => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                    'checked_in'  => 'bg-sky-50 text-sky-700 border-sky-200',
+                                    'checked_out' => 'bg-slate-100 text-slate-700 border-slate-200',
+                                    'completed'   => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                                    'cancelled'   => 'bg-rose-50 text-rose-700 border-rose-200',
+                                ];
+                            @endphp
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 {{ $badgeStyles[$booking->status] ?? 'bg-slate-100 text-slate-600 border-slate-200' }}">
+                                {{ ucfirst(str_replace('_', ' ', $booking->status)) }}
+                            </span>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6" class="text-center py-10 text-slate-400">
+                            <i class="bi bi-calendar-x text-3xl block mb-2 text-slate-300"></i>
+                            No recent reservations found.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 
-    {{-- Right column carrying sidebar elements --}}
-    <div class="col-lg-4">
+    {{-- Right Column (Quick Actions & Upcoming) --}}
+    <div class="space-y-6">
         
-        {{-- Quick action dashboard navigation card --}}
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
-            {{-- Header card --}}
-            <h3 class="text-lg font-bold text-gray-800 mb-3">Quick Actions</h3>
-            {{-- Grid stack layout for buttons --}}
-            <div class="d-grid gap-2">
-                {{-- Check if authenticated user is admin --}}
-                @can('role', 'admin')
-                {{-- Button directing to packages list creation --}}
-                <a href="{{ route('packages.index') }}" class="btn btn-outline-sky btn-sm"><i class="bi bi-plus-circle me-1"></i> Add Package</a>
-                {{-- Button directing to user creation view --}}
-                <a href="{{ route('users.create') }}" class="btn btn-outline-teal btn-sm"><i class="bi bi-person-plus me-1"></i> Add Staff</a>
-                @endcan
-                {{-- Button directing to all bookings lists --}}
-                <a href="{{ route('bookings.index') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-calendar me-1"></i> View Bookings</a>
-                {{-- Button directing to emergencies dashboard --}}
-                <a href="{{ route('emergencies.index') }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-exclamation-triangle me-1"></i> Emergencies</a>
+        {{-- Quick Actions Card --}}
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <i class="bi bi-lightning-charge-fill text-amber-500"></i>
+                <span>Quick Operations</span>
+            </h3>
+            
+            <div class="space-y-2">
+                @if(auth()->user()->isAdmin())
+                <a href="{{ route('accommodations.index') }}" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 hover:border-sky-200 text-slate-700 hover:text-sky-700 transition no-underline text-xs font-semibold">
+                    <span class="flex items-center gap-2.5">
+                        <i class="bi bi-building text-sky-600 text-base"></i>
+                        <span>Manage Room &amp; Cottage</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-slate-400 text-[10px]"></i>
+                </a>
+
+                <a href="{{ route('tasks.staff') }}" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 hover:border-sky-200 text-slate-700 hover:text-sky-700 transition no-underline text-xs font-semibold">
+                    <span class="flex items-center gap-2.5">
+                        <i class="bi bi-person-lines-fill text-sky-600 text-base"></i>
+                        <span>Staff &amp; Role Management</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-slate-400 text-[10px]"></i>
+                </a>
+                @endif
+
+                <a href="{{ route('bookings.index') }}" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 hover:border-sky-200 text-slate-700 hover:text-sky-700 transition no-underline text-xs font-semibold">
+                    <span class="flex items-center gap-2.5">
+                        <i class="bi bi-calendar-check-fill text-sky-600 text-base"></i>
+                        <span>Search All Reservations</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-slate-400 text-[10px]"></i>
+                </a>
+
+                <a href="{{ route('payments.index') }}" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 hover:border-emerald-200 text-slate-700 hover:text-emerald-700 transition no-underline text-xs font-semibold">
+                    <span class="flex items-center gap-2.5">
+                        <i class="bi bi-credit-card-2-front-fill text-emerald-600 text-base"></i>
+                        <span>Verify Guest Payments</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-slate-400 text-[10px]"></i>
+                </a>
+
+                <a href="{{ route('reviews.index') }}" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 hover:border-amber-200 text-slate-700 hover:text-amber-700 transition no-underline text-xs font-semibold">
+                    <span class="flex items-center gap-2.5">
+                        <i class="bi bi-star-fill text-amber-500 text-base"></i>
+                        <span>Moderate Guest Reviews</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-slate-400 text-[10px]"></i>
+                </a>
             </div>
         </div>
 
-        {{-- Upcoming reservations card --}}
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            {{-- Header upcoming reservation label --}}
-            <h3 class="text-lg font-bold text-gray-800 mb-3">Upcoming Reservations</h3>
-            {{-- Forelse loops matching future records --}}
-            @forelse($upcomingReservations as $res)
-            {{-- Display card flexbox layout for individual guest item --}}
-            <div class="flex items-center gap-3 mb-3 p-2 rounded-lg hover:bg-gray-50">
-                {{-- Circular icon --}}
-                <div class="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
-                    <i class="bi bi-person text-sky-600"></i>
+        {{-- Upcoming Reservations Card --}}
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <i class="bi bi-calendar-event text-sky-500"></i>
+                <span>Upcoming Check-Ins</span>
+            </h3>
+
+            <div class="space-y-3">
+                @forelse($upcomingReservations as $res)
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
+                            {{ strtoupper(substr($res->user->name, 0, 2)) }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-slate-900 truncate mb-0">{{ $res->user->name }}</p>
+                            <p class="text-[11px] text-slate-500 truncate mb-0">
+                                {{ $res->accommodationUnit->unit_number ?? 'Exclusive Resort' }} • {{ $res->booking_date->format('M d') }}
+                            </p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $res->status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }} flex-shrink-0">
+                        {{ ucfirst($res->status) }}
+                    </span>
                 </div>
-                {{-- Name and package title area --}}
-                <div class="flex-1">
-                    <p class="text-sm font-medium">{{ $res->user->name }}</p>
-                    <p class="text-xs text-gray-500">{{ $res->package->name }} - {{ $res->booking_date->format('M d') }}</p>
+                @empty
+                <div class="text-center py-6 text-slate-400">
+                    <p class="text-xs font-medium mb-0">No upcoming check-ins in the next 48 hours.</p>
                 </div>
-                {{-- Small badge indicating booking status --}}
-                <span class="badge bg-{{ $res->status === 'paid' ? 'success' : 'warning' }}">{{ ucfirst($res->status) }}</span>
+                @endforelse
             </div>
-            {{-- Alternative block shown if collection list is empty --}}
-            @empty
-            <p class="text-gray-400 text-sm">No upcoming reservations</p>
-            @endforelse
+        </div>
+
+    </div>
+</div>
+
+{{-- ── Analytics & Trends Grid ────────────────────────────────────────────── --}}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    
+    {{-- Revenue Trends Chart --}}
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 mb-0.5 flex items-center gap-2">
+                    <i class="bi bi-graph-up-arrow text-sky-500"></i>
+                    <span>Revenue Trends</span>
+                </h3>
+                <p class="text-xs text-slate-400 mb-0">Monthly earnings summary (Past 6 Months)</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200/60">PHP</span>
+        </div>
+        <div class="relative" style="height: 230px;">
+            <canvas id="revenueChart"></canvas>
+        </div>
+    </div>
+
+    {{-- Occupancy Bar Chart --}}
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 mb-0.5 flex items-center gap-2">
+                    <i class="bi bi-bar-chart-line-fill text-teal-500"></i>
+                    <span>Occupancy Rate</span>
+                </h3>
+                <p class="text-xs text-slate-400 mb-0">Daily guest utilization percentage (Past 7 Days)</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200/60">% Rate</span>
+        </div>
+        <div class="relative" style="height: 230px;">
+            <canvas id="occupancyChart"></canvas>
+        </div>
+    </div>
+
+    {{-- Popular Accommodations Doughnut --}}
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 mb-0.5 flex items-center gap-2">
+                    <i class="bi bi-pie-chart-fill text-amber-500"></i>
+                    <span>Most Booked Rooms &amp; Cottages</span>
+                </h3>
+                <p class="text-xs text-slate-400 mb-0">Popularity distribution across rooms & cottages</p>
+            </div>
+        </div>
+        <div class="relative" style="height: 230px;">
+            <canvas id="accommodationsChart"></canvas>
+        </div>
+    </div>
+
+    {{-- Guest Sentiment Analysis --}}
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-base font-bold text-slate-900 mb-0.5 flex items-center gap-2">
+                    <i class="bi bi-emoji-smile-fill text-emerald-500"></i>
+                    <span>Guest Feedback Sentiment</span>
+                </h3>
+                <p class="text-xs text-slate-400 mb-0">Review ratings ratio and guest satisfaction</p>
+            </div>
+        </div>
+        <div class="relative" style="height: 230px;">
+            <canvas id="sentimentChart"></canvas>
         </div>
     </div>
 </div>
+
 @endsection
 
-{{-- Push additional chart scripts to base app layouts --}}
+{{-- Push chart scripts --}}
 @push('scripts')
 <script>
-// Load occupancy data labels from controller passed array
+// Occupancy Chart
 const occupancyLabels = {{ Js::from($occupancyData->pluck('date')) }};
-// Load occupancy utilization data numbers
 const occupancyValues = {{ Js::from($occupancyData->pluck('utilization')) }};
-
-// Render the 7-day occupancy statistics chart
 const occupancyCtx = document.getElementById('occupancyChart').getContext('2d');
 new Chart(occupancyCtx, {
     type: 'bar',
@@ -285,107 +392,143 @@ new Chart(occupancyCtx, {
         datasets: [{
             label: 'Occupancy %',
             data: occupancyValues,
-            backgroundColor: 'rgba(20, 184, 166, 0.6)',
-            borderColor: 'rgb(20, 184, 166)',
-            borderWidth: 1,
-            borderRadius: 6,
+            backgroundColor: 'rgba(14, 165, 233, 0.75)',
+            borderColor: '#0284c7',
+            borderWidth: 1.5,
+            borderRadius: 8,
+            hoverBackgroundColor: '#0ea5e9'
         }]
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-            y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }
+            y: { 
+                beginAtZero: true, 
+                max: 100, 
+                ticks: { callback: v => v + '%' },
+                grid: { color: '#f1f5f9' }
+            },
+            x: {
+                grid: { display: false }
+            }
         }
     }
 });
 
-// Load monthly revenue trend labels
+// Revenue Trends Line Chart
 const revenueLabels = {{ Js::from(collect($revenueTrends)->pluck('month')) }};
-// Load monthly revenue totals
 const revenueValues = {{ Js::from(collect($revenueTrends)->pluck('total')) }};
-
-// Render the 6-month revenue trends chart
 const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+
+const revGradient = revenueCtx.createLinearGradient(0, 0, 0, 200);
+revGradient.addColorStop(0, 'rgba(14, 165, 233, 0.35)');
+revGradient.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
+
 new Chart(revenueCtx, {
     type: 'line',
     data: {
         labels: revenueLabels,
         datasets: [{
-            label: 'Revenue (PHP)',
+            label: 'Revenue (₱)',
             data: revenueValues,
-            backgroundColor: 'rgba(14, 165, 233, 0.1)',
-            borderColor: 'rgb(14, 165, 233)',
-            borderWidth: 2,
-            tension: 0.3,
+            backgroundColor: revGradient,
+            borderColor: '#0284c7',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#0ea5e9',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            tension: 0.35,
             fill: true,
         }]
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return '₱' + Number(context.parsed.y).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    }
+                }
+            }
+        },
         scales: {
-            y: { beginAtZero: true }
+            y: { 
+                beginAtZero: true,
+                grid: { color: '#f1f5f9' },
+                ticks: {
+                    callback: v => '₱' + Number(v).toLocaleString()
+                }
+            },
+            x: {
+                grid: { display: false }
+            }
         }
     }
 });
 
-// Load popular package names
-const packageLabels = {{ Js::from($popularPackages->pluck('name')) }};
-// Load popular package booking counts
-const packageValues = {{ Js::from($popularPackages->pluck('count')) }};
-
-// Render the popular packages doughnut chart
-const packagesCtx = document.getElementById('packagesChart').getContext('2d');
-new Chart(packagesCtx, {
+// Accommodations Popularity Chart
+const accommodationLabels = {{ Js::from($popularAccommodations->pluck('unit_number')) }};
+const accommodationValues = {{ Js::from($popularAccommodations->pluck('bookings_count')) }};
+const accommodationsCtx = document.getElementById('accommodationsChart').getContext('2d');
+new Chart(accommodationsCtx, {
     type: 'doughnut',
     data: {
-        labels: packageLabels,
+        labels: accommodationLabels,
         datasets: [{
-            data: packageValues,
+            data: accommodationValues,
             backgroundColor: [
+                '#0284c7',
                 '#0ea5e9',
                 '#14b8a6',
                 '#f59e0b',
-                '#ef4444',
                 '#8b5cf6'
-            ]
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
         }]
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'bottom' }
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Plus Jakarta Sans', size: 11 } } }
         }
     }
 });
 
-// Load sentiment count data
+// Sentiment Analysis Chart
 const sentimentData = {{ Js::from($sentimentData) }};
-
-// Render review sentiment pie chart
 const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
 new Chart(sentimentCtx, {
     type: 'pie',
     data: {
-        labels: ['Positive (4-5 Stars)', 'Neutral (3 Stars)', 'Negative (1-2 Stars)'],
+        labels: ['Positive (4-5★)', 'Neutral (3★)', 'Negative (1-2★)'],
         datasets: [{
             data: [sentimentData.positive, sentimentData.neutral, sentimentData.negative],
             backgroundColor: [
                 '#10b981',
                 '#f59e0b',
-                '#ef4444'
-            ]
+                '#f43f5e'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
         }]
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'bottom' }
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Plus Jakarta Sans', size: 11 } } }
         }
     }
 });
 
-// Real-time booking updates via Pusher connections
+// Real-time booking feed via Pusher
 const bookingPusher = new Pusher('{{ config("broadcasting.connections.pusher.key", "talisay-key") }}', {
     cluster: '{{ config("broadcasting.connections.pusher.options.cluster", "mt1") }}',
     wsHost: '{{ config("broadcasting.connections.pusher.options.host", "127.0.0.1") }}',
@@ -394,29 +537,40 @@ const bookingPusher = new Pusher('{{ config("broadcasting.connections.pusher.key
     disableStats: true,
 });
 
-// Subscribe to staff-bookings channel
 const bookingChannel = bookingPusher.subscribe('staff-bookings');
 bookingChannel.bind('App\\Events\\BookingCreated', function(data) {
-    // Get table body DOM element
     const tbody = document.querySelector('#bookingFeedTable tbody');
-    // Define bootstrap status class mappings
-    const statusMap = { pending: 'warning', paid: 'success', checked_in: 'info', cancelled: 'danger', completed: 'primary' };
-    // Create new table row
+    const badgeStyles = {
+        pending: 'bg-amber-50 text-amber-700 border-amber-200',
+        paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        checked_in: 'bg-sky-50 text-sky-700 border-sky-200',
+        checked_out: 'bg-slate-100 text-slate-700 border-slate-200',
+        completed: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        cancelled: 'bg-rose-50 text-rose-700 border-rose-200'
+    };
+
     const row = document.createElement('tr');
-    // Add styling classes
     row.className = 'booking-row';
     row.dataset.id = data.id;
     row.style.animation = 'fadeIn 0.5s ease';
-    // Fill dynamic details into the row cells
     row.innerHTML = `
-        <td class="font-mono text-sky-600">${data.reference_no}</td>
-        <td>${data.guest_name}</td>
-        <td>${data.package_name}</td>
-        <td>${data.booking_date}</td>
-        <td>${data.guests_count}</td>
-        <td><span class="badge bg-${statusMap[data.status] || 'secondary'}">${data.status.charAt(0).toUpperCase() + data.status.slice(1)}</span></td>
+        <td>
+            <span class="font-mono text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200/60">${data.reference_no}</span>
+        </td>
+        <td>
+            <div class="font-semibold text-slate-800">${data.guest_name}</div>
+        </td>
+        <td>
+            <span class="font-medium text-slate-700">${data.accommodation_unit_name || data.unit_name || 'Accommodation'}</span>
+        </td>
+        <td><span class="text-xs font-medium text-slate-600">${data.booking_date}</span></td>
+        <td><span class="text-xs font-semibold text-slate-700">${data.guests_count}</span></td>
+        <td>
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${badgeStyles[data.status] || 'bg-slate-100 text-slate-600'}">
+                ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}
+            </span>
+        </td>
     `;
-    // Insert the row at the top of the booking feed list
     tbody.insertBefore(row, tbody.firstChild);
 });
 </script>

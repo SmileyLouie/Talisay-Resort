@@ -8,13 +8,13 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * The root URL now shows the landing page (not a redirect to login).
      */
-    public function test_the_application_redirects_unauthenticated_user_to_login(): void
+    public function test_the_application_shows_landing_page_to_unauthenticated_user(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(302)->assertRedirect('/login');
+        $response->assertStatus(200);
     }
 
     public function test_the_login_page_is_accessible(): void

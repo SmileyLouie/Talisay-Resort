@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\CapacitySchedule;
-use App\Models\Package;
+use App\Models\AccommodationUnit;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -15,7 +15,7 @@ class BookingController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Booking::with(['user', 'package', 'payment']);
+        $query = Booking::with(['user', 'accommodationUnit', 'payment']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -41,7 +41,7 @@ class BookingController extends Controller
 
     public function myBookings(Request $request)
     {
-        $bookings = Booking::with(['package', 'payment', 'review'])
+        $bookings = Booking::with(['accommodationUnit', 'payment', 'review'])
             ->where('user_id', $request->user()->id)
             ->orderBy('created_at', 'desc')
             ->paginate(10);
@@ -52,19 +52,19 @@ class BookingController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'package_id' => 'required|exists:packages,id',
-            'booking_date' => 'required|date|after_or_equal:today',
-            'time_slot' => 'nullable|string',
-            'guests_count' => 'required|integer|min:1',
-            'special_requests' => 'nullable|string',
+            'accommodation_unit_id' => 'required|exists:accommodation_units,id',
+            'booking_date'          => 'required|date|after_or_equal:today',
+            'time_slot'             => 'nullable|string',
+            'guests_count'          => 'required|integer|min:1',
+            'special_requests'      => 'nullable|string',
         ]);
 
-        $package = Package::findOrFail($request->package_id);
+        $unit = AccommodationUnit::findOrFail($request->accommodation_unit_id);
 
         // Check slot lock to prevent double-booking
-        $lockKey = "booking_lock_{$request->package_id}_{$request->booking_date}";
+        $lockKey = "booking_lock_{$request->accommodation_unit_id}_{$request->booking_date}";
         if (Cache::has($lockKey)) {
-            return response()->json(['error' => 'Someone is currently booking this slot. Please try again in a moment.'], 409);
+            return response()->json(['error' => 'Someone is currently booking this accommodation. Please try again in a moment.'], 409);
         }
 
         // Lock slot for 5 minutes
@@ -92,15 +92,15 @@ class BookingController extends Controller
             }
 
             $booking = Booking::create([
-                'reference_no' => Booking::generateReferenceNo(),
-                'user_id' => $request->user()->id,
-                'package_id' => $request->package_id,
-                'booking_date' => $request->booking_date,
-                'time_slot' => $request->time_slot,
-                'guests_count' => $request->guests_count,
-                'special_requests' => $request->special_requests,
-                'status' => 'pending',
-                'total_amount' => $package->price * $request->guests_count,
+                'reference_no'          => Booking::generateReferenceNo(),
+                'user_id'               => $request->user()->id,
+                'accommodation_unit_id' => $request->accommodation_unit_id,
+                'booking_date'          => $request->booking_date,
+                'time_slot'             => $request->time_slot ?? '2:00 PM Check-in · 11:00 AM Check-out',
+                'guests_count'          => $request->guests_count,
+                'special_requests'      => $request->special_requests,
+                'status'                => 'pending',
+                'total_amount'          => $unit->price_per_night,
             ]);
 
             // Update capacity
@@ -111,7 +111,7 @@ class BookingController extends Controller
             // Release slot lock
             Cache::forget($lockKey);
 
-            $booking->load(['package', 'user']);
+            $booking->load(['accommodationUnit', 'user']);
 
             // Broadcast event
             broadcast(new \App\Events\BookingCreated($booking))->toOthers();
@@ -130,14 +130,14 @@ class BookingController extends Controller
 
     public function show(Booking $booking)
     {
-        $booking->load(['user', 'package', 'payment', 'memoryTimeline', 'review']);
+        $booking->load(['user', 'accommodationUnit', 'payment', 'review']);
         return response()->json($booking);
     }
 
     public function update(Request $request, Booking $booking)
     {
         $request->validate([
-            'status' => 'sometimes|in:pending,paid,checked_in,checked_out,cancelled,completed',
+            'status'              => 'sometimes|in:pending,paid,checked_in,checked_out,cancelled,completed',
             'cancellation_reason' => 'required_if:status,cancelled',
         ]);
 
@@ -145,8 +145,8 @@ class BookingController extends Controller
 
         if ($request->status === 'cancelled' && $oldStatus !== 'cancelled') {
             $booking->update([
-                'status' => 'cancelled',
-                'cancelled_at' => now(),
+                'status'              => 'cancelled',
+                'cancelled_at'        => now(),
                 'cancellation_reason' => $request->cancellation_reason,
             ]);
 
@@ -164,7 +164,7 @@ class BookingController extends Controller
         broadcast(new \App\Events\BookingUpdated($booking));
 
         return response()->json([
-            'booking' => $booking->fresh()->load(['user', 'package', 'payment']),
+            'booking' => $booking->fresh()->load(['user', 'accommodationUnit', 'payment']),
             'message' => 'Booking updated successfully.',
         ]);
     }
@@ -172,7 +172,6 @@ class BookingController extends Controller
     public function availability(Request $request)
     {
         $request->validate([
-            'package_id' => 'sometimes|exists:packages,id',
             'month' => 'sometimes|date_format:Y-m',
         ]);
 
@@ -197,11 +196,11 @@ class BookingController extends Controller
             }
 
             $availability[] = [
-                'date' => $date->format('Y-m-d'),
-                'status' => $status,
+                'date'          => $date->format('Y-m-d'),
+                'status'        => $status,
                 'current_count' => $currentCount,
-                'max_capacity' => $maxCapacity,
-                'utilization' => round($utilization, 1),
+                'max_capacity'  => $maxCapacity,
+                'utilization'   => round($utilization, 1),
             ];
         }
 
@@ -219,8 +218,8 @@ class BookingController extends Controller
         }
 
         $booking->update([
-            'status' => 'cancelled',
-            'cancelled_at' => now(),
+            'status'              => 'cancelled',
+            'cancelled_at'        => now(),
             'cancellation_reason' => $request->cancellation_reason,
         ]);
 

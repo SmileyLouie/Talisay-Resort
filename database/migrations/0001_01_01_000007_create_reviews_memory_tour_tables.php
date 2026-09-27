@@ -21,33 +21,6 @@ return new class extends Migration
             $table->index('booking_id');
         });
 
-        Schema::create('memory_timeline_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('booking_id')->constrained()->onDelete('cascade');
-            $table->enum('type', ['photo', 'video', 'note']);
-            $table->string('file_path')->nullable();
-            $table->text('caption')->nullable();
-            $table->boolean('is_selected')->default(false);
-            $table->timestamps();
-
-            $table->index('user_id');
-            $table->index('booking_id');
-        });
-
-        Schema::create('memory_timelines', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('booking_id')->constrained()->onDelete('cascade');
-            $table->string('title');
-            $table->string('generated_pdf_path')->nullable();
-            $table->boolean('is_generated')->default(false);
-            $table->timestamps();
-
-            $table->index('user_id');
-            $table->index('booking_id');
-        });
-
         Schema::create('tour_assets', function (Blueprint $table) {
             $table->id();
             $table->string('title');
@@ -64,8 +37,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('tour_assets');
-        Schema::dropIfExists('memory_timelines');
-        Schema::dropIfExists('memory_timeline_items');
         Schema::dropIfExists('reviews');
     }
 };
+

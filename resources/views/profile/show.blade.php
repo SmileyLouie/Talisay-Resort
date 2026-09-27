@@ -1,4 +1,5 @@
 @extends('layouts.app')
+
 @section('title', 'My Profile - Talisay Smart Tourism')
 
 @push('styles')
@@ -7,49 +8,83 @@
         position: relative;
         width: 110px;
         height: 110px;
-        margin: 0 auto 16px;
+        margin: 0 auto 10px;
     }
     .avatar-img {
         width: 100%;
         height: 100%;
-        border-radius: 50%;
+        border-radius: 24px;
         object-fit: cover;
         border: 4px solid #e0f2fe;
+        box-shadow: 0 4px 14px rgba(14, 165, 233, 0.15);
     }
     .avatar-placeholder {
         width: 100%;
         height: 100%;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #0ea5e9, #14b8a6);
+        border-radius: 24px;
+        background: linear-gradient(135deg, #0284c7, #0ea5e9);
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 700;
+        font-weight: 800;
         font-size: 36px;
         border: 4px solid #e0f2fe;
+        box-shadow: 0 4px 14px rgba(14, 165, 233, 0.2);
     }
-    .info-item {
-        padding: 12px 16px;
+    .btn-remove-avatar {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #e11d48;
+        background: #fff1f2;
+        border: 1px solid #fecdd3;
         border-radius: 10px;
-        background: #f8fafc;
-        border: 1px solid #f1f5f9;
-        margin-bottom: 8px;
+        padding: 5px 12px;
+        cursor: pointer;
+        transition: background 0.18s, color 0.18s;
+        text-decoration: none;
+    }
+    .btn-remove-avatar:hover {
+        background: #ffe4e6;
+        color: #be123c;
     }
 </style>
 @endpush
 
 @section('content')
 
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">My Profile</h1>
-    <p class="text-gray-500 text-sm">Manage your personal account settings and security preferences</p>
+{{-- Header --}}
+<div class="mb-8">
+    <div class="flex items-center gap-2 mb-1">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
+            <i class="bi bi-person-fill text-[10px] text-sky-600"></i>
+            Account Profile
+        </span>
+    </div>
+    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
+        My Profile Settings
+    </h1>
+    <p class="text-sm text-slate-500 mb-0">
+        Manage your personal profile details, account avatar, and security passwords.
+    </p>
 </div>
 
-<div class="row g-4">
-    {{-- Left Profile Card --}}
-    <div class="col-lg-4">
-        <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    {{-- Left Profile Summary Card --}}
+    <div class="lg:col-span-4">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 text-center">
+
+            {{-- Flash messages --}}
+            @if(session('success'))
+            <div class="mb-4 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                <i class="bi bi-check-circle-fill me-1"></i> {{ session('success') }}
+            </div>
+            @endif
+
             <div class="avatar-wrapper">
                 @if(auth()->user()->avatar)
                     <img src="{{ Storage::url(auth()->user()->avatar) }}" id="avatarPreview" class="avatar-img" alt="{{ auth()->user()->name }}">
@@ -61,60 +96,75 @@
                 @endif
             </div>
 
-            <h3 class="font-bold text-xl text-gray-800 mb-1">{{ auth()->user()->name }}</h3>
-            <p class="text-sm text-gray-500 mb-3">{{ auth()->user()->email }}</p>
+            {{-- Remove avatar button (only if user has an avatar) --}}
+            @if(auth()->user()->avatar)
+            <form method="POST" action="{{ route('profile.avatar.destroy') }}" class="mb-3"
+                  onsubmit="return confirm('Remove your profile picture?')">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn-remove-avatar">
+                    <i class="bi bi-trash3-fill"></i>
+                    Remove Photo
+                </button>
+            </form>
+            @endif
+
+            <h3 class="font-extrabold text-lg text-slate-900 mb-0.5">{{ auth()->user()->name }}</h3>
+            <p class="text-xs text-slate-400 mb-3">{{ auth()->user()->email }}</p>
 
             @php
                 $roleBadges = [
-                    'admin' => ['bg' => 'bg-red-100 text-red-700', 'icon' => 'bi-shield-fill', 'label' => 'Administrator'],
-                    'staff' => ['bg' => 'bg-teal-100 text-teal-700', 'icon' => 'bi-person-badge-fill', 'label' => 'Resort Staff'],
-                    'tourist' => ['bg' => 'bg-blue-100 text-blue-700', 'icon' => 'bi-person-fill', 'label' => 'Tourist'],
+                    'admin'   => ['bg' => 'bg-rose-50 text-rose-700 border-rose-200', 'icon' => 'bi-shield-fill', 'label' => 'Administrator'],
+                    'staff'   => ['bg' => 'bg-teal-50 text-teal-700 border-teal-200', 'icon' => 'bi-person-badge-fill', 'label' => 'Resort Staff'],
+                    'tourist' => ['bg' => 'bg-sky-50 text-sky-700 border-sky-200', 'icon' => 'bi-person-fill', 'label' => 'Tourist Guest'],
                 ];
-                $b = $roleBadges[auth()->user()->role] ?? ['bg' => 'bg-gray-100 text-gray-700', 'icon' => 'bi-person', 'label' => ucfirst(auth()->user()->role)];
+                $b = $roleBadges[auth()->user()->role] ?? ['bg' => 'bg-slate-100 text-slate-700 border-slate-200', 'icon' => 'bi-person', 'label' => ucfirst(auth()->user()->role)];
             @endphp
 
-            <span class="badge {{ $b['bg'] }} px-3 py-2 text-xs font-semibold rounded-full mb-4">
-                <i class="bi {{ $b['icon'] }} me-1"></i>{{ $b['label'] }}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border {{ $b['bg'] }} mb-6">
+                <i class="bi {{ $b['icon'] }}"></i>
+                <span>{{ $b['label'] }}</span>
             </span>
 
-            <hr class="my-4">
-
-            {{-- Account Information Summary --}}
-            <div class="text-start">
-                <div class="info-item">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Phone</p>
-                    <p class="text-sm font-semibold text-gray-700 mb-0">{{ auth()->user()->phone ?? 'Not set' }}</p>
+            <div class="space-y-2.5 text-start pt-4 border-t border-slate-100">
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Phone Number</span>
+                    <span class="text-xs font-bold text-slate-700">{{ auth()->user()->phone ?? 'Not set' }}</span>
                 </div>
-                <div class="info-item">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
-                    <span class="badge bg-success text-xs">
-                        <i class="bi bi-check-circle me-1"></i>Active Account
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Account Status</span>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Active &amp; Verified
                     </span>
                 </div>
-                <div class="info-item">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Member Since</p>
-                    <p class="text-sm font-semibold text-gray-700 mb-0">{{ auth()->user()->created_at->format('F d, Y') }}</p>
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Member Since</span>
+                    <span class="text-xs font-bold text-slate-700">{{ auth()->user()->created_at->format('F d, Y') }}</span>
                 </div>
             </div>
         </div>
     </div>
 
     {{-- Right Form Area --}}
-    <div class="col-lg-8">
-        {{-- Edit Details Card --}}
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
-            <h3 class="font-bold text-lg text-gray-800 mb-4 pb-2 border-b">
-                <i class="bi bi-person-lines-fill text-sky-500 me-2"></i>Personal Details
-            </h3>
+    <div class="lg:col-span-8 space-y-6">
+        
+        {{-- Personal Details Form --}}
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-6">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 mb-0.5">Personal Information</h3>
+                    <p class="text-xs text-slate-400 mb-0">Update your account name, email address, and profile photo</p>
+                </div>
+            </div>
 
             @if($errors->any() && !$errors->has('current_password'))
-            <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+            <div class="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl mb-4 text-xs">
                 <ul class="mb-0 ps-3">
                     @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             @endif
 
@@ -122,50 +172,53 @@
                 @csrf
                 @method('PUT')
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-medium text-sm">Full Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" value="{{ old('name', auth()->user()->name) }}" required>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Full Name</label>
+                        <input type="text" name="name" class="w-full form-control-clean text-xs font-semibold" value="{{ old('name', auth()->user()->name) }}" required>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-medium text-sm">Email Address <span class="text-danger">*</span></label>
-                        <input type="email" name="email" class="form-control" value="{{ old('email', auth()->user()->email) }}" required>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Email Address</label>
+                        <input type="email" name="email" class="w-full form-control-clean text-xs font-semibold" value="{{ old('email', auth()->user()->email) }}" required>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-medium text-sm">Phone Number</label>
-                        <input type="tel" name="phone" class="form-control" value="{{ old('phone', auth()->user()->phone) }}" placeholder="+63-9XX-XXX-XXXX">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Phone Number</label>
+                        <input type="tel" name="phone" class="w-full form-control-clean text-xs" value="{{ old('phone', auth()->user()->phone) }}" placeholder="+63-9XX-XXX-XXXX">
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-medium text-sm">Profile Photo</label>
-                        <input type="file" name="avatar" class="form-control" accept="image/*" onchange="previewImage(this)">
-                        <small class="text-muted text-xs">JPG, PNG or GIF (max 2MB)</small>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Upload New Avatar</label>
+                        <input type="file" name="avatar" class="w-full form-control-clean text-xs" accept="image/*" onchange="previewImage(this)">
+                        <span class="text-[10px] text-slate-400 mt-1 block">JPG, PNG or GIF (max 2MB)</span>
                     </div>
                 </div>
 
-                <div class="mt-4 text-end">
-                    <button type="submit" class="btn btn-primary px-5">
-                        <i class="bi bi-check-lg me-1"></i>Update Profile
+                <div class="mt-6 flex justify-end">
+                    <button type="submit" class="btn-ocean text-xs px-5 py-2.5">
+                        <i class="bi bi-check2-circle text-base"></i>
+                        <span>Save Profile Details</span>
                     </button>
                 </div>
             </form>
         </div>
 
-        {{-- Security / Change Password Card --}}
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="font-bold text-lg text-gray-800 mb-4 pb-2 border-b">
-                <i class="bi bi-shield-lock-fill text-sky-500 me-2"></i>Security & Password
-            </h3>
+        {{-- Security & Password Card --}}
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-6">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900 mb-0.5">Security &amp; Password</h3>
+                    <p class="text-xs text-slate-400 mb-0">Ensure your account uses a strong, unique password</p>
+                </div>
+            </div>
 
             @if($errors->has('current_password') || $errors->has('password'))
-            <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+            <div class="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl mb-4 text-xs">
                 <ul class="mb-0 ps-3">
                     @foreach($errors->get('current_password') as $e) <li>{{ $e }}</li> @endforeach
                     @foreach($errors->get('password') as $e) <li>{{ $e }}</li> @endforeach
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             @endif
 
@@ -173,32 +226,37 @@
                 @csrf
                 @method('PUT')
 
-                <div class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label fw-medium text-sm">Current Password <span class="text-danger">*</span></label>
-                        <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Current Password</label>
+                        <input type="password" name="current_password" class="w-full form-control-clean text-xs" placeholder="Enter your current password" required>
                     </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-medium text-sm">New Password <span class="text-danger">*</span></label>
-                        <input type="password" name="password" class="form-control" placeholder="Min. 8 characters" required>
-                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">New Password</label>
+                            <input type="password" name="password" class="w-full form-control-clean text-xs" placeholder="Minimum 8 characters" required>
+                        </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-medium text-sm">Confirm New Password <span class="text-danger">*</span></label>
-                        <input type="password" name="password_confirmation" class="form-control" placeholder="Repeat new password" required>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Confirm New Password</label>
+                            <input type="password" name="password_confirmation" class="w-full form-control-clean text-xs" placeholder="Repeat new password" required>
+                        </div>
                     </div>
                 </div>
 
-                <div class="mt-4 text-end">
-                    <button type="submit" class="btn btn-outline-sky px-5">
-                        <i class="bi bi-key-fill me-1"></i>Change Password
+                <div class="mt-6 flex justify-end">
+                    <button type="submit" class="btn-secondary-clean text-xs px-5 py-2.5">
+                        <i class="bi bi-shield-lock text-base"></i>
+                        <span>Update Password</span>
                     </button>
                 </div>
             </form>
         </div>
+
     </div>
 </div>
+
 @endsection
 
 @push('scripts')

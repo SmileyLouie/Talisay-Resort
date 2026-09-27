@@ -3,84 +3,87 @@
 // ============================================================
 // Booking.php — Eloquent Model for the 'bookings' Table
 // ============================================================
-// Represents a guest's reservation for a resort package.
+// Represents a guest's reservation for a room or cottage.
 // Contains booking reference, dates, guest count, status,
-// and all relationships to user, package, payment, and reviews.
+// and all relationships to user, accommodation unit, payment, and reviews.
 // ============================================================
 
 namespace App\Models;
 
-// Import the Fillable attribute to declare mass-assignable columns
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-
-// Import HasFactory for test/seeder factory support
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
-// Import the base Eloquent Model class
 use Illuminate\Database\Eloquent\Model;
 
-// Declare which columns can be mass-assigned via create() or fill()
-// This is a security measure to prevent unwanted field injection
 #[Fillable([
-    'reference_no',       // Unique booking reference (e.g., TBR-A1B2C3D4)
-    'user_id',            // Foreign key to the users table (the guest)
-    'package_id',         // Foreign key to the packages table
-    'booking_date',       // The date the guest will visit
-    'time_slot',          // Optional time slot string (e.g., '08:00 AM - 05:00 PM')
-    'guests_count',       // Number of guests included in this booking
-    'status',             // Current status: pending|paid|checked_in|checked_out|cancelled|completed
-    'special_requests',   // Optional text for special guest requests
-    'cancelled_at',       // Timestamp when this booking was cancelled (null if not cancelled)
-    'cancellation_reason',// Reason given for cancellation (required when cancelling)
-    'total_amount',       // Total price = package price × guests_count
+    'reference_no',                     // Unique booking reference (e.g., TBR-A1B2C3D4)
+    'booking_type',                     // 'regular' or 'special_resort'
+    'booking_source',                   // 'online' or 'manual'
+    'user_id',                          // Foreign key to the users table (the guest, nullable for walk-in)
+    'guest_name_manual',                // Walk-in guest name (when no user account)
+    'guest_contact_manual',             // Walk-in guest contact (phone/email)
+    'accommodation_unit_id',            // Foreign key to the accommodation_units table
+    'original_accommodation_unit_id',   // Foreign key to accommodation_units (previous unit before modification)
+    'booking_date',                     // The date the guest will visit / check in
+    'check_in_date',                    // Check-in date for multi-day / special bookings
+    'check_out_date',                   // Check-out date for multi-day / special bookings
+    'nights_count',                     // Number of nights for multi-day bookings
+    'time_slot',                        // Optional time slot string (e.g., '08:00 AM - 05:00 PM')
+    'guests_count',                     // Number of guests included in this booking
+    'status',                           // Current status: pending|paid|checked_in|checked_out|cancelled|completed
+    'admin_approval_status',            // 'not_required', 'pending', 'approved', 'rejected'
+    'admin_approved_by',                // FK to user (admin who approved)
+    'special_requests',                 // Optional text for special guest requests
+    'modified_at',                      // Timestamp of last modification
+    'modification_notes',               // Notes regarding booking modification
+    'cancelled_at',                     // Timestamp when this booking was cancelled (null if not cancelled)
+    'cancellation_reason',              // Reason given for cancellation (required when cancelling)
+    'total_amount',                     // Total price in PHP
 ])]
 
-/**
- * Class Booking
- *
- * Represents a single resort reservation made by a tourist.
- *
- * Status flow: pending → paid → checked_in → checked_out → completed
- *                     └→ cancelled (at any point before check-in)
- *
- * @property int         $id                  Auto-incrementing primary key
- * @property string      $reference_no        Unique booking reference code (TBR-XXXXXXXX)
- * @property int         $user_id             FK — the tourist who made the booking
- * @property int         $package_id          FK — the resort package booked
- * @property \Carbon\Carbon $booking_date     The visit date (cast to Carbon)
- * @property string|null $time_slot           Optional time range string
- * @property int         $guests_count        Number of guests
- * @property string      $status              Current lifecycle status
- * @property string|null $special_requests    Guest's special notes
- * @property \Carbon\Carbon|null $cancelled_at Cancellation timestamp
- * @property string|null $cancellation_reason Reason for cancellation
- * @property float       $total_amount        Total booking cost in PHP
- */
 class Booking extends Model
 {
-    // Enable model factory support for seeding and testing
     use HasFactory;
 
     /**
      * Define how specific columns should be cast when read from the database.
-     * This allows Carbon date objects, proper decimal handling, etc.
      *
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
-            // Cast booking_date column to a Carbon date object
-            // Allows: $booking->booking_date->format('M d, Y')
-            'booking_date'  => 'date',
-
-            // Cast cancelled_at to a full Carbon datetime object (date + time)
-            // Allows: $booking->cancelled_at->diffForHumans()
-            'cancelled_at'  => 'datetime',
-
-            // Cast total_amount to a decimal with 2 places (for accurate money math)
-            'total_amount'  => 'decimal:2',
+            'booking_date'   => 'date',
+            'check_in_date'  => 'date',
+            'check_out_date' => 'date',
+            'cancelled_at'   => 'datetime',
+            'modified_at'    => 'datetime',
+            'total_amount'   => 'decimal:2',
+            'nights_count'   => 'integer',
         ];
+    }
+
+    /**
+     * Get the display name for the guest (manual walk-in or registered user).
+     */
+    public function getGuestNameAttribute(): string
+    {
+        return $this->guest_name_manual ?: ($this->user?->name ?? 'Guest User');
+    }
+
+    /**
+     * Get the contact information for the guest.
+     */
+    public function getGuestContactAttribute(): string
+    {
+        return $this->guest_contact_manual ?: ($this->user?->phone ?? $this->user?->email ?? 'N/A');
+    }
+
+    /**
+     * Check if booking was manually created by staff/admin.
+     */
+    public function isManual(): bool
+    {
+        return $this->booking_source === 'manual';
     }
 
     // ──────────────────────────────────────────────────────────
@@ -89,137 +92,200 @@ class Booking extends Model
 
     /**
      * The tourist/guest who made this booking (many-to-one).
-     * Foreign key: bookings.user_id → users.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function user()
     {
-        // Each booking belongs to exactly one user (the guest)
         return $this->belongsTo(User::class);
     }
 
     /**
-     * The resort package that was booked (many-to-one).
-     * Foreign key: bookings.package_id → packages.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * The accommodation room/cottage that was booked (many-to-one).
      */
-    public function package()
+    public function accommodationUnit()
     {
-        // Each booking belongs to exactly one package (e.g., Day Tour, Cabin Suite)
-        return $this->belongsTo(Package::class);
+        return $this->belongsTo(AccommodationUnit::class, 'accommodation_unit_id');
+    }
+
+    /**
+     * The previous accommodation unit before modification (many-to-one).
+     */
+    public function originalAccommodationUnit()
+    {
+        return $this->belongsTo(AccommodationUnit::class, 'original_accommodation_unit_id');
+    }
+
+    public function adminApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'admin_approved_by');
     }
 
     /**
      * The payment record associated with this booking (one-to-one).
-     * A booking has at most one payment record.
-     * Foreign key: payments.booking_id → bookings.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
      */
     public function payment()
     {
-        // A booking has one payment entry (pending, success, failed, or refunded)
         return $this->hasOne(Payment::class);
     }
 
     /**
-     * The compiled memory timeline generated after the stay (one-to-one).
-     * Foreign key: memory_timelines.booking_id → bookings.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
-     */
-    public function memoryTimeline()
-    {
-        // A booking can optionally have one generated memory timeline PDF
-        return $this->hasOne(MemoryTimeline::class);
-    }
-
-    /**
-     * Individual media items (photos, videos, notes) uploaded during this booking.
-     * Foreign key: memory_timeline_items.booking_id → bookings.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function memoryTimelineItems()
-    {
-        // A booking can have many individual memory items (photos, notes, etc.)
-        return $this->hasMany(MemoryTimelineItem::class);
-    }
-
-    /**
      * The guest's post-visit review for this booking (one-to-one).
-     * Foreign key: reviews.booking_id → bookings.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
      */
     public function review()
     {
-        // A booking can have at most one review submitted after the stay
         return $this->hasOne(Review::class);
     }
 
     // ──────────────────────────────────────────────────────────
     // QUERY SCOPES
-    // Scopes are reusable query constraints prefixed with 'scope'.
-    // Usage: Booking::pending()->get()
     // ──────────────────────────────────────────────────────────
 
-    /**
-     * Scope: Filter bookings with 'pending' status.
-     * Pending means the booking was created but payment hasn't been confirmed.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder $query
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
     public function scopePending($query)
     {
-        // Add a WHERE clause to filter only bookings with status = 'pending'
         return $query->where('status', 'pending');
     }
 
-    /**
-     * Scope: Filter bookings with 'paid' status.
-     * Paid means payment was confirmed; guest hasn't checked in yet.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder $query
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
     public function scopePaid($query)
     {
-        // Add a WHERE clause to filter only confirmed/paid bookings
         return $query->where('status', 'paid');
     }
 
-    /**
-     * Scope: Filter active bookings (pending, paid, or checked in).
-     * Active means the booking is still "alive" and occupies capacity.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder $query
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
     public function scopeActive($query)
     {
-        // Filter for any status that is not yet completed or cancelled
         return $query->whereIn('status', ['pending', 'paid', 'checked_in']);
     }
 
     // ──────────────────────────────────────────────────────────
-    // STATIC HELPERS
+    // STATIC HELPERS & CONFLICT CHECKING
     // ──────────────────────────────────────────────────────────
 
-    /**
-     * Generate a unique booking reference number in the format: TBR-XXXXXXXX
-     * This is called when creating a new booking to assign a human-readable ID.
-     *
-     * @return string A unique 12-character reference string (e.g., TBR-A1B2C3D4)
-     */
     public static function generateReferenceNo(): string
     {
-        // Generate a cryptographically-random unique ID using mt_rand + uniqid,
-        // then md5-hash it and take the first 8 characters, uppercased
-        // Prefix with 'TBR-' to identify it as a Talisay Beach Resort reference
         return 'TBR-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8));
+    }
+
+    /**
+     * Check if a specific accommodation unit has an overlapping active reservation.
+     * Overlap occurs when:
+     * (existing_check_in < requested_check_out) AND (existing_check_out > requested_check_in)
+     *
+     * @param int|string $unitId
+     * @param string|\Carbon\Carbon $checkInDate
+     * @param string|\Carbon\Carbon $checkOutDate
+     * @param int|null $excludeBookingId
+     * @return bool
+     */
+    public static function hasConflict($unitId, $checkInDate, $checkOutDate, $excludeBookingId = null): bool
+    {
+        return self::getConflictingBooking($unitId, $checkInDate, $checkOutDate, $excludeBookingId) !== null;
+    }
+
+    /**
+     * Retrieve the first conflicting booking for a unit in the given date range.
+     *
+     * @param int|string $unitId
+     * @param string|\Carbon\Carbon $checkInDate
+     * @param string|\Carbon\Carbon $checkOutDate
+     * @param int|null $excludeBookingId
+     * @return Booking|null
+     */
+    public static function getConflictingBooking($unitId, $checkInDate, $checkOutDate, $excludeBookingId = null): ?self
+    {
+        $cin = \Carbon\Carbon::parse($checkInDate)->format('Y-m-d');
+        $cout = \Carbon\Carbon::parse($checkOutDate)->format('Y-m-d');
+        if ($cout <= $cin) {
+            $cout = \Carbon\Carbon::parse($cin)->addDay()->format('Y-m-d');
+        }
+
+        $query = self::whereIn('status', ['pending', 'paid', 'checked_in'])
+            ->where(function ($q) use ($unitId) {
+                $q->where('accommodation_unit_id', $unitId)
+                  ->orWhere('booking_type', 'special_resort');
+            })
+            ->where(function ($q) use ($cin, $cout) {
+                $q->where(function ($inner) use ($cin, $cout) {
+                    $inner->whereNotNull('check_in_date')
+                          ->whereDate('check_in_date', '<', $cout)
+                          ->whereDate('check_out_date', '>', $cin);
+                })->orWhere(function ($inner) use ($cin, $cout) {
+                    $inner->whereNull('check_in_date')
+                          ->whereDate('booking_date', '<', $cout)
+                          ->whereDate('booking_date', '>=', $cin);
+                });
+            });
+
+        if ($excludeBookingId) {
+            $query->where('id', '!=', $excludeBookingId);
+        }
+
+        return $query->with('user', 'accommodationUnit')->first();
+    }
+
+    /**
+     * Check if a Special Full-Resort booking conflicts with ANY active unit bookings.
+     *
+     * @param string|\Carbon\Carbon $checkInDate
+     * @param string|\Carbon\Carbon $checkOutDate
+     * @param int|null $excludeBookingId
+     * @return bool
+     */
+    public static function hasSpecialResortConflict($checkInDate, $checkOutDate, $excludeBookingId = null): bool
+    {
+        $cin = \Carbon\Carbon::parse($checkInDate)->format('Y-m-d');
+        $cout = \Carbon\Carbon::parse($checkOutDate)->format('Y-m-d');
+        if ($cout <= $cin) {
+            $cout = \Carbon\Carbon::parse($cin)->addDay()->format('Y-m-d');
+        }
+
+        $query = self::whereIn('status', ['pending', 'paid', 'checked_in'])
+            ->where(function ($q) use ($cin, $cout) {
+                $q->where(function ($inner) use ($cin, $cout) {
+                    $inner->whereNotNull('check_in_date')
+                          ->whereDate('check_in_date', '<', $cout)
+                          ->whereDate('check_out_date', '>', $cin);
+                })->orWhere(function ($inner) use ($cin, $cout) {
+                    $inner->whereNull('check_in_date')
+                          ->whereDate('booking_date', '<', $cout)
+                          ->whereDate('booking_date', '>=', $cin);
+                });
+            });
+
+        if ($excludeBookingId) {
+            $query->where('id', '!=', $excludeBookingId);
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * Get all booked date ranges for a unit to assist in client-side calendar disabling.
+     *
+     * @param int|string $unitId
+     * @return array
+     */
+    public static function getBookedDateRangesForUnit($unitId): array
+    {
+        return self::whereIn('status', ['pending', 'paid', 'checked_in'])
+            ->where(function ($q) use ($unitId) {
+                $q->where('accommodation_unit_id', $unitId)
+                  ->orWhere('booking_type', 'special_resort');
+            })
+            ->where(function ($q) {
+                $q->where('check_out_date', '>=', now()->format('Y-m-d'))
+                  ->orWhere('booking_date', '>=', now()->format('Y-m-d'));
+            })
+            ->orderBy('check_in_date')
+            ->get()
+            ->map(function ($b) {
+                $start = $b->check_in_date ? $b->check_in_date->format('Y-m-d') : $b->booking_date->format('Y-m-d');
+                $end = $b->check_out_date ? $b->check_out_date->format('Y-m-d') : \Carbon\Carbon::parse($start)->addDay()->format('Y-m-d');
+                return [
+                    'check_in'  => $start,
+                    'check_out' => $end,
+                    'ref'       => $b->reference_no,
+                    'type'      => $b->booking_type,
+                ];
+            })
+            ->values()
+            ->toArray();
     }
 }

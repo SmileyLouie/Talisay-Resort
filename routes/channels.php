@@ -18,11 +18,6 @@ Broadcast::channel('staff-bookings', function ($user) {
     return $user->isAdmin() || $user->isStaff();
 });
 
-// Staff-only channel for emergency alerts
-Broadcast::channel('staff-emergencies', function ($user) {
-    return $user->isAdmin() || $user->isStaff();
-});
-
 // Admin-only channel for payment notifications
 Broadcast::channel('admin-payments', function ($user) {
     return $user->isAdmin();
@@ -35,10 +30,5 @@ Broadcast::channel('capacity', function ($user) {
 
 // Guest-specific booking channel
 Broadcast::channel('guest-booking-{userId}', function ($user, $userId) {
-    return (int) $user->id === (int) $userId;
-});
-
-// Guest-specific emergency channel
-Broadcast::channel('guest-emergency-{userId}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });

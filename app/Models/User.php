@@ -34,7 +34,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 // Declare which fields are allowed to be mass-assigned (for create/update)
 // This prevents mass-assignment vulnerabilities
-#[Fillable(['name', 'email', 'phone', 'password', 'role', 'avatar', 'is_active', 'fcm_token'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'avatar', 'is_active', 'fcm_token', 'position', 'department', 'duty_status', 'duty_notes', 'staff_id', 'account_status'])]
 
 // Hide sensitive fields from JSON serialization (API responses)
 #[Hidden(['password', 'remember_token'])]
@@ -103,30 +103,6 @@ class User extends Authenticatable
     }
 
     /**
-     * A user can report many emergencies (one-to-many).
-     * Foreign key: emergencies.user_id → users.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function emergencies()
-    {
-        // Return all emergencies created by this user
-        return $this->hasMany(Emergency::class);
-    }
-
-    /**
-     * A user (staff) can be assigned to respond to many emergencies.
-     * Uses a different foreign key: emergencies.responder_id → users.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function respondedEmergencies()
-    {
-        // Use 'responder_id' as the foreign key instead of the default 'user_id'
-        return $this->hasMany(Emergency::class, 'responder_id');
-    }
-
-    /**
      * A user can write many reviews after their stay.
      * Foreign key: reviews.user_id → users.id
      *
@@ -136,30 +112,6 @@ class User extends Authenticatable
     {
         // Return all reviews authored by this user
         return $this->hasMany(Review::class);
-    }
-
-    /**
-     * A user can have many individual memory timeline items (photos, notes, videos).
-     * Foreign key: memory_timeline_items.user_id → users.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function memoryTimelineItems()
-    {
-        // Return all media items uploaded by this user for any booking
-        return $this->hasMany(MemoryTimelineItem::class);
-    }
-
-    /**
-     * A user can have many generated memory timeline PDFs.
-     * Foreign key: memory_timelines.user_id → users.id
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function memoryTimelines()
-    {
-        // Return all memory timeline compilations for this user
-        return $this->hasMany(MemoryTimeline::class);
     }
 
     /**
@@ -207,7 +159,7 @@ class User extends Authenticatable
 
     /**
      * Check if this user has the 'staff' role.
-     * Staff can manage bookings and emergencies but not system settings.
+     * Staff can manage bookings and payments but not system settings.
      *
      * @return bool True if the user is a staff member
      */
@@ -246,4 +198,143 @@ class User extends Authenticatable
         // then count the results
         return $this->customNotifications()->whereNull('read_at')->count();
     }
+
+
+
+    /**
+     * Check if staff is available to receive new tasks.
+     */
+    public function isAvailable(): bool
+    {
+        return $this->is_active && ($this->duty_status ?? 'available') === 'available';
+    }
+
+    /**
+     * Tailwind badge styling for duty status.
+     */
+    public function dutyStatusBadgeClass(): string
+    {
+        return match ($this->duty_status ?? 'available') {
+            'available' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            'busy'      => 'bg-amber-50 text-amber-700 border-amber-200',
+            'on_leave'  => 'bg-rose-50 text-rose-700 border-rose-200',
+            'off_duty'  => 'bg-slate-100 text-slate-600 border-slate-200',
+            default     => 'bg-slate-100 text-slate-600 border-slate-200',
+        };
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // STAFF JOB ASSIGNMENT & RBAC PERMISSIONS
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * Granular system permissions assigned to this staff account.
+     */
+    public function permissions()
+    {
+        return $this->hasMany(StaffPermission::class, 'user_id');
+    }
+
+    /**
+     * Check if user is allowed to access a specific system module.
+     * Admins have universal access. Staff with no permissions configured
+     * also have full access (unconfigured = unrestricted).
+     */
+    public function hasModuleAccess(string $module): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if (!$this->isStaff()) {
+            return false;
+        }
+
+        // Account must be active and not suspended
+        if (!$this->is_active || in_array($this->account_status, ['inactive', 'suspended'])) {
+            return false;
+        }
+
+        // Check if permissions are eager loaded, otherwise query
+        if ($this->relationLoaded('permissions')) {
+            return $this->permissions->contains('module', $module);
+        }
+
+        return $this->permissions()->where('module', $module)->exists();
+    }
+
+    /**
+     * Check if user has permission to perform a specific action in a module.
+     * e.g., hasPermission('bookings', 'create')
+     */
+    public function hasPermission(string $module, string $action = 'view'): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if (!$this->isStaff()) {
+            return false;
+        }
+
+        if (!$this->is_active || in_array($this->account_status, ['inactive', 'suspended'])) {
+            return false;
+        }
+
+        $perm = $this->relationLoaded('permissions')
+            ? $this->permissions->firstWhere('module', $module)
+            : $this->permissions()->where('module', $module)->first();
+
+        if (!$perm) {
+            return false;
+        }
+
+        $actions = $perm->actions ?? [];
+        return in_array($action, $actions) || in_array('*', $actions);
+    }
+
+    /**
+     * List of all modules assigned to this user.
+     */
+    public function assignedModules(): array
+    {
+        if ($this->isAdmin()) {
+            return array_keys(StaffPermission::MODULES);
+        }
+
+        if ($this->relationLoaded('permissions')) {
+            return $this->permissions->pluck('module')->toArray();
+        }
+
+        return $this->permissions()->pluck('module')->toArray();
+    }
+
+    /**
+     * Visual Tailwind styling for account status.
+     */
+    public function accountStatusBadgeClass(): string
+    {
+        return match ($this->account_status ?? 'active') {
+            'active'    => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            'on_leave'  => 'bg-amber-50 text-amber-700 border-amber-200',
+            'suspended' => 'bg-rose-50 text-rose-700 border-rose-200',
+            'inactive'  => 'bg-slate-100 text-slate-600 border-slate-200',
+            default     => 'bg-slate-100 text-slate-600 border-slate-200',
+        };
+    }
+
+    /**
+     * Formatted label for account status.
+     */
+    public function accountStatusLabel(): string
+    {
+        return match ($this->account_status ?? 'active') {
+            'active'    => 'Active',
+            'on_leave'  => 'On Leave',
+            'suspended' => 'Suspended',
+            'inactive'  => 'Inactive',
+            default     => 'Active',
+        };
+    }
 }
+

@@ -21,13 +21,17 @@ use Illuminate\Database\Eloquent\Model;
 
 // Declare mass-assignable columns (protects against mass-assignment attacks)
 #[Fillable([
-    'booking_id',      // FK — the booking this payment is for
-    'amount',          // Amount paid in Philippine Pesos
-    'gateway',         // Payment method: 'stripe' or 'manual'
-    'transaction_id',  // Stripe charge ID or manual reference number (nullable)
-    'status',          // Payment lifecycle: pending|success|failed|refunded
-    'proof_path',      // Storage path to uploaded payment proof image (for manual payments)
-    'metadata',        // JSON blob for extra data (Stripe response, refund info, etc.)
+    'booking_id',          // FK — the booking this payment is for
+    'amount',              // Amount paid in Philippine Pesos
+    'gateway',             // Payment method: 'gcash', 'paypal', 'card', 'cash', etc.
+    'payment_channel',     // 'gcash', 'paypal', 'card', 'cash'
+    'transaction_id',      // Reference number (nullable)
+    'paypal_order_id',     // PayPal Order ID (nullable)
+    'card_last_four',      // Last 4 digits of card (nullable)
+    'is_cash_on_arrival',  // Boolean flag for cash payments
+    'status',              // Payment lifecycle: pending|success|failed|refunded
+    'proof_path',          // Storage path to uploaded payment proof image (for manual payments)
+    'metadata',            // JSON blob for extra data
 ])]
 
 /**

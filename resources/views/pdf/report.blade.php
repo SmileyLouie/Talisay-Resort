@@ -121,25 +121,27 @@
         </table>
     </div>
 
-    {{-- Popular package metrics section --}}
+    {{-- Popular accommodations data section --}}
     <div class="section">
-        <div class="section-title">3. Popular Service Packages</div>
+        <div class="section-title">3. Popular Rooms and Cottages</div>
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>Resort Package Name</th>
-                    <th>Package Price Rate</th>
-                    <th>Max Guests Capacity</th>
-                    <th class="text-right">Confirmed Bookings Count</th>
+                    <th>Room &amp; Cottage</th>
+                    <th>Type &amp; Variant</th>
+                    <th>Nightly Rate</th>
+                    <th>Max Occupancy</th>
+                    <th class="text-right">Confirmed Bookings</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($popularPackages as $pkg)
+                @foreach($popularAccommodations as $unit)
                 <tr>
-                    <td>{{ $pkg->name }}</td>
-                    <td>PHP {{ number_format($pkg->price, 2) }}</td>
-                    <td>{{ $pkg->max_capacity }} guests</td>
-                    <td class="text-right">{{ $pkg->bookings_count }}</td>
+                    <td>{{ $unit->unit_number }}</td>
+                    <td>{{ $unit->type_label }} ({{ $unit->variant_label }})</td>
+                    <td>PHP {{ number_format($unit->price_per_night, 2) }}</td>
+                    <td>{{ $unit->max_occupancy }} guests</td>
+                    <td class="text-right">{{ $unit->bookings_count }}</td>
                 </tr>
                 @endforeach
             </tbody>

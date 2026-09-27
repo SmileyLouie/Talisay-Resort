@@ -7,12 +7,8 @@ use App\Models\Booking;
 use App\Models\CapacitySchedule;
 use App\Models\ChatbotIntent;
 use App\Models\ChatbotLog;
-use App\Models\Emergency;
-use App\Models\MemoryTimeline;
-use App\Models\MemoryTimelineItem;
 use App\Models\NotificationModel;
-use App\Models\Package;
-use App\Models\PackageSchedule;
+use App\Models\AccommodationUnit;
 use App\Models\Payment;
 use App\Models\Review;
 use App\Models\SystemSetting;
@@ -37,24 +33,52 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $staff1 = User::create([
-            'name' => 'Maria Santos',
-            'email' => 'staff1@talisayresort.com',
+            'name'              => 'Maria Santos',
+            'email'             => 'staff1@talisayresort.com',
             'email_verified_at' => now(),
-            'password' => Hash::make('password'),
-            'role' => 'staff',
-            'phone' => '+63-917-000-0002',
-            'is_active' => true,
+            'password'          => Hash::make('password'),
+            'role'              => 'staff',
+            'phone'             => '+63-917-000-0002',
+            'department'        => 'Front Office',
+            'position'          => 'Front Desk Supervisor',
+            'staff_id'          => 'EMP-001',
+            'duty_status'       => 'busy',
+            'account_status'    => 'active',
+            'is_active'         => true,
         ]);
 
+        foreach (['bookings', 'payments', 'accommodations', 'reviews', 'guests'] as $module) {
+            \App\Models\StaffPermission::create([
+                'user_id' => $staff1->id,
+                'module'  => $module,
+                'actions' => \App\Models\StaffPermission::MODULES[$module]['default'] ?? ['view'],
+            ]);
+        }
+
         $staff2 = User::create([
-            'name' => 'Juan Dela Cruz',
-            'email' => 'staff2@talisayresort.com',
+            'name'              => 'Juan Dela Cruz',
+            'email'             => 'staff2@talisayresort.com',
             'email_verified_at' => now(),
-            'password' => Hash::make('password'),
-            'role' => 'staff',
-            'phone' => '+63-917-000-0003',
-            'is_active' => true,
+            'password'          => Hash::make('password'),
+            'role'              => 'staff',
+            'phone'             => '+63-917-000-0003',
+            'department'        => 'Resort Operations',
+            'position'          => 'Operations Lead',
+            'staff_id'          => 'EMP-002',
+            'duty_status'       => 'available',
+            'account_status'    => 'active',
+            'is_active'         => true,
         ]);
+
+        foreach (['bookings', 'accommodations', 'housekeeping', 'maintenance', 'reviews'] as $module) {
+            \App\Models\StaffPermission::create([
+                'user_id' => $staff2->id,
+                'module'  => $module,
+                'actions' => \App\Models\StaffPermission::MODULES[$module]['default'] ?? ['view'],
+            ]);
+        }
+
+        \App\Models\ChatbotConfig::current();
 
         $tourists = [];
         $touristData = [
@@ -77,142 +101,57 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // ─── Packages ────────────────────────────────────────────
-        $packages = [];
+        // ─── Accommodation Units ───────────────────────────────────────
+        $units = [];
+        $roomData = [
+            ['Room 01', 'room', 'normal',  22,  '1 Queen Bed',              4,  1500.00],
+            ['Room 02', 'room', 'normal',  22,  '1 Queen Bed',              4,  1500.00],
+            ['Room 03', 'room', 'normal',  22,  '1 Queen Bed',              4,  1500.00],
+            ['Room 04', 'room', 'normal',  22,  '1 Queen Bed',              4,  1500.00],
+            ['Room 05', 'room', 'normal',  22,  '1 Queen Bed',              4,  1500.00],
+            ['Room 06', 'room', 'premium', 30,  '1 King Bed',               4,  2500.00],
+            ['Room 07', 'room', 'premium', 30,  '1 King Bed',               4,  2500.00],
+            ['Room 08', 'room', 'premium', 30,  '1 King Bed + 1 Sofa Bed',  5,  2800.00],
+            ['Room 09', 'room', 'premium', 30,  '1 King Bed + 1 Sofa Bed',  5,  2800.00],
+            ['Room 10', 'room', 'premium', 35,  '2 Queen Beds',             6,  3200.00],
+        ];
+        $cottageData = [
+            ['Cottage 01', 'cottage', 'normal',  40,  '2 Queen Beds',          8,  2000.00],
+            ['Cottage 02', 'cottage', 'normal',  40,  '2 Queen Beds',          8,  2000.00],
+            ['Cottage 03', 'cottage', 'normal',  40,  '2 Queen Beds',          8,  2000.00],
+            ['Cottage 04', 'cottage', 'normal',  40,  '2 Queen Beds + Bunks', 10,  2200.00],
+            ['Cottage 05', 'cottage', 'normal',  40,  '2 Queen Beds + Bunks', 10,  2200.00],
+            ['Cottage 06', 'cottage', 'premium', 55,  '1 King + 2 Queens',    12,  3500.00],
+            ['Cottage 07', 'cottage', 'premium', 55,  '1 King + 2 Queens',    12,  3500.00],
+            ['Cottage 08', 'cottage', 'premium', 60,  '2 Kings + Loft',       14,  4000.00],
+            ['Cottage 09', 'cottage', 'premium', 60,  '2 Kings + Loft',       14,  4000.00],
+            ['Cottage 10', 'cottage', 'premium', 65,  '3 Queens + Sala Set',  16,  4500.00],
+        ];
+        $amenitiesBase   = ['Free Wi-Fi', 'Air Conditioning', 'Private Bathroom', 'Hot & Cold Shower', 'Beach Access'];
+        $amenitiesPremium = ['Free Wi-Fi', 'Air Conditioning', 'Private Bathroom', 'Hot & Cold Shower', 'Beach Access', 'Mini Fridge', 'Smart TV', 'Private Veranda', 'In-room Safe'];
 
-        $packages[] = Package::create([
-            'name' => 'Day Tour Package',
-            'description' => 'Enjoy a full day of sun, sand, and sea at Talisay Beach. Includes access to all beach facilities, cottage use, and a complimentary welcome drink. Perfect for families and friends looking for a quick beach getaway.',
-            'price' => 500.00,
-            'max_capacity' => 50,
-            'images' => ['packages/day-tour-1.jpg', 'packages/day-tour-2.jpg'],
-            'is_visible' => true,
-            'seasonal_pricing' => [
-                ['season' => 'Peak (March-May)', 'markup_percent' => 20],
-                ['season' => 'Lean (Nov-Feb)', 'discount_percent' => 10],
-            ],
-        ]);
-
-        $packages[] = Package::create([
-            'name' => 'Overnight Cottage Stay',
-            'description' => 'Stay overnight in our cozy beachfront cottages with a stunning view of the Camotes Sea. Includes dinner and breakfast for two, bonfire access, and morning snorkeling gear rental.',
-            'price' => 1500.00,
-            'max_capacity' => 20,
-            'images' => ['packages/overnight-1.jpg', 'packages/overnight-2.jpg'],
-            'is_visible' => true,
-            'seasonal_pricing' => [
-                ['season' => 'Peak (March-May)', 'markup_percent' => 25],
-                ['season' => 'Lean (Nov-Feb)', 'discount_percent' => 15],
-            ],
-        ]);
-
-        $packages[] = Package::create([
-            'name' => 'Beachfront Cabin Suite',
-            'description' => 'Indulge in our premium beachfront cabin with air conditioning, private veranda, and direct beach access. Includes full-board meals for two, kayak rental, and a sunset cruise.',
-            'price' => 3500.00,
-            'max_capacity' => 10,
-            'images' => ['packages/cabin-1.jpg'],
-            'is_visible' => true,
-            'seasonal_pricing' => [
-                ['season' => 'Peak (March-May)', 'markup_percent' => 30],
-            ],
-        ]);
-
-        $packages[] = Package::create([
-            'name' => 'Group Adventure Package',
-            'description' => 'Designed for groups of 5-15 people. Includes beach games, island hopping, snorkeling adventure, grilled lunch by the shore, and a group photo session. Minimum 5 guests required.',
-            'price' => 800.00,
-            'max_capacity' => 30,
-            'images' => ['packages/group-1.jpg', 'packages/group-2.jpg'],
-            'is_visible' => true,
-            'seasonal_pricing' => [
-                ['season' => 'Peak (March-May)', 'markup_percent' => 15],
-            ],
-        ]);
-
-        $packages[] = Package::create([
-            'name' => 'Snorkeling Adventure Add-on',
-            'description' => 'Add this to any package for a guided snorkeling experience at the Talisay coral reef. Includes mask, snorkel, fins, and a certified guide. Available daily from 9AM to 4PM.',
-            'price' => 350.00,
-            'max_capacity' => 15,
-            'images' => ['packages/snorkel-1.jpg'],
-            'is_visible' => true,
-            'seasonal_pricing' => null,
-        ]);
-
-        $packages[] = Package::create([
-            'name' => 'Kayak Rental',
-            'description' => 'Explore the calm waters of Talisay Bay on a single or double kayak. Life jackets and brief orientation included. Available in 1-hour or half-day rentals.',
-            'price' => 250.00,
-            'max_capacity' => 20,
-            'images' => ['packages/kayak-1.jpg'],
-            'is_visible' => true,
-            'seasonal_pricing' => null,
-        ]);
-
-        // ─── Package Schedules ────────────────────────────────────
-        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-        foreach ($packages as $pkg) {
-            // Day Tour: Open daily
-            if ($pkg->name === 'Day Tour Package') {
-                foreach ($days as $day) {
-                    PackageSchedule::create([
-                        'package_id' => $pkg->id,
-                        'day_of_week' => $day,
-                        'start_time' => '08:00:00',
-                        'end_time' => '17:00:00',
-                        'available_slots' => 50,
-                    ]);
-                }
-            }
-            // Overnight: Open Thu-Sun
-            elseif ($pkg->name === 'Overnight Cottage Stay') {
-                foreach (['thursday', 'friday', 'saturday', 'sunday'] as $day) {
-                    PackageSchedule::create([
-                        'package_id' => $pkg->id,
-                        'day_of_week' => $day,
-                        'start_time' => '14:00:00',
-                        'end_time' => '11:00:00',
-                        'available_slots' => 10,
-                    ]);
-                }
-            }
-            // Cabin Suite: Open daily
-            elseif ($pkg->name === 'Beachfront Cabin Suite') {
-                foreach ($days as $day) {
-                    PackageSchedule::create([
-                        'package_id' => $pkg->id,
-                        'day_of_week' => $day,
-                        'start_time' => '14:00:00',
-                        'end_time' => '12:00:00',
-                        'available_slots' => 5,
-                    ]);
-                }
-            }
-            // Group Adventure: Weekends only
-            elseif ($pkg->name === 'Group Adventure Package') {
-                foreach (['saturday', 'sunday'] as $day) {
-                    PackageSchedule::create([
-                        'package_id' => $pkg->id,
-                        'day_of_week' => $day,
-                        'start_time' => '09:00:00',
-                        'end_time' => '16:00:00',
-                        'available_slots' => 30,
-                    ]);
-                }
-            }
-            // Add-ons: Open daily
-            else {
-                foreach ($days as $day) {
-                    PackageSchedule::create([
-                        'package_id' => $pkg->id,
-                        'day_of_week' => $day,
-                        'start_time' => '09:00:00',
-                        'end_time' => '16:00:00',
-                        'available_slots' => $pkg->max_capacity,
-                    ]);
-                }
+        $sortOrder = 1;
+        foreach ([$roomData, $cottageData] as $dataSet) {
+            foreach ($dataSet as $row) {
+                [$unitNumber, $type, $variant, $floorArea, $bedConfig, $maxOcc, $price] = $row;
+                $isPremium = $variant === 'premium';
+                $units[] = AccommodationUnit::create([
+                    'unit_number'      => $unitNumber,
+                    'unit_type'        => $type,
+                    'variant'          => $variant,
+                    'floor_area_sqm'   => $floorArea,
+                    'bed_configuration'=> $bedConfig,
+                    'max_occupancy'    => $maxOcc,
+                    'amenities'        => $isPremium ? $amenitiesPremium : $amenitiesBase,
+                    'description'      => $isPremium
+                        ? "Spacious {$variant} {$type} ({$unitNumber}) with premium finishes, private veranda, and stunning Camotes Sea views. Ideal for families and couples seeking a premium beach escape."
+                        : "Comfortable {$variant} {$type} ({$unitNumber}) with all essential amenities and direct beach access. Great value for groups and families.",
+                    'images'           => [],
+                    'tour_video_path'  => null,
+                    'price_per_night'  => $price,
+                    'is_available'     => true,
+                    'sort_order'       => $sortOrder++,
+                ]);
             }
         }
 
@@ -225,54 +164,44 @@ class DatabaseSeeder extends Seeder
                 'current_count' => rand(10, 65),
             ]);
         }
-        // Past 7 days for chart data
-        for ($i = 7; $i >= 1; $i--) {
-            $date = now()->subDays($i)->format('Y-m-d');
-            CapacitySchedule::create([
-                'date' => $date,
-                'max_capacity' => 100,
-                'current_count' => rand(25, 80),
-            ]);
-        }
-
-        // ─── Bookings ────────────────────────────────────────────
-        $statuses = ['pending', 'paid', 'checked_in', 'completed', 'cancelled'];
+            // ─── Bookings ───────────────────────────────────────────
         $bookings = [];
 
         // Create bookings spread across past and future dates
         $bookingData = [
             // Past completed bookings
-            ['tourist_idx' => 0, 'pkg_idx' => 0, 'days_offset' => -14, 'guests' => 2, 'status' => 'completed', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 1, 'pkg_idx' => 1, 'days_offset' => -12, 'guests' => 2, 'status' => 'completed', 'time' => '02:00 PM - 11:00 AM'],
-            ['tourist_idx' => 2, 'pkg_idx' => 0, 'days_offset' => -10, 'guests' => 4, 'status' => 'completed', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 3, 'pkg_idx' => 2, 'days_offset' => -8, 'guests' => 2, 'status' => 'completed', 'time' => '02:00 PM - 12:00 PM'],
-            ['tourist_idx' => 4, 'pkg_idx' => 3, 'days_offset' => -7, 'guests' => 8, 'status' => 'completed', 'time' => '09:00 AM - 04:00 PM'],
-            ['tourist_idx' => 0, 'pkg_idx' => 4, 'days_offset' => -7, 'guests' => 2, 'status' => 'completed', 'time' => '10:00 AM - 02:00 PM'],
+            ['tourist_idx' => 0, 'unit_idx' => 0,  'days_offset' => -14, 'nights' => 2, 'guests' => 2,  'status' => 'completed'],
+            ['tourist_idx' => 1, 'unit_idx' => 10, 'days_offset' => -12, 'nights' => 3, 'guests' => 4,  'status' => 'completed'],
+            ['tourist_idx' => 2, 'unit_idx' => 1,  'days_offset' => -10, 'nights' => 1, 'guests' => 2,  'status' => 'completed'],
+            ['tourist_idx' => 3, 'unit_idx' => 5,  'days_offset' => -8,  'nights' => 2, 'guests' => 4,  'status' => 'completed'],
+            ['tourist_idx' => 4, 'unit_idx' => 11, 'days_offset' => -7,  'nights' => 2, 'guests' => 8,  'status' => 'completed'],
+            ['tourist_idx' => 0, 'unit_idx' => 6,  'days_offset' => -7,  'nights' => 3, 'guests' => 6,  'status' => 'completed'],
             // Recent/past with different statuses
-            ['tourist_idx' => 1, 'pkg_idx' => 0, 'days_offset' => -3, 'guests' => 3, 'status' => 'completed', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 2, 'pkg_idx' => 5, 'days_offset' => -2, 'guests' => 1, 'status' => 'completed', 'time' => '09:00 AM - 01:00 PM'],
-            ['tourist_idx' => 3, 'pkg_idx' => 0, 'days_offset' => -5, 'guests' => 2, 'status' => 'cancelled', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 4, 'pkg_idx' => 1, 'days_offset' => -4, 'guests' => 2, 'status' => 'cancelled', 'time' => '02:00 PM - 11:00 AM'],
+            ['tourist_idx' => 1, 'unit_idx' => 2,  'days_offset' => -3,  'nights' => 1, 'guests' => 2,  'status' => 'completed'],
+            ['tourist_idx' => 2, 'unit_idx' => 7,  'days_offset' => -2,  'nights' => 2, 'guests' => 4,  'status' => 'completed'],
+            ['tourist_idx' => 3, 'unit_idx' => 0,  'days_offset' => -5,  'nights' => 1, 'guests' => 2,  'status' => 'cancelled'],
+            ['tourist_idx' => 4, 'unit_idx' => 10, 'days_offset' => -4,  'nights' => 2, 'guests' => 4,  'status' => 'cancelled'],
             // Today's bookings
-            ['tourist_idx' => 0, 'pkg_idx' => 0, 'days_offset' => 0, 'guests' => 3, 'status' => 'checked_in', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 1, 'pkg_idx' => 2, 'days_offset' => 0, 'guests' => 2, 'status' => 'paid', 'time' => '02:00 PM - 12:00 PM'],
+            ['tourist_idx' => 0, 'unit_idx' => 3,  'days_offset' => 0,   'nights' => 1, 'guests' => 3,  'status' => 'checked_in'],
+            ['tourist_idx' => 1, 'unit_idx' => 5,  'days_offset' => 0,   'nights' => 2, 'guests' => 4,  'status' => 'paid'],
             // Upcoming bookings
-            ['tourist_idx' => 2, 'pkg_idx' => 0, 'days_offset' => 1, 'guests' => 5, 'status' => 'paid', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 3, 'pkg_idx' => 1, 'days_offset' => 2, 'guests' => 2, 'status' => 'paid', 'time' => '02:00 PM - 11:00 AM'],
-            ['tourist_idx' => 4, 'pkg_idx' => 0, 'days_offset' => 3, 'guests' => 2, 'status' => 'pending', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 0, 'pkg_idx' => 3, 'days_offset' => 5, 'guests' => 10, 'status' => 'pending', 'time' => '09:00 AM - 04:00 PM'],
-            ['tourist_idx' => 1, 'pkg_idx' => 4, 'days_offset' => 5, 'guests' => 2, 'status' => 'paid', 'time' => '09:00 AM - 01:00 PM'],
-            ['tourist_idx' => 2, 'pkg_idx' => 2, 'days_offset' => 7, 'guests' => 2, 'status' => 'pending', 'time' => '02:00 PM - 12:00 PM'],
-            ['tourist_idx' => 3, 'pkg_idx' => 5, 'days_offset' => 7, 'guests' => 2, 'status' => 'pending', 'time' => '10:00 AM - 02:00 PM'],
-            ['tourist_idx' => 4, 'pkg_idx' => 0, 'days_offset' => 10, 'guests' => 4, 'status' => 'pending', 'time' => '08:00 AM - 05:00 PM'],
-            ['tourist_idx' => 0, 'pkg_idx' => 1, 'days_offset' => 12, 'guests' => 2, 'status' => 'paid', 'time' => '02:00 PM - 11:00 AM'],
-            ['tourist_idx' => 1, 'pkg_idx' => 0, 'days_offset' => 14, 'guests' => 6, 'status' => 'pending', 'time' => '08:00 AM - 05:00 PM'],
+            ['tourist_idx' => 2, 'unit_idx' => 4,  'days_offset' => 1,   'nights' => 1, 'guests' => 2,  'status' => 'paid'],
+            ['tourist_idx' => 3, 'unit_idx' => 11, 'days_offset' => 2,   'nights' => 2, 'guests' => 6,  'status' => 'paid'],
+            ['tourist_idx' => 4, 'unit_idx' => 0,  'days_offset' => 3,   'nights' => 1, 'guests' => 2,  'status' => 'pending'],
+            ['tourist_idx' => 0, 'unit_idx' => 8,  'days_offset' => 5,   'nights' => 3, 'guests' => 8,  'status' => 'pending'],
+            ['tourist_idx' => 1, 'unit_idx' => 6,  'days_offset' => 5,   'nights' => 2, 'guests' => 4,  'status' => 'paid'],
+            ['tourist_idx' => 2, 'unit_idx' => 5,  'days_offset' => 7,   'nights' => 2, 'guests' => 4,  'status' => 'pending'],
+            ['tourist_idx' => 3, 'unit_idx' => 12, 'days_offset' => 7,   'nights' => 2, 'guests' => 6,  'status' => 'pending'],
+            ['tourist_idx' => 4, 'unit_idx' => 1,  'days_offset' => 10,  'nights' => 1, 'guests' => 2,  'status' => 'pending'],
+            ['tourist_idx' => 0, 'unit_idx' => 10, 'days_offset' => 12,  'nights' => 3, 'guests' => 8,  'status' => 'paid'],
+            ['tourist_idx' => 1, 'unit_idx' => 2,  'days_offset' => 14,  'nights' => 1, 'guests' => 2,  'status' => 'pending'],
         ];
 
         foreach ($bookingData as $bd) {
             $bookingDate = now()->addDays($bd['days_offset'])->format('Y-m-d');
-            $package = $packages[$bd['pkg_idx']];
-            $totalAmount = $package->price * $bd['guests'];
+            $checkOutDate = now()->addDays($bd['days_offset'] + $bd['nights'])->format('Y-m-d');
+            $unit = $units[$bd['unit_idx']] ?? $units[0];
+            $totalAmount = $unit->price_per_night * $bd['nights'];
 
             $cancelledAt = null;
             $cancellationReason = null;
@@ -282,81 +211,69 @@ class DatabaseSeeder extends Seeder
             }
 
             $bookings[] = Booking::create([
-                'reference_no' => Booking::generateReferenceNo(),
-                'user_id' => $tourists[$bd['tourist_idx']]->id,
-                'package_id' => $package->id,
-                'booking_date' => $bookingDate,
-                'time_slot' => $bd['time'],
-                'guests_count' => $bd['guests'],
-                'status' => $bd['status'],
-                'total_amount' => $totalAmount,
-                'special_requests' => $bd['guests'] > 4 ? 'Please prepare extra beach chairs and a designated cottage area for our group.' : null,
-                'cancelled_at' => $cancelledAt,
-                'cancellation_reason' => $cancellationReason,
-                'created_at' => now()->subDays(abs($bd['days_offset']) + rand(1, 5)),
+                'reference_no'          => Booking::generateReferenceNo(),
+                'user_id'               => $tourists[$bd['tourist_idx']]->id,
+                'accommodation_unit_id' => $unit->id,
+                'booking_date'          => $bookingDate,
+                'check_in_date'         => $bookingDate,
+                'check_out_date'        => $checkOutDate,
+                'nights_count'          => $bd['nights'],
+                'time_slot'             => '2:00 PM Check-in · 11:00 AM Check-out',
+                'guests_count'          => $bd['guests'],
+                'status'                => $bd['status'],
+                'total_amount'          => $totalAmount,
+                'special_requests'      => $bd['guests'] > 4 ? 'Please prepare extra beach chairs and a designated cottage area for our group.' : null,
+                'cancelled_at'          => $cancelledAt,
+                'cancellation_reason'   => $cancellationReason,
+                'created_at'            => now()->subDays(abs($bd['days_offset']) + rand(1, 5)),
             ]);
         }
 
         // ─── Payments ────────────────────────────────────────────
-        foreach ($bookings as $booking) {
+        $channels = ['gcash', 'paypal', 'card', 'cash'];
+        foreach ($bookings as $idx => $booking) {
+            $channel = $channels[$idx % count($channels)];
+            $isCash = $channel === 'cash';
+
             if (in_array($booking->status, ['paid', 'checked_in', 'completed'])) {
                 Payment::create([
-                    'booking_id' => $booking->id,
-                    'amount' => $booking->total_amount,
-                    'gateway' => rand(0, 1) ? 'stripe' : 'manual',
-                    'transaction_id' => 'TXN-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 10)),
-                    'status' => 'success',
-                    'metadata' => ['currency' => 'PHP', 'paid_at' => $booking->created_at->addHours(2)->toIso8601String()],
+                    'booking_id'         => $booking->id,
+                    'amount'             => $booking->total_amount,
+                    'gateway'            => $channel,
+                    'payment_channel'    => $channel,
+                    'transaction_id'     => $isCash ? null : 'TXN-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 10)),
+                    'card_last_four'     => $channel === 'card' ? '4242' : null,
+                    'is_cash_on_arrival' => $isCash,
+                    'proof_path'         => $channel === 'gcash' ? 'payments/sample-receipt.jpg' : null,
+                    'status'             => 'success',
+                    'metadata'           => ['currency' => 'PHP', 'paid_at' => $booking->created_at->addHours(2)->toIso8601String()],
                 ]);
             } elseif ($booking->status === 'pending') {
                 Payment::create([
-                    'booking_id' => $booking->id,
-                    'amount' => $booking->total_amount,
-                    'gateway' => 'stripe',
-                    'transaction_id' => null,
-                    'status' => 'pending',
-                    'metadata' => null,
+                    'booking_id'         => $booking->id,
+                    'amount'             => $booking->total_amount,
+                    'gateway'            => $channel,
+                    'payment_channel'    => $channel,
+                    'transaction_id'     => null,
+                    'is_cash_on_arrival' => $isCash,
+                    'status'             => 'pending',
+                    'metadata'           => null,
                 ]);
             } elseif ($booking->status === 'cancelled') {
                 // Some cancelled bookings had refunds
                 if (rand(0, 1)) {
                     Payment::create([
-                        'booking_id' => $booking->id,
-                        'amount' => $booking->total_amount,
-                        'gateway' => 'stripe',
-                        'transaction_id' => 'TXN-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 10)),
-                        'status' => 'refunded',
-                        'metadata' => ['refunded_at' => now()->toIso8601String(), 'reason' => 'Cancellation within 24h window'],
+                        'booking_id'         => $booking->id,
+                        'amount'             => $booking->total_amount,
+                        'gateway'            => $channel,
+                        'payment_channel'    => $channel,
+                        'transaction_id'     => 'TXN-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 10)),
+                        'is_cash_on_arrival' => false,
+                        'status'             => 'refunded',
+                        'metadata'           => ['refunded_at' => now()->toIso8601String(), 'reason' => 'Cancellation within 24h window'],
                     ]);
                 }
             }
-        }
-
-        // ─── Emergencies ─────────────────────────────────────────
-        $emergencyData = [
-            ['user_idx' => 0, 'category' => 'medical', 'description' => 'Guest experienced heat exhaustion near the beachfront. Feeling dizzy and dehydrated.', 'status' => 'resolved', 'responder_idx' => 1],
-            ['user_idx' => 1, 'category' => 'lost_item', 'description' => 'Lost a black wallet near the cottage area. Contains IDs and cash.', 'status' => 'responding', 'responder_idx' => 1],
-            ['user_idx' => 2, 'category' => 'security', 'description' => 'Suspicious individual near the parking area. Requesting security check.', 'status' => 'acknowledged', 'responder_idx' => 2],
-            ['user_idx' => 3, 'category' => 'medical', 'description' => 'Child scraped knee on rocks near the shore. Needs first aid.', 'status' => 'pending', 'responder_idx' => null],
-            ['user_idx' => 4, 'category' => 'other', 'description' => 'Cottage water supply not working. Requesting maintenance assistance.', 'status' => 'acknowledged', 'responder_idx' => 1],
-        ];
-
-        foreach ($emergencyData as $ed) {
-            $resolvedAt = $ed['status'] === 'resolved' ? now()->subHours(2) : null;
-
-            Emergency::create([
-                'user_id' => $tourists[$ed['user_idx']]->id,
-                'category' => $ed['category'],
-                'description' => $ed['description'],
-                'photo_path' => null,
-                'latitude' => 10.6837 + (rand(-100, 100) / 10000),
-                'longitude' => 124.7970 + (rand(-100, 100) / 10000),
-                'status' => $ed['status'],
-                'tracking_number' => Emergency::generateTrackingNumber(),
-                'resolved_at' => $resolvedAt,
-                'responder_id' => $ed['responder_idx'] ? ($ed['responder_idx'] == 1 ? $staff1->id : $staff2->id) : null,
-                'response_notes' => $ed['status'] === 'resolved' ? 'First aid administered. Guest recovered after resting in the shade with hydration.' : null,
-            ]);
         }
 
         // ─── Chatbot Intents ─────────────────────────────────────
@@ -386,8 +303,8 @@ class DatabaseSeeder extends Seeder
             ['keyword' => 'kayak', 'response' => 'Kayak Rental is PHP 250 per session. Single and double kayaks are available. Life jackets and a brief orientation are included. Available daily from 9:00 AM to 4:00 PM.', 'category' => 'rates'],
             ['keyword' => 'hello', 'response' => 'Welcome to Talisay Beach Resort! How can I help you today? You can ask me about our rates, facilities, booking process, directions, or resort policies.', 'category' => 'general'],
             ['keyword' => 'hi', 'response' => 'Hello! Welcome to Talisay Beach Resort! I can help you with information about rates, hours, booking, directions, and more. What would you like to know?', 'category' => 'general'],
-            ['keyword' => 'help', 'response' => 'I can help you with: Rates & Pricing, Operating Hours, Booking & Reservations, Directions & Location, Facilities & Amenities, Resort Policies, and Emergency Assistance. Just ask away!', 'category' => 'general'],
-            ['keyword' => 'emergency', 'response' => 'For emergencies, please use the Emergency button in the app or alert any staff member immediately. Our security team is on-site 24/7. For life-threatening emergencies, call 911 or the local emergency number.', 'category' => 'general'],
+            ['keyword' => 'help', 'response' => 'I can help you with: Rates & Pricing, Operating Hours, Booking & Reservations, Directions & Location, Facilities & Amenities, 360° Virtual Tour, and Resort Policies. Just ask away!', 'category' => 'general'],
+            ['keyword' => 'emergency', 'response' => 'For assistance or medical needs on-site, please alert any resort staff member or visit the Front Desk immediately. Our team is available 24/7. For national emergencies, dial 911 or Baybay PNP at (053) 563-0166.', 'category' => 'general'],
             ['keyword' => 'contact', 'response' => 'You can reach us at: Email: info@talisayresort.com, Phone: +63-53-XXX-XXXX, or visit us at Barangay Maslug, Baybay City, Leyte. Our staff is also available on-site during operating hours.', 'category' => 'general'],
             ['keyword' => 'parking', 'response' => 'Free parking is available for all guests. Our parking area can accommodate up to 50 vehicles. For oversized vehicles, please inform us in advance so we can reserve an appropriate spot.', 'category' => 'facilities'],
             ['keyword' => 'children', 'response' => 'Children are welcome at Talisay Beach Resort! Kids under 5 stay free with a paying adult. We have a children\'s play area and shallow swimming zones. Parental supervision is required at all times near the water.', 'category' => 'policies'],
@@ -464,46 +381,6 @@ class DatabaseSeeder extends Seeder
             'is_approved' => false,
         ]);
 
-        // ─── Memory Timeline Items ───────────────────────────────
-        $completedBookingsForTimeline = $completedBookings->take(3);
-        $timelineItemsData = [
-            ['type' => 'photo', 'caption' => 'Arrival at Talisay Beach - The view took our breath away!', 'selected' => true],
-            ['type' => 'note', 'caption' => 'First dip in the crystal clear waters. The sand was so fine and white!', 'selected' => true],
-            ['type' => 'photo', 'caption' => 'Cottage view from the beachfront - paradise!', 'selected' => true],
-            ['type' => 'video', 'caption' => 'Sunset time-lapse from the veranda', 'selected' => true],
-            ['type' => 'note', 'caption' => 'Best grilled seafood lunch ever! Fresh catch of the day.', 'selected' => false],
-            ['type' => 'photo', 'caption' => 'Group photo with the amazing Talisay sunset', 'selected' => true],
-            ['type' => 'photo', 'caption' => 'Snorkeling adventure - saw Nemo!', 'selected' => true],
-            ['type' => 'note', 'caption' => 'Bonfire night under the stars - magical evening', 'selected' => true],
-            ['type' => 'video', 'caption' => 'Kayaking along the coast', 'selected' => false],
-        ];
-
-        foreach ($completedBookingsForTimeline as $bookingIdx => $booking) {
-            $itemOffset = $bookingIdx * 3;
-            for ($i = 0; $i < 3; $i++) {
-                $itemData = $timelineItemsData[$itemOffset + $i] ?? $timelineItemsData[$i];
-                MemoryTimelineItem::create([
-                    'user_id' => $booking->user_id,
-                    'booking_id' => $booking->id,
-                    'type' => $itemData['type'],
-                    'file_path' => $itemData['type'] !== 'note' ? "memory-items/sample-{$itemData['type']}-" . ($itemOffset + $i + 1) . ".jpg" : null,
-                    'caption' => $itemData['caption'],
-                    'is_selected' => $itemData['selected'],
-                ]);
-            }
-        }
-
-        // ─── Memory Timelines ────────────────────────────────────
-        foreach ($completedBookingsForTimeline as $booking) {
-            MemoryTimeline::create([
-                'user_id' => $booking->user_id,
-                'booking_id' => $booking->id,
-                'title' => 'My Talisay Beach Memories - ' . $booking->booking_date->format('F Y'),
-                'generated_pdf_path' => null,
-                'is_generated' => false,
-            ]);
-        }
-
         // ─── Tour Assets ─────────────────────────────────────────
         $tourAssets = [
             [
@@ -579,7 +456,6 @@ class DatabaseSeeder extends Seeder
             'notification_booking_created' => 'New booking created: {reference_no}',
             'notification_booking_confirmed' => 'Your booking {reference_no} has been confirmed!',
             'notification_booking_cancelled' => 'Booking {reference_no} has been cancelled.',
-            'notification_emergency_alert' => 'Emergency alert at Talisay Beach Resort',
             'notification_payment_received' => 'Payment of PHP {amount} received for booking {reference_no}',
             'stripe_mode' => 'test',
             'timezone' => 'Asia/Manila',
@@ -600,15 +476,6 @@ class DatabaseSeeder extends Seeder
             'message' => 'A new booking (TBR-DEMO001) has been placed by Ana Reyes for the Day Tour Package.',
             'data' => ['booking_id' => $bookings[0]->id ?? 1],
             'read_at' => now()->subHours(3),
-        ]);
-
-        NotificationModel::create([
-            'user_id' => $admin->id,
-            'type' => 'emergency',
-            'title' => 'Emergency Alert',
-            'message' => 'New emergency reported: Medical - Guest experienced heat exhaustion near the beachfront.',
-            'data' => ['emergency_id' => 1],
-            'read_at' => null,
         ]);
 
         NotificationModel::create([
@@ -650,12 +517,12 @@ class DatabaseSeeder extends Seeder
         ]);
 
         AuditLog::create([
-            'user_id' => $admin->id,
-            'action' => 'package_created',
-            'model_type' => Package::class,
-            'model_id' => 1,
-            'old_values' => null,
-            'new_values' => ['name' => 'Day Tour Package', 'price' => 500.00],
+            'user_id'     => $admin->id,
+            'action'      => 'accommodation_unit_created',
+            'model_type'  => AccommodationUnit::class,
+            'model_id'    => 1,
+            'old_values'  => null,
+            'new_values'  => ['unit_number' => 'Room 01', 'price_per_night' => 1500.00],
         ]);
 
         AuditLog::create([
@@ -665,15 +532,6 @@ class DatabaseSeeder extends Seeder
             'model_id' => 1,
             'old_values' => ['status' => 'pending'],
             'new_values' => ['status' => 'success'],
-        ]);
-
-        AuditLog::create([
-            'user_id' => $staff1->id,
-            'action' => 'emergency_status_updated',
-            'model_type' => Emergency::class,
-            'model_id' => 1,
-            'old_values' => ['status' => 'pending'],
-            'new_values' => ['status' => 'resolved'],
         ]);
 
         AuditLog::create([
