@@ -2,42 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\BookingConflictException;
+use App\Exceptions\InvalidBookingTransitionException;
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\CapacitySchedule;
 use App\Models\AccommodationUnit;
 use App\Models\AuditLog;
+use App\Models\Booking;
+use App\Models\CapacitySchedule;
+use App\Models\NotificationModel;
+use App\Services\BookingService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class BookingController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = Booking::with(['user', 'accommodationUnit', 'payment']);
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->has('date_from')) {
-            $query->where('booking_date', '>=', $request->date_from);
-        }
-        if ($request->has('date_to')) {
-            $query->where('booking_date', '<=', $request->date_to);
-        }
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('reference_no', 'like', "%{$search}%")
-                  ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', "%{$search}%"));
-            });
-        }
-
-        $bookings = $query->orderBy('created_at', 'desc')->paginate(15);
-
-        return response()->json($bookings);
-    }
+    public function __construct(private BookingService $bookings) {}
 
     public function myBookings(Request $request)
     {
@@ -54,181 +34,143 @@ class BookingController extends Controller
         $request->validate([
             'accommodation_unit_id' => 'required|exists:accommodation_units,id',
             'booking_date'          => 'required|date|after_or_equal:today',
-            'time_slot'             => 'nullable|string',
-            'guests_count'          => 'required|integer|min:1',
-            'special_requests'      => 'nullable|string',
+            'check_out_date'        => 'nullable|date|after:booking_date',
+            'guests_count'          => 'required|integer|min:1|max:50',
+            'special_requests'      => 'nullable|string|max:500',
+            'payment_method'        => 'nullable|in:gcash,paypal,card,cash',
         ]);
+
+        $user = $request->user();
+        if (!$user->isTourist()) {
+            return response()->json(['error' => 'Only guest accounts can create online reservations.'], 403);
+        }
 
         $unit = AccommodationUnit::findOrFail($request->accommodation_unit_id);
 
-        // Check slot lock to prevent double-booking
-        $lockKey = "booking_lock_{$request->accommodation_unit_id}_{$request->booking_date}";
-        if (Cache::has($lockKey)) {
-            return response()->json(['error' => 'Someone is currently booking this accommodation. Please try again in a moment.'], 409);
-        }
-
-        // Lock slot for 5 minutes
-        Cache::put($lockKey, true, 300);
-
         try {
-            DB::beginTransaction();
-
-            // Check capacity
-            $capacity = CapacitySchedule::getCapacityForDate($request->booking_date);
-            if (!$capacity->isAvailable($request->guests_count)) {
-                Cache::forget($lockKey);
-                return response()->json(['error' => 'Capacity exceeded for this date. Please choose another date.'], 422);
-            }
-
-            // Check for existing active booking by same user for same date
-            $existingBooking = Booking::where('user_id', $request->user()->id)
-                ->where('booking_date', $request->booking_date)
-                ->whereIn('status', ['pending', 'paid', 'checked_in'])
-                ->first();
-
-            if ($existingBooking) {
-                Cache::forget($lockKey);
-                return response()->json(['error' => 'You already have an active booking for this date.'], 422);
-            }
-
-            $booking = Booking::create([
-                'reference_no'          => Booking::generateReferenceNo(),
-                'user_id'               => $request->user()->id,
-                'accommodation_unit_id' => $request->accommodation_unit_id,
-                'booking_date'          => $request->booking_date,
-                'time_slot'             => $request->time_slot ?? '2:00 PM Check-in · 11:00 AM Check-out',
-                'guests_count'          => $request->guests_count,
-                'special_requests'      => $request->special_requests,
-                'status'                => 'pending',
-                'total_amount'          => $unit->price_per_night,
+            $booking = $this->bookings->createRegular([
+                'unit'             => $unit,
+                'check_in'         => $request->booking_date,
+                'check_out'        => $request->check_out_date,
+                'guests_count'     => $request->guests_count,
+                'user_id'          => $user->id,
+                'special_requests' => $request->special_requests,
+                'payment_method'   => $request->input('payment_method', 'gcash'),
+                'booking_source'   => 'online',
             ]);
-
-            // Update capacity
-            $capacity->increment('current_count', $request->guests_count);
-
-            DB::commit();
-
-            // Release slot lock
-            Cache::forget($lockKey);
-
-            $booking->load(['accommodationUnit', 'user']);
-
-            // Broadcast event
-            broadcast(new \App\Events\BookingCreated($booking))->toOthers();
-
-            return response()->json([
-                'booking' => $booking,
-                'message' => 'Booking created successfully! Please proceed to payment.',
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Cache::forget($lockKey);
-            throw $e;
+        } catch (BookingConflictException $e) {
+            return response()->json(['error' => $e->getMessage()], 409);
         }
+
+        AuditLog::log('booking_created_by_tourist', $booking, null, $booking->toArray());
+
+        NotificationModel::notifyUser(
+            $user->id,
+            'booking',
+            'Reservation Submitted',
+            "Your reservation for {$unit->unit_number} ({$booking->reference_no}) has been received. Please complete payment to secure your stay.",
+            ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
+        );
+        NotificationModel::notifyAdminsAndStaff(
+            'booking',
+            'New Reservation Received',
+            "{$user->name} reserved {$unit->unit_number} from " . $booking->checkInDate()->format('M d') . ' to ' . $booking->checkOutDate()->format('M d, Y') . " (Ref: {$booking->reference_no}).",
+            ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
+        );
+
+        return response()->json([
+            'booking' => $booking->load(['accommodationUnit', 'payment']),
+            'message' => 'Booking created successfully. Please proceed to payment.',
+        ], 201);
     }
 
-    public function show(Booking $booking)
+    public function show(Request $request, Booking $booking)
     {
-        $booking->load(['user', 'accommodationUnit', 'payment', 'review']);
+        Gate::authorize('view', $booking);
+
+        $booking->load(['accommodationUnit', 'payment', 'review']);
+
+        if ($request->user()->isAdmin() || $request->user()->isStaff()) {
+            $booking->load('user');
+        }
+
         return response()->json($booking);
     }
 
     public function update(Request $request, Booking $booking)
     {
+        Gate::authorize('manage', $booking);
+
         $request->validate([
-            'status'              => 'sometimes|in:pending,paid,checked_in,checked_out,cancelled,completed',
-            'cancellation_reason' => 'required_if:status,cancelled',
+            'status'              => 'required|in:' . implode(',', Booking::STATUSES),
+            'cancellation_reason' => 'required_if:status,cancelled|nullable|string|max:255',
         ]);
 
-        $oldStatus = $booking->status;
-
-        if ($request->status === 'cancelled' && $oldStatus !== 'cancelled') {
-            $booking->update([
-                'status'              => 'cancelled',
-                'cancelled_at'        => now(),
-                'cancellation_reason' => $request->cancellation_reason,
+        try {
+            $booking = $this->bookings->changeStatus($booking, $request->status, [
+                'reason' => $request->cancellation_reason,
             ]);
-
-            // Release capacity
-            $capacity = CapacitySchedule::getCapacityForDate($booking->booking_date);
-            $capacity->decrement('current_count', $booking->guests_count);
-
-            broadcast(new \App\Events\CapacityUpdated($capacity));
-        } else {
-            $booking->update($request->only('status'));
+        } catch (InvalidBookingTransitionException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (BookingConflictException $e) {
+            return response()->json(['error' => $e->getMessage()], 409);
         }
 
-        AuditLog::log('booking_status_changed', $booking, ['status' => $oldStatus], ['status' => $booking->status]);
-
-        broadcast(new \App\Events\BookingUpdated($booking));
+        $this->bookings->notifyGuestOfStatus($booking);
 
         return response()->json([
-            'booking' => $booking->fresh()->load(['user', 'accommodationUnit', 'payment']),
+            'booking' => $booking->load(['user', 'accommodationUnit', 'payment']),
             'message' => 'Booking updated successfully.',
         ]);
     }
 
+    public function cancel(Request $request, Booking $booking)
+    {
+        Gate::authorize('cancel', $booking);
+
+        $request->validate(['cancellation_reason' => 'nullable|string|max:255']);
+
+        if (!in_array($booking->status, [Booking::STATUS_PENDING, Booking::STATUS_PAID], true)) {
+            return response()->json(['error' => 'Only pending or paid reservations can be cancelled.'], 422);
+        }
+
+        $booking = $this->bookings->cancel($booking, $request->cancellation_reason, 'booking_cancelled_by_tourist');
+
+        return response()->json(['message' => 'Booking cancelled successfully.', 'booking' => $booking]);
+    }
+
+    /**
+     * Public month view of daily visitor capacity (aggregate only).
+     */
     public function availability(Request $request)
     {
-        $request->validate([
-            'month' => 'sometimes|date_format:Y-m',
-        ]);
+        $request->validate(['month' => 'sometimes|date_format:Y-m']);
 
-        $month = $request->month ?? now()->format('Y-m');
-        $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        $endDate = $startDate->copy()->endOfMonth();
+        $startDate = Carbon::createFromFormat('Y-m', $request->month ?? now()->format('Y-m'))->startOfMonth();
+        $endDate   = $startDate->copy()->endOfMonth();
+        $defaultCap = (int) setting('daily_visitor_cap', 100);
 
-        $capacities = CapacitySchedule::whereBetween('date', [$startDate, $endDate])->get();
+        $capacities = CapacitySchedule::whereBetween('date', [$startDate, $endDate])
+            ->get()
+            ->keyBy(fn ($c) => $c->date->format('Y-m-d'));
 
         $availability = [];
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $capacity = $capacities->first(fn($c) => $c->date->format('Y-m-d') === $date->format('Y-m-d'));
-            $currentCount = $capacity ? $capacity->current_count : 0;
-            $maxCapacity = $capacity ? $capacity->max_capacity : setting('daily_visitor_cap', 100);
-            $utilization = $maxCapacity > 0 ? ($currentCount / $maxCapacity) * 100 : 0;
-
-            $status = 'available';
-            if ($utilization >= 100) {
-                $status = 'full';
-            } elseif ($utilization >= 70) {
-                $status = 'limited';
-            }
+            $key      = $date->format('Y-m-d');
+            $capacity = $capacities->get($key);
+            $current  = $capacity ? (int) $capacity->current_count : 0;
+            $max      = $capacity ? (int) $capacity->max_capacity : $defaultCap;
+            $util     = $max > 0 ? ($current / $max) * 100 : 0;
 
             $availability[] = [
-                'date'          => $date->format('Y-m-d'),
-                'status'        => $status,
-                'current_count' => $currentCount,
-                'max_capacity'  => $maxCapacity,
-                'utilization'   => round($utilization, 1),
+                'date'          => $key,
+                'status'        => $util >= 100 ? 'full' : ($util >= 70 ? 'limited' : 'available'),
+                'current_count' => $current,
+                'max_capacity'  => $max,
+                'utilization'   => round($util, 1),
             ];
         }
 
         return response()->json($availability);
-    }
-
-    public function cancel(Request $request, Booking $booking)
-    {
-        $request->validate([
-            'cancellation_reason' => 'required|string',
-        ]);
-
-        if (!in_array($booking->status, ['pending', 'paid'])) {
-            return response()->json(['error' => 'This booking cannot be cancelled.'], 422);
-        }
-
-        $booking->update([
-            'status'              => 'cancelled',
-            'cancelled_at'        => now(),
-            'cancellation_reason' => $request->cancellation_reason,
-        ]);
-
-        $capacity = CapacitySchedule::getCapacityForDate($booking->booking_date);
-        $capacity->decrement('current_count', $booking->guests_count);
-
-        broadcast(new \App\Events\CapacityUpdated($capacity));
-        broadcast(new \App\Events\BookingUpdated($booking));
-
-        return response()->json(['message' => 'Booking cancelled successfully.', 'booking' => $booking->fresh()]);
     }
 }

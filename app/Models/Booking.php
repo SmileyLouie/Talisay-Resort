@@ -10,9 +10,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'reference_no',                     // Unique booking reference (e.g., TBR-A1B2C3D4)
@@ -38,11 +40,108 @@ use Illuminate\Database\Eloquent\Model;
     'cancelled_at',                     // Timestamp when this booking was cancelled (null if not cancelled)
     'cancellation_reason',              // Reason given for cancellation (required when cancelling)
     'total_amount',                     // Total price in PHP
+    'external_id',                      // UUID shared with the Supabase client booking
 ])]
 
 class Booking extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
+
+    public const STATUS_PENDING     = 'pending';
+    public const STATUS_PAID        = 'paid';
+    public const STATUS_CHECKED_IN  = 'checked_in';
+    public const STATUS_CHECKED_OUT = 'checked_out';
+    public const STATUS_CANCELLED   = 'cancelled';
+    public const STATUS_COMPLETED   = 'completed';
+
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PAID,
+        self::STATUS_CHECKED_IN,
+        self::STATUS_CHECKED_OUT,
+        self::STATUS_CANCELLED,
+        self::STATUS_COMPLETED,
+    ];
+
+    /** Statuses that occupy inventory and block other reservations. */
+    public const ACTIVE_STATUSES = [self::STATUS_PENDING, self::STATUS_PAID, self::STATUS_CHECKED_IN];
+
+    /**
+     * Allowed status transitions. A cancelled booking may be reinstated,
+     * but only after the availability check is repeated.
+     */
+    public const TRANSITIONS = [
+        self::STATUS_PENDING     => [self::STATUS_PAID, self::STATUS_CHECKED_IN, self::STATUS_CANCELLED],
+        self::STATUS_PAID        => [self::STATUS_CHECKED_IN, self::STATUS_COMPLETED, self::STATUS_CANCELLED],
+        self::STATUS_CHECKED_IN  => [self::STATUS_CHECKED_OUT, self::STATUS_COMPLETED, self::STATUS_CANCELLED],
+        self::STATUS_CHECKED_OUT => [self::STATUS_COMPLETED],
+        self::STATUS_COMPLETED   => [],
+        self::STATUS_CANCELLED   => [self::STATUS_PENDING, self::STATUS_PAID],
+    ];
+
+    public const DEFAULT_TIME_SLOT = '2:00 PM Check-in · 12:00 PM Check-out';
+
+    public function canTransitionTo(string $status): bool
+    {
+        return in_array($status, self::TRANSITIONS[$this->status] ?? [], true);
+    }
+
+    public function isActive(): bool
+    {
+        return in_array($this->status, self::ACTIVE_STATUSES, true);
+    }
+
+    public function isSpecialResort(): bool
+    {
+        return $this->booking_type === 'special_resort';
+    }
+
+    /** Effective check-in date (falls back to legacy booking_date). */
+    public function checkInDate(): Carbon
+    {
+        return ($this->check_in_date ?? $this->booking_date)->copy()->startOfDay();
+    }
+
+    /** Effective check-out date (legacy rows are treated as a single night). */
+    public function checkOutDate(): Carbon
+    {
+        if ($this->check_out_date) {
+            return $this->check_out_date->copy()->startOfDay();
+        }
+
+        return $this->checkInDate()->addDays(max(1, (int) $this->nights_count));
+    }
+
+    /**
+     * Every calendar date the booking occupies: [check-in, check-out).
+     *
+     * @return array<int, string> Y-m-d strings
+     */
+    public function occupiedDates(): array
+    {
+        $dates = [];
+        for ($d = $this->checkInDate(); $d->lt($this->checkOutDate()); $d->addDay()) {
+            $dates[] = $d->format('Y-m-d');
+        }
+
+        return $dates ?: [$this->checkInDate()->format('Y-m-d')];
+    }
+
+    /**
+     * Normalise a requested stay: returns [check_in Y-m-d, check_out Y-m-d, nights].
+     * A missing or non-positive range is treated as a single night.
+     */
+    public static function normaliseStay($checkIn, $checkOut = null): array
+    {
+        $in  = Carbon::parse($checkIn)->startOfDay();
+        $out = $checkOut ? Carbon::parse($checkOut)->startOfDay() : $in->copy()->addDay();
+
+        if ($out->lte($in)) {
+            $out = $in->copy()->addDay();
+        }
+
+        return [$in->format('Y-m-d'), $out->format('Y-m-d'), (int) $in->diffInDays($out)];
+    }
 
     /**
      * Define how specific columns should be cast when read from the database.
@@ -151,16 +250,39 @@ class Booking extends Model
 
     public function scopeActive($query)
     {
-        return $query->whereIn('status', ['pending', 'paid', 'checked_in']);
+        return $query->whereIn('status', self::ACTIVE_STATUSES);
+    }
+
+    /**
+     * Bookings whose stay covers the given calendar date (check-out day excluded).
+     */
+    public function scopeOccupyingDate($query, $date)
+    {
+        $day = Carbon::parse($date)->format('Y-m-d');
+
+        return $query->where(function ($q) use ($day) {
+            $q->where(function ($inner) use ($day) {
+                $inner->whereNotNull('check_in_date')
+                      ->whereDate('check_in_date', '<=', $day)
+                      ->whereDate('check_out_date', '>', $day);
+            })->orWhere(function ($inner) use ($day) {
+                $inner->whereNull('check_in_date')
+                      ->whereDate('booking_date', '=', $day);
+            });
+        });
     }
 
     // ──────────────────────────────────────────────────────────
     // STATIC HELPERS & CONFLICT CHECKING
     // ──────────────────────────────────────────────────────────
 
-    public static function generateReferenceNo(): string
+    public static function generateReferenceNo(string $prefix = 'TBR'): string
     {
-        return 'TBR-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8));
+        do {
+            $ref = $prefix . '-' . strtoupper(bin2hex(random_bytes(4)));
+        } while (self::withTrashed()->where('reference_no', $ref)->exists());
+
+        return $ref;
     }
 
     /**
@@ -196,7 +318,7 @@ class Booking extends Model
             $cout = \Carbon\Carbon::parse($cin)->addDay()->format('Y-m-d');
         }
 
-        $query = self::whereIn('status', ['pending', 'paid', 'checked_in'])
+        $query = self::whereIn('status', self::ACTIVE_STATUSES)
             ->where(function ($q) use ($unitId) {
                 $q->where('accommodation_unit_id', $unitId)
                   ->orWhere('booking_type', 'special_resort');
@@ -236,7 +358,7 @@ class Booking extends Model
             $cout = \Carbon\Carbon::parse($cin)->addDay()->format('Y-m-d');
         }
 
-        $query = self::whereIn('status', ['pending', 'paid', 'checked_in'])
+        $query = self::whereIn('status', self::ACTIVE_STATUSES)
             ->where(function ($q) use ($cin, $cout) {
                 $q->where(function ($inner) use ($cin, $cout) {
                     $inner->whereNotNull('check_in_date')
@@ -264,7 +386,7 @@ class Booking extends Model
      */
     public static function getBookedDateRangesForUnit($unitId): array
     {
-        return self::whereIn('status', ['pending', 'paid', 'checked_in'])
+        return self::whereIn('status', self::ACTIVE_STATUSES)
             ->where(function ($q) use ($unitId) {
                 $q->where('accommodation_unit_id', $unitId)
                   ->orWhere('booking_type', 'special_resort');

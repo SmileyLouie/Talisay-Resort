@@ -1,67 +1,71 @@
-{{-- Extends the base layout designed for unauthenticated guest sessions --}}
 @extends('layouts.guest')
 
-{{-- Sets the browser tab title specifically for this password reset submission page --}}
 @section('title', 'Reset Password - Talisay Smart Tourism')
 
-{{-- Defines the main content area of the guest layout template --}}
-@section('content')
+@push('styles')
+<style>
+:root { --auth-primary: #0284c7; --auth-primary-hover: #0369a1; }
+.fp-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+.fp-bg { position: absolute; inset: 0; background-image: url('{{ asset('images/hero-landing.jpg') }}'); background-size: cover; background-position: center; }
+.fp-overlay { position: absolute; inset: 0; background: rgba(6, 20, 48, 0.55); }
+.fp-card { position: relative; z-index: 2; width: 100%; max-width: 440px; background: #fff; border-radius: 24px; padding: 40px 36px 32px; box-shadow: 0 24px 60px rgba(6, 20, 48, 0.28); margin: 20px; font-family: 'Plus Jakarta Sans', sans-serif; }
+.fp-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0 0 8px; text-align: center; }
+.fp-subtitle { font-size: 13px; color: #64748b; text-align: center; margin-bottom: 22px; }
+.fp-alert { display: flex; align-items: center; gap: 10px; border-radius: 12px; padding: 11px 14px; font-size: 13px; font-weight: 500; margin-bottom: 18px; }
+.fp-alert-error { background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; }
+.fp-label { display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 7px; }
+.fp-input { width: 100%; height: 46px; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 0 14px; font-size: 14px; margin-bottom: 14px; }
+.fp-input:focus { outline: none; border-color: var(--auth-primary); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12); }
+.fp-btn-submit { width: 100%; height: 46px; border: none; border-radius: 9999px; background: var(--auth-primary); color: #fff; font-weight: 700; cursor: pointer; }
+.fp-btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+.fp-back { display: block; text-align: center; margin-top: 16px; color: var(--auth-primary); font-size: 13px; font-weight: 600; text-decoration: none; }
+</style>
+@endpush
 
-{{-- Background wrapper div setting up full viewport height, flex layout, center alignment, relative positioning, and a premium ocean-themed gradient --}}
-<div class="min-h-screen flex items-center justify-center relative overflow-hidden" style="background: linear-gradient(135deg, #0c4a6e 0%, #164e63 40%, #0ea5e9 100%);">
-    
-    {{-- Decorative background overlay with 20% opacity using a beach image from Unsplash to match the resort aesthetics --}}
-    <div class="absolute inset-0 opacity-20" style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920'); background-size: cover; background-position: center;"></div>
-    
-    {{-- Content container with relative positioning to sit above the background, max width constraints, and padding for mobile views --}}
-    <div class="relative z-10 w-full max-w-md px-4">
-        
-        {{-- Card element containing the password reset form, featuring white background with 95% opacity, backdrop blur, rounded corners, shadow, and inner padding --}}
-        <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
-            
-            {{-- Header section containing reset password title --}}
-            <div class="text-center mb-6">
-                
-                {{-- Principal page heading for password reset confirmation --}}
-                <h1 class="text-2xl font-bold">Reset Password</h1>
-            </div>
-            
-            {{-- Form starting route submission to update password --}}
-            <form action="{{ route('password.update') }}" method="POST">
-                
-                {{-- Generates the CSRF token input field for secure post submissions --}}
-                @csrf
-                
-                {{-- Hidden input storing the token retrieved from the reset link --}}
-                <input type="hidden" name="token" value="{{ $request->token }}">
-                
-                {{-- Hidden input storing the email address retrieved from the reset link parameters --}}
-                <input type="hidden" name="email" value="{{ $request->email }}">
-                
-                {{-- Form control group for new password field --}}
-                <div class="mb-4">
-                    
-                    {{-- Label indicating password creation field --}}
-                    <label class="form-label text-sm font-medium">New Password</label>
-                    
-                    {{-- Input element for entering the new password --}}
-                    <input type="password" name="password" class="form-control" required>
-                </div>
-                
-                {{-- Form control group for password confirmation field --}}
-                <div class="mb-4">
-                    
-                    {{-- Label indicating password confirmation field --}}
-                    <label class="form-label text-sm font-medium">Confirm Password</label>
-                    
-                    {{-- Input element for verifying the new password entry --}}
-                    <input type="password" name="password_confirmation" class="form-control" required>
-                </div>
-                
-                {{-- Submission button triggering the update operation --}}
-                <button type="submit" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 rounded-lg transition">Reset Password</button>
-            </form>
+@section('content')
+<div class="fp-screen">
+    <div class="fp-bg"></div>
+    <div class="fp-overlay"></div>
+    <div class="fp-card">
+        <h1 class="fp-title">Reset Password</h1>
+        <p class="fp-subtitle">Choose a new password for your Talisay Beach Resort account.</p>
+
+        @if($errors->any())
+        <div class="fp-alert fp-alert-error" role="alert">
+            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+            <span>{{ $errors->first('email') ?: $errors->first('password') ?: $errors->first('token') ?: $errors->first() }}</span>
         </div>
+        @endif
+
+        <form action="{{ route('password.update') }}" method="POST" id="resetPasswordForm">
+            @csrf
+            <input type="hidden" name="token" value="{{ $request->route('token') ?? $request->token }}">
+
+            <label class="fp-label" for="resetEmail">Email Address</label>
+            <input type="email" name="email" id="resetEmail" class="fp-input" value="{{ old('email', $request->email ?? request('email')) }}" required autocomplete="username">
+
+            <label class="fp-label" for="resetPassword">New Password</label>
+            <input type="password" name="password" id="resetPassword" class="fp-input" required minlength="8" autocomplete="new-password">
+
+            <label class="fp-label" for="resetPasswordConfirm">Confirm Password</label>
+            <input type="password" name="password_confirmation" id="resetPasswordConfirm" class="fp-input" required minlength="8" autocomplete="new-password">
+
+            <button type="submit" class="fp-btn-submit" id="resetSubmitBtn">Reset Password</button>
+        </form>
+
+        <a href="{{ route('login') }}" class="fp-back">Back to login</a>
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.getElementById('resetPasswordForm')?.addEventListener('submit', function () {
+    const btn = document.getElementById('resetSubmitBtn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.textContent = 'Updating...';
+});
+</script>
+@endpush

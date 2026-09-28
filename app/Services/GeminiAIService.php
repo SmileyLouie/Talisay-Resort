@@ -42,7 +42,9 @@ class GeminiAIService
             $aiService = app(ChatbotAIService::class);
             return $aiService->chat($systemPrompt, $userMessage, $history);
         } catch (\Throwable $e) {
-            // Fallback to direct Gemini HTTP if ChatbotAIService encountered an issue
+            if (str_contains($e->getMessage(), 'cURL error') || str_contains($e->getMessage(), 'Gemini connection failed')) {
+                throw $e;
+            }
             return $this->chatDirectGemini($systemPrompt, $userMessage, $history);
         }
     }
@@ -81,8 +83,8 @@ class GeminiAIService
             ],
             'contents' => $contents,
             'generationConfig' => [
-                'temperature'     => (float) $config->temperature ?: 0.7,
-                'maxOutputTokens' => (int) $config->max_tokens ?: 600,
+                'temperature'     => $config->temperature !== null ? (float) $config->temperature : 0.7,
+                'maxOutputTokens' => ((int) $config->max_tokens) ?: 600,
                 'topP'            => 0.9,
             ],
             'safetySettings' => [
@@ -94,7 +96,6 @@ class GeminiAIService
         ];
 
         $response = Http::timeout(15)
-            ->withoutVerifying()
             ->withHeaders(['Content-Type' => 'application/json'])
             ->post($endpoint, $payload);
 
@@ -125,7 +126,11 @@ class GeminiAIService
     public function isConfigured(): bool
     {
         $config = ChatbotConfig::current();
-        if ($config->is_enabled && $config->hasApiKey()) {
+        if (!$config->is_enabled) {
+            return false;
+        }
+
+        if ($config->hasApiKey()) {
             return true;
         }
 

@@ -67,7 +67,6 @@ class OpenAIProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(15)
-                ->withoutVerifying()
                 ->withHeaders([
                     'Authorization' => "Bearer {$apiKey}",
                     'Content-Type'  => 'application/json',
@@ -108,7 +107,6 @@ class OpenAIProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(10)
-                ->withoutVerifying()
                 ->withHeaders([
                     'Authorization' => "Bearer {$apiKey}",
                     'Content-Type'  => 'application/json',

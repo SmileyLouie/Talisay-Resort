@@ -120,7 +120,7 @@ class SystemSettingsUserAccountsTest extends TestCase
 
         $response = $this->delete(route('users.destroy', $guest));
         $response->assertRedirect(route('users.index'));
-        $this->assertDatabaseMissing('users', ['id' => $guest->id]);
+        $this->assertSoftDeleted('users', ['id' => $guest->id]);
     }
 
     public function test_users_index_url_redirects_to_settings_user_accounts_tab(): void

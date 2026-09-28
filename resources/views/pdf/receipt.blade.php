@@ -25,7 +25,7 @@
     <div class="header">
         <h1>TALISAY BEACH RESORT</h1>
         <p>Barangay Maslug, Baybay City, Leyte</p>
-        <p>Email: info@talisayresort.com | Phone: +63-XXX-XXX-XXXX</p>
+        <p>Email: {{ setting('resort_email', 'info@talisayresort.com') }} | Phone: {{ setting('resort_phone', '+63 (053) 563-7000') }}</p>
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;">

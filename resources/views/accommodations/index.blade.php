@@ -226,7 +226,7 @@
 <div class="modal fade" id="createUnitModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-slate-900 to-sky-950 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
                         <i class="bi bi-building-add"></i>
@@ -315,7 +315,7 @@
 <div class="modal fade" id="editUnitModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-slate-900 to-sky-950 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
                         <i class="bi bi-pencil-square"></i>

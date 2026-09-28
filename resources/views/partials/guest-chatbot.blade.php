@@ -15,6 +15,7 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
+        padding: 0;
         z-index: 1050;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -233,39 +234,40 @@
 </style>
 
 {{-- Floating Chatbot FAB Button --}}
-<div class="guest-chatbot-fab" id="guestChatbotFab" onclick="toggleGuestChatbot()" title="Open Resort Assistant">
-    <i class="bi bi-chat-dots-fill" id="guestChatbotIcon"></i>
-</div>
+<button type="button" class="guest-chatbot-fab" id="guestChatbotFab" onclick="toggleGuestChatbot()" title="Open Resort Assistant" aria-label="Open Resort Assistant" aria-expanded="false" aria-controls="guestChatbotCard">
+    <i class="bi bi-chat-dots-fill" id="guestChatbotIcon" aria-hidden="true"></i>
+</button>
 
 {{-- Floating Chatbot Panel --}}
-<div class="guest-chatbot-card" id="guestChatbotCard">
+<div class="guest-chatbot-card" id="guestChatbotCard" role="dialog" aria-labelledby="gcbTitle" aria-hidden="true">
     <div class="gcb-header">
         <div class="gcb-header-info">
             <div class="gcb-avatar">
-                <i class="bi bi-robot"></i>
+                <i class="bi bi-robot" aria-hidden="true"></i>
             </div>
             <div>
-                <div class="gcb-title">Talisay Assistant</div>
+                <div class="gcb-title" id="gcbTitle">Talisay Assistant</div>
                 <div class="gcb-subtitle">Resort Assistant</div>
             </div>
         </div>
         <button type="button" class="gcb-close-btn" onclick="toggleGuestChatbot(false)" aria-label="Close Chatbot">
-            <i class="bi bi-x-lg"></i>
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
         </button>
     </div>
 
-    <div class="gcb-body" id="gcbMessages">
+    <div class="gcb-body" id="gcbMessages" aria-live="polite">
         {{-- Initial Bot Message --}}
         <div class="gcb-msg gcb-msg-bot" id="gcbInitialMsg">
-            Hello! 👋 Welcome to Talisay Beach Resort. How can I assist you today? You can ask about room rates, amenities, check-in policies, or account registration.
+            Hello! Welcome to Talisay Beach Resort. How can I assist you today? You can ask about room rates, amenities, check-in policies, or account registration.
         </div>
         <div class="gcb-chips-wrap" id="gcbChipsContainer"></div>
     </div>
 
     <form class="gcb-footer" id="gcbForm" onsubmit="handleGuestChatSubmit(event)">
+        <label for="gcbInput" class="visually-hidden">Type your message</label>
         <input type="text" class="gcb-input" id="gcbInput" placeholder="Ask about rates, hours, 360° tour..." autocomplete="off">
         <button type="submit" class="gcb-send-btn" id="gcbSendBtn" aria-label="Send message">
-            <i class="bi bi-send-fill"></i>
+            <i class="bi bi-send-fill" aria-hidden="true"></i>
         </button>
     </form>
 </div>
@@ -279,10 +281,11 @@
 
     function formatGcbText(text) {
         if (!text) return '';
-        let escaped = text
+        let escaped = String(text)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
 
         escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">•</span><span>$1</span></div>');
 
@@ -298,12 +301,19 @@
     window.toggleGuestChatbot = function(forceState) {
         const card = document.getElementById('guestChatbotCard');
         const icon = document.getElementById('guestChatbotIcon');
+        const fab = document.getElementById('guestChatbotFab');
         if (!card || !icon) return;
 
         if (typeof forceState === 'boolean') {
             gcbOpen = forceState;
         } else {
             gcbOpen = !gcbOpen;
+        }
+
+        card.setAttribute('aria-hidden', gcbOpen ? 'false' : 'true');
+        if (fab) {
+            fab.setAttribute('aria-expanded', gcbOpen ? 'true' : 'false');
+            fab.setAttribute('aria-label', gcbOpen ? 'Close Resort Assistant' : 'Open Resort Assistant');
         }
 
         if (gcbOpen) {
@@ -320,6 +330,12 @@
         }
     };
 
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && gcbOpen) {
+            window.toggleGuestChatbot(false);
+        }
+    });
+
     function renderGcbChips(chips) {
         const container = document.getElementById('gcbChipsContainer');
         if (!container) return;
@@ -327,11 +343,12 @@
         if (!chips || !chips.length) return;
 
         chips.forEach(chip => {
+            const label = String(chip);
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'gcb-chip-btn';
-            btn.textContent = chip;
-            btn.onclick = () => handleGcbChipClick(chip);
+            btn.textContent = label;
+            btn.onclick = () => handleGcbChipClick(label);
             container.appendChild(btn);
         });
     }
@@ -418,7 +435,7 @@
 
             if (chipsContainer) {
                 bodyEl.appendChild(chipsContainer);
-                renderGcbChips(data.chips || gcbDefaultChips);
+                renderGcbChips(Array.isArray(data.chips) && data.chips.length ? data.chips : gcbDefaultChips);
             }
         } catch (err) {
             typingEl.remove();

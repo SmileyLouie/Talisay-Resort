@@ -28,6 +28,7 @@
                             100: '#e0f2fe',
                             500: '#0ea5e9',
                             600: '#0284c7',
+                            700: '#0369a1',
                             800: '#075985',
                             900: '#0c4a6e',
                         }
@@ -38,12 +39,15 @@
     </script>
 
     {{-- Alpine.js --}}
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 
     <style>
+        [x-cloak] { display: none !important; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .bg-ocean-gradient { background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 60%, #0ea5e9 100%); }
-        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); }
+        .bg-ocean-gradient { background: #0c4a6e; }
+        .glass-card { background: #ffffff; }
+        .rounded-3xl { border-radius: 12px !important; }
+        .rounded-2xl { border-radius: 8px !important; }
         .chat-widget-box { height: 420px; }
         .chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.88rem; margin-bottom: 10px; }
         .chat-msg.bot { background: #e0f2fe; color: #075985; border-bottom-left-radius: 4px; align-self: flex-start; }
@@ -53,13 +57,13 @@
 <body class="h-full flex flex-col text-slate-800 antialiased" x-data="{ chatOpen: false, mobileMenuOpen: false }">
 
     {{-- ── Top Navigation Bar ─────────────────────────────────────────── --}}
-    <nav class="bg-ocean-900 text-white sticky top-0 z-40 shadow-lg border-b border-white/10">
+    <nav class="bg-ocean-900 text-white sticky top-0 z-40 border-b border-ocean-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-20">
+            <div class="flex items-center justify-between h-16">
 
                 {{-- Brand Logo + Title --}}
                 <a href="{{ route('tourist.dashboard') }}" class="flex items-center gap-3 no-underline group">
-                    <img src="{{ asset('images/logo.png') }}" alt="Talisay Logo" class="w-11 h-11 rounded-xl border-2 border-sky-400 shadow-md group-hover:scale-105 transition-transform">
+                    <img src="{{ asset('images/logo.png') }}" alt="Talisay Logo" class="w-10 h-10 rounded-lg border border-sky-700">
                     <div>
                         <span class="text-lg font-extrabold tracking-tight text-white block leading-tight">Talisay Beach Resort</span>
                         <span class="text-xs font-semibold text-sky-300 tracking-wider uppercase block">Guest Web Portal</span>
@@ -123,19 +127,19 @@
                             } catch (e) {}
                         }
                     }">
-                        <button @click="notifOpen = !notifOpen" class="relative p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition">
-                            <i class="bi bi-bell-fill text-base"></i>
+                        <button type="button" @click="notifOpen = !notifOpen" :aria-expanded="notifOpen.toString()" aria-controls="touristNotifPanel" aria-label="Notifications" class="relative p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                            <i class="bi bi-bell-fill text-base" aria-hidden="true"></i>
                             <span x-show="unread > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-extrabold rounded-full w-5 h-5 flex items-center justify-center shadow" x-text="unread"></span>
                         </button>
 
-                        <div x-show="notifOpen" @click.outside="notifOpen = false" x-transition class="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-slate-800" style="width: 22rem;" x-cloak>
+                        <div id="touristNotifPanel" x-show="notifOpen" @click.outside="notifOpen = false" @keydown.escape.window="notifOpen = false" x-transition class="absolute right-0 mt-2 w-[calc(100vw-4rem)] sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-slate-800" x-cloak>
                             <div class="p-3.5 bg-ocean-900 text-white flex items-center justify-between">
                                 <div class="flex items-center gap-2">
-                                    <i class="bi bi-bell-fill text-sky-400"></i>
+                                    <i class="bi bi-bell-fill text-sky-400" aria-hidden="true"></i>
                                     <span class="font-extrabold text-xs tracking-wider uppercase">Notifications</span>
                                     <span x-show="unread > 0" class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full" x-text="unread + ' new'"></span>
                                 </div>
-                                <button @click="markAllRead()" class="text-[11px] text-sky-300 hover:text-white font-semibold transition">
+                                <button type="button" @click="markAllRead()" class="text-[11px] text-sky-300 hover:text-white font-semibold transition">
                                     Mark all read
                                 </button>
                             </div>
@@ -169,8 +173,9 @@
                                 </div>
                                 @empty
                                 <div class="p-8 text-center text-slate-400">
-                                    <i class="bi bi-bell-slash text-3xl block mb-2 text-slate-300"></i>
-                                    <p class="text-xs font-semibold mb-0">No notifications yet</p>
+                                    <i class="bi bi-bell-slash text-3xl block mb-2 text-slate-300" aria-hidden="true"></i>
+                                    <p class="text-xs font-semibold mb-1">No notifications yet</p>
+                                    <p class="text-[11px] text-slate-400 mb-0">Booking updates and payment confirmations will appear here.</p>
                                 </div>
                                 @endforelse
                             </div>
@@ -179,15 +184,15 @@
 
                     {{-- Profile / Logout Dropdown --}}
                     <div class="relative" x-data="{ open: false }">
-                        <button @click="open = !open" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 p-1.5 pr-3 rounded-full transition border border-white/10">
+                        <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="touristUserMenu" aria-label="Account menu" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 p-1.5 pr-3 rounded-full transition border border-white/10">
                             <div class="w-8 h-8 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center border border-white/30">
                                 {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                             </div>
                             <span class="text-xs font-semibold text-white hidden sm:inline">{{ auth()->user()->name }}</span>
-                            <i class="bi bi-chevron-down text-xs text-sky-200"></i>
+                            <i class="bi bi-chevron-down text-xs text-sky-200" aria-hidden="true"></i>
                         </button>
 
-                        <div x-show="open" @click.outside="open = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 text-slate-700 z-50">
+                        <div id="touristUserMenu" x-show="open" @click.outside="open = false" @keydown.escape.window="open = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 text-slate-700 z-50" x-cloak>
                             <div class="px-4 py-2 border-b border-slate-100">
                                 <p class="text-xs font-bold text-slate-800 mb-0">{{ auth()->user()->name }}</p>
                                 <p class="text-xs text-slate-500 mb-0 truncate">{{ auth()->user()->email }}</p>
@@ -209,8 +214,8 @@
                     @endauth
 
                     {{-- Mobile Hamburger Toggle Button --}}
-                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden text-white p-2 rounded-lg bg-white/10 hover:bg-white/20 text-lg">
-                        <i class="bi" :class="mobileMenuOpen ? 'bi-x-lg' : 'bi-list'"></i>
+                    <button type="button" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="touristMobileMenu" aria-label="Toggle navigation menu" class="md:hidden text-white p-2 rounded-lg bg-white/10 hover:bg-white/20 text-lg">
+                        <i class="bi" :class="mobileMenuOpen ? 'bi-x-lg' : 'bi-list'" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -218,7 +223,7 @@
         </div>
 
         {{-- Mobile Dropdown Menu --}}
-        <div x-show="mobileMenuOpen" x-transition class="md:hidden bg-ocean-950 border-t border-white/10 px-4 pt-3 pb-4 space-y-1">
+        <div id="touristMobileMenu" x-show="mobileMenuOpen" x-transition x-cloak class="md:hidden bg-ocean-950 border-t border-white/10 px-4 pt-3 pb-4 space-y-1">
             <a href="{{ route('tourist.dashboard') }}" class="block px-3 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 no-underline">
                 <i class="bi bi-house-door me-2"></i>Home
             </a>
@@ -239,25 +244,50 @@
 
     {{-- Flash Notifications --}}
     @if(session('success'))
-    <div class="max-w-7xl mx-auto px-4 mt-4 w-full">
+    <div class="max-w-7xl mx-auto px-4 mt-4 w-full" id="touristFlashSuccess" role="status">
         <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm">
             <div class="flex items-center gap-2">
-                <i class="bi bi-check-circle-fill text-emerald-600 text-lg"></i>
+                <i class="bi bi-check-circle-fill text-emerald-600 text-lg" aria-hidden="true"></i>
                 <span class="text-sm font-semibold">{{ session('success') }}</span>
             </div>
-            <button onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-800"><i class="bi bi-x-lg"></i></button>
+            <button type="button" onclick="this.closest('#touristFlashSuccess').remove()" class="text-emerald-500 hover:text-emerald-800" aria-label="Dismiss message"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+        </div>
+    </div>
+    <script>
+        setTimeout(function () {
+            var el = document.getElementById('touristFlashSuccess');
+            if (el) el.remove();
+        }, 6000);
+    </script>
+    @endif
+
+    @if(session('error'))
+    <div class="max-w-7xl mx-auto px-4 mt-4 w-full" id="touristFlashError" role="alert">
+        <div class="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-rose-600 text-lg" aria-hidden="true"></i>
+                <span class="text-sm font-semibold">{{ session('error') }}</span>
+            </div>
+            <button type="button" onclick="this.closest('#touristFlashError').remove()" class="text-rose-500 hover:text-rose-800" aria-label="Dismiss message"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
         </div>
     </div>
     @endif
 
-    @if(session('error'))
-    <div class="max-w-7xl mx-auto px-4 mt-4 w-full">
-        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2">
-                <i class="bi bi-exclamation-triangle-fill text-red-600 text-lg"></i>
-                <span class="text-sm font-semibold">{{ session('error') }}</span>
+    @if($errors->any())
+    <div class="max-w-7xl mx-auto px-4 mt-4 w-full" id="touristFlashErrors" role="alert">
+        <div class="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-start justify-between gap-3 shadow-sm">
+            <div class="flex items-start gap-2">
+                <i class="bi bi-exclamation-circle-fill text-rose-600 text-lg" aria-hidden="true"></i>
+                <div>
+                    <p class="text-sm font-bold mb-1">Please correct the following:</p>
+                    <ul class="mb-0 ps-3 text-xs space-y-0.5">
+                        @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             </div>
-            <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-800"><i class="bi bi-x-lg"></i></button>
+            <button type="button" onclick="this.closest('#touristFlashErrors').remove()" class="text-rose-500 hover:text-rose-800" aria-label="Dismiss message"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
         </div>
     </div>
     @endif
@@ -271,10 +301,10 @@
     <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center">
             <div class="flex items-center justify-center gap-2 mb-3">
-                <img src="{{ asset('images/logo.png') }}" alt="Logo" class="w-6 h-6 rounded-md">
+                <img src="{{ asset('images/logo.png') }}" alt="Talisay Beach Resort logo" class="w-6 h-6 rounded-md">
                 <span class="text-sm font-bold text-white">Talisay Beach Resort Smart Tourism</span>
             </div>
-            <p class="text-xs text-slate-500 mb-0">&copy; 2026 Talisay Beach Resort. Barangay Maslug, Baybay City, Leyte. All rights reserved.</p>
+            <p class="text-xs text-slate-500 mb-0">&copy; {{ date('Y') }} Talisay Beach Resort. {{ setting('resort_address', 'Barangay Maslug, Baybay City, Leyte') }}. All rights reserved.</p>
         </div>
     </footer>
 
@@ -289,40 +319,40 @@
         .typing-dot:nth-child(3){ animation-delay:.4s; }
         @keyframes bounce{ 0%,80%,100%{ transform:translateY(0); } 40%{ transform:translateY(-7px); } }
     </style>
-    <div class="fixed bottom-6 right-6 z-50" x-data="touristChatbot()">
+    <div class="fixed bottom-6 right-6 z-50" x-data="touristChatbot()" @keydown.escape.window="open = false">
         {{-- Chat Trigger Floating Button --}}
-        <button @click="open = !open" style="background: linear-gradient(135deg, #0c4a6e 0%, #075985 60%, #0284c7 100%); box-shadow: 0 10px 28px rgba(12, 74, 110, 0.45);" class="w-14 h-14 text-white rounded-full flex items-center justify-center text-2xl transition transform hover:scale-108 border-2 border-white/40">
-            <i class="bi" :class="open ? 'bi-x-lg' : 'bi-chat-dots-fill'"></i>
+        <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="touristChatWindow" aria-label="Open Talisay AI Assistant" style="background: linear-gradient(135deg, #0c4a6e 0%, #075985 60%, #0284c7 100%); box-shadow: 0 10px 28px rgba(12, 74, 110, 0.45);" class="w-14 h-14 text-white rounded-full flex items-center justify-center text-2xl transition transform hover:scale-108 border-2 border-white/40">
+            <i class="bi" :class="open ? 'bi-x-lg' : 'bi-chat-dots-fill'" aria-hidden="true"></i>
         </button>
 
         {{-- Chat Box Window --}}
-        <div x-show="open" x-transition class="absolute bottom-16 right-0 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col chat-widget-box" x-cloak>
+        <div id="touristChatWindow" x-show="open" x-transition role="dialog" aria-labelledby="touristChatTitle" class="absolute bottom-16 right-0 w-[calc(100vw-3rem)] sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col chat-widget-box" x-cloak>
             {{-- Header --}}
             <div style="background: linear-gradient(135deg, #0c4a6e 0%, #075985 60%, #0284c7 100%);" class="text-white p-4 flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-sky-500/30 flex items-center justify-center border border-sky-400">
-                    <i class="bi bi-robot text-lg text-sky-200"></i>
+                    <i class="bi bi-robot text-lg text-sky-200" aria-hidden="true"></i>
                 </div>
                 <div class="flex-1">
-                    <h4 class="text-sm font-extrabold mb-0">Talisay AI Assistant</h4>
+                    <h4 id="touristChatTitle" class="text-sm font-extrabold mb-0">Talisay AI Assistant</h4>
                     <p class="text-xs text-sky-300 mb-0">Online • Real-time Resort Info</p>
                 </div>
-                <button @click="open = false" class="text-white/60 hover:text-white text-lg">
-                    <i class="bi bi-x-lg"></i>
+                <button type="button" @click="open = false" class="text-white/60 hover:text-white text-lg" aria-label="Close chat">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
                 </button>
             </div>
 
             {{-- Messages Area --}}
-            <div class="flex-1 p-4 overflow-y-auto flex flex-col gap-2 bg-slate-50" style="max-height:380px;" x-ref="messagesBox">
+            <div class="flex-1 p-4 overflow-y-auto flex flex-col gap-2 bg-slate-50" style="max-height:380px;" x-ref="messagesBox" aria-live="polite">
                 <div class="chat-msg-bot">
-                    Hello {{ first_name(auth()->user()->name) }}! 👋 Welcome back to Talisay Beach Resort.
+                    Hello {{ first_name(auth()->user()->name) }}! Welcome back to Talisay Beach Resort.
                     How can I help you today? You can check your bookings, inquire about room rates, payment methods, or explore the 360° virtual tour!
                 </div>
                 <div class="flex flex-wrap gap-1 mt-1">
-                    <button @click="sendChip('My Bookings')" class="chat-chip">My Bookings</button>
-                    <button @click="sendChip('Room Rates')" class="chat-chip">Room Rates</button>
-                    <button @click="sendChip('GCash payment')" class="chat-chip">GCash Guide</button>
-                    <button @click="sendChip('virtual tour')" class="chat-chip">360° Tour</button>
-                    <button @click="sendChip('Check Availability')" class="chat-chip">Availability</button>
+                    <button type="button" @click="sendChip('My Bookings')" class="chat-chip">My Bookings</button>
+                    <button type="button" @click="sendChip('Room Rates')" class="chat-chip">Room Rates</button>
+                    <button type="button" @click="sendChip('GCash payment')" class="chat-chip">GCash Guide</button>
+                    <button type="button" @click="sendChip('virtual tour')" class="chat-chip">360° Tour</button>
+                    <button type="button" @click="sendChip('Check Availability')" class="chat-chip">Availability</button>
                 </div>
 
                 <template x-for="(msg, idx) in messages" :key="idx">
@@ -332,7 +362,7 @@
                         <template x-if="msg.sender === 'bot' && msg.chips && msg.chips.length">
                             <div class="flex flex-wrap gap-1 mt-1 ml-1">
                                 <template x-for="chip in msg.chips" :key="chip">
-                                    <button @click="sendChip(chip)" class="chat-chip" x-text="chip"></button>
+                                    <button type="button" @click="sendChip(chip)" class="chat-chip" x-text="chip"></button>
                                 </template>
                             </div>
                         </template>
@@ -349,11 +379,12 @@
 
             {{-- Input Area --}}
             <form @submit.prevent="sendMessage()" class="p-3 bg-white border-t border-slate-100 flex gap-2">
-                <input type="text" x-model="inputText"
+                <label for="touristChatInput" class="visually-hidden">Type your message</label>
+                <input type="text" id="touristChatInput" x-model="inputText"
                     placeholder="Ask about rates, booking, directions..."
                     class="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-ocean-500">
-                <button type="submit" class="bg-ocean-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-ocean-800 transition">
-                    <i class="bi bi-send-fill"></i>
+                <button type="submit" class="bg-ocean-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-ocean-800 transition" aria-label="Send message">
+                    <i class="bi bi-send-fill" aria-hidden="true"></i>
                 </button>
             </form>
         </div>
@@ -371,10 +402,11 @@
 
                 formatText(text) {
                     if (!text) return '';
-                    let escaped = text
+                    let escaped = String(text)
                         .replace(/&/g, "&amp;")
                         .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;");
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;");
 
                     escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">•</span><span>$1</span></div>');
 
@@ -421,13 +453,13 @@
                         const data = await res.json();
                         this.typing = false;
                         const reply = data.reply || data.response || 'I am here to help! You can ask about room rates, how to book, directions, payment methods, or the 360° virtual tour.';
-                        const chips = data.chips || [];
+                        const chips = Array.isArray(data.chips) ? data.chips.map(c => String(c)) : [];
                         this.messages.push({ sender: 'bot', text: reply, chips: chips });
                     } catch (e) {
                         this.typing = false;
                         this.messages.push({
                             sender: 'bot',
-                            text: 'Sorry, I had trouble connecting. Please try again, or call us at +63 (053) 563-7000.',
+                            text: 'Sorry, I had trouble connecting. Please try again, or call us at ' + @json(setting('resort_phone', '+63 (053) 563-7000')) + '.',
                             chips: ['Room Rates', 'How to Book', 'Directions']
                         });
                     }
@@ -443,6 +475,22 @@
                 }
             }
         }
+    </script>
+    <script>
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-loading')) return;
+        if (e.defaultPrevented) return;
+        var btn = form.querySelector('button[type="submit"]');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+        var spinner = document.createElement('span');
+        spinner.className = 'spinner-border spinner-border-sm me-2';
+        spinner.setAttribute('role', 'status');
+        spinner.setAttribute('aria-hidden', 'true');
+        btn.insertBefore(spinner, btn.firstChild);
+    });
     </script>
     {{-- Bootstrap JS Bundle --}}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

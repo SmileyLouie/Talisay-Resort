@@ -182,7 +182,7 @@
                             </a>
                             @if($user->id !== auth()->id())
                             <button type="button" class="p-1.5 rounded-xl text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition" title="Delete User"
-                                    onclick="confirmDelete({{ $user->id }}, '{{ addslashes($user->name) }}')">
+                                    onclick="confirmDelete({{ $user->id }}, {{ Js::from($user->name) }})">
                                 <i class="bi bi-trash"></i>
                             </button>
                             @endif

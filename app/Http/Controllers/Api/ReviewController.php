@@ -22,8 +22,8 @@ class ReviewController extends Controller
             return response()->json(['error' => 'You can only review your own bookings.'], 403);
         }
 
-        if ($booking->status !== 'completed') {
-            return response()->json(['error' => 'You can only review completed bookings.'], 422);
+        if (!in_array($booking->status, ['paid', 'checked_in', 'checked_out', 'completed'], true)) {
+            return response()->json(['error' => 'You can only review bookings that have been paid or completed.'], 422);
         }
 
         $existingReview = Review::where('booking_id', $request->booking_id)->first();
@@ -53,7 +53,7 @@ class ReviewController extends Controller
 
     public function myReviews(Request $request)
     {
-        $reviews = Review::with('booking.package')
+        $reviews = Review::with('booking.accommodationUnit')
             ->where('user_id', $request->user()->id)
             ->orderBy('created_at', 'desc')
             ->paginate(10);

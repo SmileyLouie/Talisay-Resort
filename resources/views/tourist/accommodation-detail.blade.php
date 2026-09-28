@@ -52,7 +52,7 @@
             </div>
 
             <button type="button" 
-                @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: '{{ addslashes($unit->unit_number) }}', unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" 
+                @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: {{ Js::from($unit->unit_number) }}, unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" 
                 class="bg-ocean-600 hover:bg-ocean-700 text-white font-extrabold text-xs px-6 py-3.5 rounded-2xl shadow-md hover:shadow-lg transition flex items-center gap-2">
                 <i class="bi bi-calendar-check-fill"></i> Reserve This Unit
             </button>
@@ -212,7 +212,7 @@
                 </div>
 
                 <button type="button" 
-                    @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: '{{ addslashes($unit->unit_number) }}', unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" 
+                    @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: {{ Js::from($unit->unit_number) }}, unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" 
                     class="w-full bg-ocean-600 hover:bg-ocean-700 text-white font-extrabold text-xs py-3.5 rounded-2xl text-center block transition shadow-md flex items-center justify-center gap-2">
                     <i class="bi bi-calendar-plus-fill"></i> Reserve {{ $unit->unit_number }} Now
                 </button>
@@ -254,7 +254,7 @@
 <div x-data="{
         open: false,
         unitId: {{ $unit->id }},
-        unitName: '{{ addslashes($unit->unit_number) }}',
+        unitName: {{ Js::from($unit->unit_number) }},
         unitPrice: {{ $unit->price_per_night }},
         maxCap: {{ $unit->max_occupancy }},
         guests: 1,
@@ -304,7 +304,7 @@
     @open-booking-modal.window="
         open = true;
         unitId = $event.detail.unitId || {{ $unit->id }};
-        unitName = $event.detail.unitName || '{{ addslashes($unit->unit_number) }}';
+        unitName = $event.detail.unitName || {{ Js::from($unit->unit_number) }};
         unitPrice = $event.detail.unitPrice || {{ $unit->price_per_night }};
         maxCap = $event.detail.maxCap || {{ $unit->max_occupancy }};
         guests = 1;
@@ -323,7 +323,7 @@
             <button @click="open = false" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4">
+        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4" data-loading>
             @csrf
             <input type="hidden" name="accommodation_unit_id" :value="unitId">
 

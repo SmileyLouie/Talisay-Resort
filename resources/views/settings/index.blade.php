@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'System Settings - Talisay Smart Tourism')
 
@@ -112,7 +112,7 @@
 
     {{-- Right Settings Panels Form --}}
     <div class="lg:col-span-9">
-        <form method="POST" action="{{ route('settings.save') }}" id="settingsForm">
+        <form method="POST" action="{{ route('settings.save') }}" id="settingsForm" data-loading>
             @csrf
             @method('PUT')
 
@@ -209,26 +209,27 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Stripe Publishable Key</label>
-                            <input type="text" name="settings[stripe_key]" class="w-full form-control-clean text-xs font-mono"
+                            <label for="setting_stripe_key" class="block text-xs font-bold text-slate-600 mb-1">Stripe Publishable Key</label>
+                            <input type="text" id="setting_stripe_key" name="settings[stripe_key]" class="w-full form-control-clean text-xs font-mono"
                                    value="{{ $settings['stripe_key'] ?? '' }}" placeholder="pk_test_...">
                         </div>
 
                         <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Stripe Secret Key</label>
-                            <input type="password" name="settings[stripe_secret]" class="w-full form-control-clean text-xs font-mono"
-                                   value="{{ $settings['stripe_secret'] ?? '' }}" placeholder="sk_test_...">
+                            <label for="setting_stripe_secret" class="block text-xs font-bold text-slate-600 mb-1">Stripe Secret Key</label>
+                            <input type="password" id="setting_stripe_secret" name="settings[stripe_secret]" class="w-full form-control-clean text-xs font-mono"
+                                   value="" autocomplete="new-password" placeholder="Leave blank to keep the current key">
+                            <p class="text-[11px] text-slate-400 mt-1 mb-0">{{ !empty($settings['stripe_secret']) ? 'A secret key is stored.' : 'No secret key stored.' }}</p>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">GCash Account Number</label>
-                            <input type="text" name="settings[gcash_number]" class="w-full form-control-clean text-xs"
+                            <label for="setting_gcash_number" class="block text-xs font-bold text-slate-600 mb-1">GCash Account Number</label>
+                            <input type="text" id="setting_gcash_number" name="settings[gcash_number]" class="w-full form-control-clean text-xs"
                                    value="{{ $settings['gcash_number'] ?? '' }}" placeholder="09XX-XXX-XXXX">
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">GCash Account Name</label>
-                            <input type="text" name="settings[gcash_name]" class="w-full form-control-clean text-xs"
+                            <label for="setting_gcash_name" class="block text-xs font-bold text-slate-600 mb-1">GCash Account Name</label>
+                            <input type="text" id="setting_gcash_name" name="settings[gcash_name]" class="w-full form-control-clean text-xs"
                                    value="{{ $settings['gcash_name'] ?? '' }}" placeholder="Talisay Beach Resort">
                         </div>
                     </div>
@@ -268,7 +269,7 @@
                 $systemPrompt = $cfg?->system_prompt ?? "You are the official Talisay Beach Resort AI tourism assistant in Baybay City, Leyte, Philippines. Help visitors, tourists, and staff with resort information, room rates, cottage availability, facilities, policies, and booking inquiries. Be courteous, concise, and helpful. Never invent information not available in the system.";
             @endphp
 
-            <form method="POST" action="{{ route('settings.chatbot.save') }}" id="chatbotForm">
+            <form method="POST" action="{{ route('settings.chatbot.save') }}" id="chatbotForm" data-loading>
                 @csrf
 
                 {{-- Section Header --}}
@@ -295,8 +296,8 @@
                     @if($isOperational)
                         <div class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700">
                             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Active & Operational Â· Model: {{ $currentModel }}
-                            @if($lastTestedAt) Â· Verified {{ $lastTestedAt->diffForHumans() }} @endif
+                            Active & Operational &middot; Model: {{ $currentModel }}
+                            @if($lastTestedAt) &middot; Verified {{ $lastTestedAt->diffForHumans() }} @endif
                         </div>
                     @elseif($cfg && $cfg->is_enabled && !$hasKey)
                         <div class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-700">
@@ -343,7 +344,7 @@
                                         <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 mb-2 provider-model-select"
                                                 data-provider="{{ $pid }}"
                                                 onchange="syncModelInput(this.value, '{{ $pid }}')">
-                                            <option value="">â€” Select a model â€”</option>
+                                            <option value="">Select a model</option>
                                             @foreach($pdata['models'] as $modelId => $modelLabel)
                                             <option value="{{ $modelId }}"
                                                 {{ (($cfg?->model ?? $pdata['default_model']) === $modelId && $currentProvider === $pid) ? 'selected' : '' }}>
@@ -401,16 +402,17 @@
 
                             <div id="changeKeyRow" class="hidden space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
                                 <div class="flex items-center justify-between mb-1">
-                                    <label class="text-xs font-semibold text-slate-700">New API Key</label>
-                                    <button type="button" class="text-xs text-slate-400 hover:text-slate-700" onclick="cancelChangeKey()">â†© Keep existing</button>
+                                    <label class="text-xs font-semibold text-slate-700" for="apiKeyInput">New API Key</label>
+                                    <button type="button" class="text-xs text-slate-400 hover:text-slate-700" onclick="cancelChangeKey()"><i class="bi bi-arrow-return-left" aria-hidden="true"></i> Keep existing</button>
                                 </div>
                                 <div class="relative">
                                     <input type="password" name="api_key" id="apiKeyInput"
                                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-mono pr-10 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                                           placeholder="Paste new API keyâ€¦"
-                                           autocomplete="off">
-                                    <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="toggleApiKeyVis()">
-                                        <i class="bi bi-eye-slash-fill" id="apiKeyEyeIcon"></i>
+                                           value=""
+                                           placeholder="{{ $cfg->maskedApiKey }}"
+                                           autocomplete="new-password">
+                                    <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="toggleApiKeyVis()" aria-label="Show or hide API key">
+                                        <i class="bi bi-eye-slash-fill" id="apiKeyEyeIcon" aria-hidden="true"></i>
                                     </button>
                                 </div>
                                 <label class="flex items-center gap-2 cursor-pointer">
@@ -427,12 +429,14 @@
                                 <p class="text-xs text-amber-800 mb-0">No API key configured. The chatbot cannot generate responses until a valid key is set.</p>
                             </div>
                             <div class="relative">
+                                <label for="apiKeyInput" class="sr-only">API Key</label>
                                 <input type="password" name="api_key" id="apiKeyInput"
                                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-mono pr-10 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                                       placeholder="Paste your API key (e.g. AIzaSyâ€¦ or sk-â€¦)"
-                                       autocomplete="off">
-                                <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="toggleApiKeyVis()">
-                                    <i class="bi bi-eye-slash-fill" id="apiKeyEyeIcon"></i>
+                                       value=""
+                                       placeholder="Paste your API key (e.g. AIzaSy... or sk-...)"
+                                       autocomplete="new-password">
+                                <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="toggleApiKeyVis()" aria-label="Show or hide API key">
+                                    <i class="bi bi-eye-slash-fill" id="apiKeyEyeIcon" aria-hidden="true"></i>
                                 </button>
                             </div>
                             @endif
@@ -651,7 +655,7 @@
                     <form method="GET" action="{{ route('settings.index') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                         <input type="hidden" name="tab" value="users">
                         
-                        <div class="sm:col-span-5">
+                        <div class="sm:col-span-7">
                             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search User</label>
                             <div class="relative">
                                 <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -669,20 +673,11 @@
                             </select>
                         </div>
 
-                        <div class="sm:col-span-2">
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-                            <select name="status" class="w-full form-select-clean text-xs font-medium" onchange="this.form.submit()">
-                                <option value="">All Status</option>
-                                <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Suspended</option>
-                            </select>
-                        </div>
-
                         <div class="sm:col-span-2 flex gap-1.5">
                             <button type="submit" class="btn-ocean text-xs flex-1 justify-center py-2">
                                 Filter
                             </button>
-                            @if(request()->hasAny(['search', 'role', 'status']))
+                            @if(request()->hasAny(['search', 'role']))
                             <a href="{{ route('settings.index', ['tab' => 'users']) }}" class="btn-secondary-clean text-xs px-2.5 py-2 flex items-center justify-center" title="Clear Filters">
                                 <i class="bi bi-x-lg"></i>
                             </a>
@@ -698,7 +693,6 @@
                             <tr>
                                 <th>Account Holder</th>
                                 <th>Role</th>
-                                <th>Status</th>
                                 <th>Phone</th>
                                 <th>Activity</th>
                                 <th>Registered</th>
@@ -748,21 +742,7 @@
                                 </td>
 
                                 <td>
-                                    @if($u->is_active)
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                            Active
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                            Suspended
-                                        </span>
-                                    @endif
-                                </td>
-
-                                <td>
-                                    <span class="text-xs text-slate-600 font-mono">{{ $u->phone ?: 'â€”' }}</span>
+                                    <span class="text-xs text-slate-600 font-mono">{{ $u->phone ?: '—' }}</span>
                                 </td>
 
                                 <td>
@@ -777,7 +757,7 @@
                                 </td>
 
                                 <td>
-                                    <span class="text-xs text-slate-500 font-medium">{{ $u->created_at ? $u->created_at->format('M d, Y') : 'â€”' }}</span>
+                                    <span class="text-xs text-slate-500 font-medium">{{ $u->created_at ? $u->created_at->format('M d, Y') : '—' }}</span>
                                 </td>
 
                                 <td class="text-end">
@@ -802,7 +782,7 @@
 
                                         {{-- Reset Password --}}
                                         <button type="button" class="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Reset Password"
-                                                onclick="openResetPasswordModal({{ $u->id }}, '{{ addslashes($u->name) }}')">
+                                                onclick="openResetPasswordModal({{ $u->id }}, {{ Js::from($u->name) }})">
                                             <i class="bi bi-key"></i>
                                         </button>
 
@@ -822,7 +802,7 @@
                                         {{-- Delete User --}}
                                         @if($u->id !== auth()->id() && $u->role !== 'admin')
                                         <button type="button" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition" title="Delete Account"
-                                                onclick="confirmDeleteUser({{ $u->id }}, '{{ addslashes($u->name) }}')">
+                                                onclick="confirmDeleteUser({{ $u->id }}, {{ Js::from($u->name) }})">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                         @endif
@@ -831,7 +811,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="7" class="text-center py-12 text-slate-400">
+                                <td colspan="6" class="text-center py-12 text-slate-400">
                                     <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-2xl">
                                         <i class="bi bi-people"></i>
                                     </div>
@@ -860,7 +840,7 @@
 <div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-sky-600 to-sky-500 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-700 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg">
                         <i class="bi bi-person-plus-fill"></i>
@@ -929,7 +909,7 @@
 <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-slate-900 to-sky-900 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg">
                         <i class="bi bi-pencil-square"></i>
@@ -1004,7 +984,7 @@
 <div class="modal fade" id="viewUserModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-6 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-white relative">
+            <div class="p-6 bg-ocean-900 text-white relative">
                 <button type="button" class="btn-close btn-close-white text-xs absolute top-5 right-5" data-bs-dismiss="modal"></button>
                 <div class="flex items-center gap-4">
                     <div id="viewUserAvatar" class="w-14 h-14 rounded-2xl bg-sky-500/20 text-sky-300 font-extrabold flex items-center justify-center text-xl border border-sky-400/30">
@@ -1024,11 +1004,11 @@
                 <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <div>
                         <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Phone Number</span>
-                        <span class="font-bold text-slate-800 text-xs" id="viewUserPhone">â€”</span>
+                        <span class="font-bold text-slate-800 text-xs" id="viewUserPhone">—</span>
                     </div>
                     <div>
                         <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Registration Date</span>
-                        <span class="font-bold text-slate-800 text-xs" id="viewUserCreated">â€”</span>
+                        <span class="font-bold text-slate-800 text-xs" id="viewUserCreated">—</span>
                     </div>
                     <div>
                         <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Total Bookings</span>
@@ -1049,11 +1029,11 @@
                     <div class="grid grid-cols-2 gap-2 text-[11px]">
                         <div>
                             <span class="text-slate-400 block">Position:</span>
-                            <strong class="text-slate-800" id="viewUserPosition">â€”</strong>
+                            <strong class="text-slate-800" id="viewUserPosition">—</strong>
                         </div>
                         <div>
                             <span class="text-slate-400 block">Department:</span>
-                            <strong class="text-slate-800" id="viewUserDepartment">â€”</strong>
+                            <strong class="text-slate-800" id="viewUserDepartment">—</strong>
                         </div>
                     </div>
                     <div class="pt-2 border-t border-indigo-100/60">
@@ -1076,7 +1056,7 @@
 <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-indigo-700 to-indigo-600 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-800 text-white flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                     <i class="bi bi-key-fill text-lg"></i>
                     <h5 class="text-sm font-extrabold mb-0">Reset Password</h5>
@@ -1252,7 +1232,7 @@ async function testAIConnection() {
 
     btn.disabled = true;
     icon.className = 'bi bi-arrow-repeat animate-spin';
-    text.textContent = 'Testingâ€¦';
+    text.textContent = 'Testing...';
     resultBox.classList.add('hidden');
 
     const provider = document.getElementById('providerSelect')?.value ?? 'gemini';
@@ -1279,12 +1259,12 @@ async function testAIConnection() {
             resultBox.className = 'mt-3 p-3 rounded-xl border text-xs bg-emerald-50 border-emerald-200 text-emerald-800';
             resultBox.innerHTML = `<i class="bi bi-check-circle-fill mr-1"></i> <strong>Connection verified!</strong> ${escHtml(data.message)}${data.latency_ms ? ` (${data.latency_ms}ms)` : ''}${data.sample_reply ? `<div class="mt-1 text-slate-600">"${escHtml(data.sample_reply)}"</div>` : ''}`;
             icon.className = 'bi bi-check-circle-fill text-emerald-500';
-            text.textContent = 'Verified âœ“';
+            text.textContent = 'Verified';
         } else {
             resultBox.className = 'mt-3 p-3 rounded-xl border text-xs bg-rose-50 border-rose-200 text-rose-800';
             resultBox.innerHTML = `<i class="bi bi-x-circle-fill mr-1"></i> <strong>Failed:</strong> ${escHtml(data.message ?? 'Unknown error')}`;
             icon.className = 'bi bi-x-circle-fill text-rose-500';
-            text.textContent = 'Failed âœ—';
+            text.textContent = 'Failed';
         }
     } catch (err) {
         resultBox.classList.remove('hidden');
@@ -1352,7 +1332,7 @@ function openEditUserModal(user) {
 function viewUser(user) {
     document.getElementById('viewUserName').textContent = user.name || 'Unnamed';
     document.getElementById('viewUserEmail').textContent = user.email || 'No email';
-    document.getElementById('viewUserPhone').textContent = user.phone || 'â€”';
+        document.getElementById('viewUserPhone').textContent = user.phone || '—';
     document.getElementById('viewUserBookings').textContent = user.bookings_count !== undefined ? user.bookings_count : '0';
     document.getElementById('viewUserReviews').textContent = user.reviews_count !== undefined ? user.reviews_count : '0';
 
@@ -1360,15 +1340,19 @@ function viewUser(user) {
         const d = new Date(user.created_at);
         document.getElementById('viewUserCreated').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } else {
-        document.getElementById('viewUserCreated').textContent = 'â€”';
+        document.getElementById('viewUserCreated').textContent = '—';
     }
 
     const avatarBox = document.getElementById('viewUserAvatar');
+    avatarBox.replaceChildren();
     if (user.avatar) {
-        avatarBox.innerHTML = `<img src="/storage/${user.avatar}" class="w-full h-full object-cover rounded-2xl" alt="${user.name}">`;
+        const img = document.createElement('img');
+        img.src = '/storage/' + String(user.avatar).replace(/^\/+/, '');
+        img.className = 'w-full h-full object-cover rounded-2xl';
+        img.alt = user.name || 'User photo';
+        avatarBox.appendChild(img);
     } else {
-        const initial = user.name ? user.name.charAt(0).toUpperCase() : 'U';
-        avatarBox.textContent = initial;
+        avatarBox.textContent = user.name ? user.name.charAt(0).toUpperCase() : 'U';
     }
 
     const roleBadge = document.getElementById('viewUserRoleBadge');

@@ -26,6 +26,7 @@
                             100: '#e0f2fe',
                             500: '#0ea5e9',
                             600: '#0284c7',
+                            700: '#0369a1',
                             800: '#075985',
                             900: '#0c4a6e',
                         }
@@ -39,7 +40,8 @@
     
     {{-- Chart.js & Alpine.js --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+    <style>[x-cloak]{display:none!important}</style>
 
     @stack('styles')
 
@@ -81,9 +83,9 @@
             left: 0;
             display: flex;
             flex-direction: column;
-            background: linear-gradient(180deg, #0c4a6e 0%, #075985 55%, #064566 100%);
-            border-right: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 4px 0 24px rgba(12, 74, 110, 0.22);
+            background: #0c4a6e;
+            border-right: 1px solid #083654;
+            box-shadow: none;
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1040;
             overflow: hidden;
@@ -154,14 +156,12 @@
             transition: transform 0.2s ease, opacity 0.2s ease;
         }
         .sidebar-link:hover {
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.1);
             color: #ffffff;
-            transform: translateX(2px);
         }
         .sidebar-link:hover i {
             opacity: 1;
-            transform: scale(1.1);
-            color: #38bdf8;
+            color: #7dd3fc;
         }
         .sidebar-link.active {
             background: rgba(255, 255, 255, 0.18);
@@ -190,26 +190,21 @@
 
         /* ── Modern Topbar ── */
         .topbar-nav {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(12px);
+            background: #ffffff;
             border-bottom: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
         }
 
         /* ── Card & Component Polish ── */
         .stat-card-clean {
             background: #ffffff;
             border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 22px;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: none;
             position: relative;
             overflow: hidden;
         }
         .stat-card-clean:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.1), 0 8px 10px -6px rgba(14, 165, 233, 0.05);
             border-color: #cbd5e1;
         }
 
@@ -248,24 +243,22 @@
 
         /* ── Unified Buttons ── */
         .btn-ocean {
-            background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+            background: #0284c7;
             color: #ffffff !important;
             font-weight: 600;
-            border-radius: 12px;
-            padding: 8px 18px;
+            border-radius: 8px;
+            padding: 8px 16px;
             font-size: 0.875rem;
-            border: none;
+            border: 1px solid #0369a1;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.28);
-            transition: all 0.2s ease;
+            transition: background-color 0.15s ease;
             text-decoration: none;
         }
         .btn-ocean:hover {
-            background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
-            transform: translateY(-1px);
+            background: #0369a1;
+            color: #ffffff !important;
         }
 
         .btn-secondary-clean {
@@ -301,9 +294,12 @@
         }
         .form-control-clean:focus, .form-select-clean:focus {
             outline: none;
-            border-color: #0ea5e9;
-            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+            border-color: #0284c7;
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
         }
+
+        .rounded-3xl { border-radius: 12px !important; }
+        .rounded-2xl { border-radius: 8px !important; }
 
         /* ── Modern Chatbot Widget ── */
         .chatbot-bubble {
@@ -313,20 +309,18 @@
             width: 58px;
             height: 58px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #0c4a6e 0%, #075985 60%, #0284c7 100%);
+            background: #0c4a6e;
             color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             z-index: 1050;
-            border: 2px solid rgba(255, 255, 255, 0.35);
-            box-shadow: 0 10px 28px rgba(12, 74, 110, 0.45);
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            border: none;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
         }
         .chatbot-bubble:hover {
-            transform: scale(1.08) translateY(-2px);
-            box-shadow: 0 14px 34px rgba(12, 74, 110, 0.6);
+            background: #075985;
         }
         .chatbot-panel {
             position: fixed;
@@ -464,10 +458,10 @@
         default => 'from-sky-700 to-sky-600',
     };
     $cbInitialWelcome = match($cbRole) {
-        'admin' => "Hello **{$cbFirstName}**! 👋 Admin Assistant ready.\nI can assist with revenue stats, booking overviews, user accounts, and system operations.",
-        'staff' => "Hello **{$cbFirstName}**! 👋 Staff Assistant ready.\nAsk about today's arrivals, pending bookings, cottage availability, or guest check-ins.",
-        'tourist' => "Hello **{$cbFirstName}**! 👋 Welcome back to Talisay Beach Resort.\nAsk about your bookings, room rates, GCash payment, or virtual tour.",
-        default => "Hello! 👋 Welcome to Talisay Beach Resort.\nHow can I help you plan your visit today?",
+        'admin' => "Hello **{$cbFirstName}**! Admin Assistant ready.\nI can assist with revenue stats, booking overviews, user accounts, and system operations.",
+        'staff' => "Hello **{$cbFirstName}**! Staff Assistant ready.\nAsk about today's arrivals, pending bookings, cottage availability, or guest check-ins.",
+        'tourist' => "Hello **{$cbFirstName}**! Welcome back to Talisay Beach Resort.\nAsk about your bookings, room rates, GCash payment, or virtual tour.",
+        default => "Hello! Welcome to Talisay Beach Resort.\nHow can I help you plan your visit today?",
     };
     $cbDefaultChips = match($cbRole) {
         'admin' => ["Today's Summary", "Pending Bookings", "Revenue Stats", "User Accounts"],
@@ -492,7 +486,7 @@
 
 @if(auth()->check())
     {{-- Sidebar Navigation --}}
-    <aside class="sidebar" :class="{ 'collapsed': !sidebarOpen, 'mobile-open': mobileSidebar }">
+    <aside class="sidebar" id="appSidebar" :class="{ 'collapsed': !sidebarOpen, 'mobile-open': mobileSidebar }" @keydown.escape.window="mobileSidebar = false">
         
         {{-- Brand Header --}}
         <div class="px-4 py-3 flex items-center gap-3 border-b border-white/10 flex-shrink-0">
@@ -552,7 +546,6 @@
             <a href="{{ route('accommodations.index') }}" class="sidebar-link {{ request()->routeIs('accommodations.*') ? 'active' : '' }}">
                 <i class="bi bi-building me-3"></i>
                 <span class="sidebar-text">Room &amp; Cottage</span>
-                <span class="sidebar-badge ms-auto text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded-full text-white/80">20</span>
             </a>
             @endif
 
@@ -567,7 +560,7 @@
             {{-- ADMIN STAFF & ROLE MANAGEMENT --}}
             @if($authUser->isAdmin())
             <a href="{{ route('tasks.staff') }}" class="sidebar-link {{ request()->routeIs('tasks.staff*') ? 'active' : '' }}">
-                <i class="bi bi-person-lines-fill me-3 text-sky-400"></i>
+                <i class="bi bi-person-lines-fill me-3"></i>
                 <span class="sidebar-text">Staff Management</span>
             </a>
             @endif
@@ -634,14 +627,17 @@
         </nav>
     </aside>
 
+    {{-- Mobile Sidebar Backdrop --}}
+    <div x-show="mobileSidebar" x-cloak @click="mobileSidebar = false" class="fixed inset-0 bg-slate-900/50 md:hidden" style="z-index: 1035;" aria-hidden="true"></div>
+
     {{-- Main Content Area --}}
     <div class="main-content" :class="{ 'expanded': !sidebarOpen }">
         
         {{-- Topbar Header --}}
         <header class="topbar-nav sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <button @click="window.innerWidth < 768 ? mobileSidebar = !mobileSidebar : sidebarOpen = !sidebarOpen" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">
-                    <i class="bi bi-list text-2xl"></i>
+                <button type="button" @click="window.innerWidth < 768 ? mobileSidebar = !mobileSidebar : sidebarOpen = !sidebarOpen" :aria-expanded="(window.innerWidth < 768 ? mobileSidebar : sidebarOpen) ? 'true' : 'false'" aria-controls="appSidebar" aria-label="Toggle navigation menu" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">
+                    <i class="bi bi-list text-2xl" aria-hidden="true"></i>
                 </button>
                 <div class="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-400">
                     <span class="text-slate-800 font-bold">Talisay Smart Tourism</span>
@@ -693,19 +689,19 @@
                         } catch (e) {}
                     }
                 }">
-                    <button @click="notifOpen = !notifOpen" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-sky-600 hover:bg-slate-100 transition relative">
-                        <i class="bi bi-bell-fill text-lg"></i>
+                    <button type="button" @click="notifOpen = !notifOpen" :aria-expanded="notifOpen ? 'true' : 'false'" aria-controls="notificationsPanel" aria-label="Notifications" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-sky-600 hover:bg-slate-100 transition relative">
+                        <i class="bi bi-bell-fill text-lg" aria-hidden="true"></i>
                         <span x-show="unread > 0" class="absolute top-1.5 right-1.5 bg-rose-500 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-sm" x-text="unread"></span>
                     </button>
 
-                    <div x-show="notifOpen" @click.away="notifOpen = false" x-transition class="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden" x-cloak>
+                    <div x-show="notifOpen" @click.away="notifOpen = false" x-transition id="notificationsPanel" class="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden" x-cloak>
                         <div class="p-3.5 bg-ocean-900 text-white flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <i class="bi bi-bell-fill text-sky-400"></i>
                                 <span class="font-extrabold text-xs tracking-wider uppercase">Notifications</span>
                                 <span x-show="unread > 0" class="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full" x-text="unread + ' new'"></span>
                             </div>
-                            <button @click="markAllRead()" class="text-[11px] text-sky-300 hover:text-white font-semibold transition">
+                            <button type="button" @click="markAllRead()" class="text-[11px] text-sky-300 hover:text-white font-semibold transition">
                                 Mark all read
                             </button>
                         </div>
@@ -749,7 +745,7 @@
 
                 {{-- User Profile Pill Dropdown --}}
                 <div class="relative" x-data="{ userMenu: false }">
-                    <button @click="userMenu = !userMenu" class="flex items-center gap-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl hover:bg-slate-100 transition border border-transparent hover:border-slate-200">
+                    <button type="button" @click="userMenu = !userMenu" :aria-expanded="userMenu ? 'true' : 'false'" aria-controls="userMenuPanel" aria-label="Account menu" class="flex items-center gap-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl hover:bg-slate-100 transition border border-transparent hover:border-slate-200">
                         @if(auth()->user()->avatar)
                             <img src="{{ Storage::url(auth()->user()->avatar) }}" class="w-8 h-8 rounded-lg object-cover border border-slate-200" alt="Avatar">
                         @else
@@ -772,7 +768,7 @@
                         <i class="bi bi-chevron-down text-[10px] text-slate-400 ms-1"></i>
                     </button>
 
-                    <div x-show="userMenu" @click.away="userMenu = false" x-transition class="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden py-1" x-cloak>
+                    <div x-show="userMenu" @click.away="userMenu = false" x-transition id="userMenuPanel" class="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden py-1" x-cloak>
                         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
                             <p class="text-xs font-bold text-slate-900 mb-0.5">{{ auth()->user()->name }}</p>
                             <p class="text-[11px] text-slate-500 truncate mb-0">{{ auth()->user()->email }}</p>
@@ -803,22 +799,22 @@
             
             {{-- Toast Flash Alerts --}}
             @if(session('success'))
-            <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-sm">
+            <div data-flash="success" role="status" class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-3">
-                    <i class="bi bi-check-circle-fill text-emerald-500 text-lg"></i>
+                    <i class="bi bi-check-circle-fill text-emerald-500 text-lg" aria-hidden="true"></i>
                     <span class="text-sm font-semibold">{{ session('success') }}</span>
                 </div>
-                <button type="button" class="btn-close text-xs" data-bs-dismiss="alert"></button>
+                <button type="button" class="btn-close text-xs" aria-label="Dismiss" onclick="this.closest('[data-flash]').remove()"></button>
             </div>
             @endif
 
             @if(session('error'))
-            <div class="mb-6 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-sm">
+            <div data-flash="error" role="alert" class="mb-6 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-3">
-                    <i class="bi bi-exclamation-triangle-fill text-rose-500 text-lg"></i>
+                    <i class="bi bi-exclamation-triangle-fill text-rose-500 text-lg" aria-hidden="true"></i>
                     <span class="text-sm font-semibold">{{ session('error') }}</span>
                 </div>
-                <button type="button" class="btn-close text-xs" data-bs-dismiss="alert"></button>
+                <button type="button" class="btn-close text-xs" aria-label="Dismiss" onclick="this.closest('[data-flash]').remove()"></button>
             </div>
             @endif
 
@@ -836,12 +832,15 @@
         </footer>
     </div>
 
-    {{-- Floating Chatbot Widget (Role-Based) --}}
-    <div class="chatbot-bubble" @click="chatOpen = !chatOpen" title="Open Resort Assistant" id="chatbot-bubble">
-        <i class="bi" :class="chatOpen ? 'bi-x-lg text-xl' : 'bi-chat-dots-fill text-2xl'"></i>
-    </div>
+    {{-- Realtime Toast Stack --}}
+    <div id="appToastStack" class="fixed top-4 right-4 flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)] pointer-events-none" style="z-index: 1060;" aria-live="polite"></div>
 
-    <div class="chatbot-panel" :class="{ 'open': chatOpen }" id="chatbot-panel">
+    {{-- Floating Chatbot Widget (Role-Based) --}}
+    <button type="button" class="chatbot-bubble" @click="chatOpen = !chatOpen" :aria-expanded="chatOpen ? 'true' : 'false'" aria-controls="chatbot-panel" aria-label="Open resort assistant" title="Open Resort Assistant" id="chatbot-bubble">
+        <i class="bi" :class="chatOpen ? 'bi-x-lg text-xl' : 'bi-chat-dots-fill text-2xl'" aria-hidden="true"></i>
+    </button>
+
+    <div class="chatbot-panel" :class="{ 'open': chatOpen }" id="chatbot-panel" x-cloak role="dialog" aria-label="Talisay Assistant">
         {{-- Header (dynamic bg per role) --}}
         <div class="chatbot-header" :class="'role-' + chatRole">
             <div class="flex items-center gap-2.5">
@@ -889,10 +888,59 @@
     @yield('content')
 @endif
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 <script>
-    // Pusher setup for real-time features
+    (function () {
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        window.APP_CSRF_TOKEN = csrfMeta ? csrfMeta.content : '';
+    })();
+
+    function showAppToast(title, message, type) {
+        var stack = document.getElementById('appToastStack');
+        if (!stack) return;
+        var palette = {
+            success: { wrap: 'bg-emerald-50 border-emerald-200 text-emerald-800', icon: 'bi-check-circle-fill text-emerald-500' },
+            info:    { wrap: 'bg-sky-50 border-sky-200 text-sky-800', icon: 'bi-calendar-check-fill text-sky-500' },
+            error:   { wrap: 'bg-rose-50 border-rose-200 text-rose-800', icon: 'bi-exclamation-triangle-fill text-rose-500' }
+        };
+        var p = palette[type] || palette.info;
+
+        var toast = document.createElement('div');
+        toast.setAttribute('role', 'status');
+        toast.className = 'pointer-events-auto border px-4 py-3 rounded-2xl flex items-start justify-between gap-3 shadow-sm ' + p.wrap;
+
+        var left = document.createElement('div');
+        left.className = 'flex items-start gap-3 min-w-0';
+        var icon = document.createElement('i');
+        icon.className = 'bi text-lg flex-shrink-0 ' + p.icon;
+        icon.setAttribute('aria-hidden', 'true');
+        var textWrap = document.createElement('div');
+        textWrap.className = 'min-w-0';
+        var titleEl = document.createElement('p');
+        titleEl.className = 'text-xs font-bold mb-0.5';
+        titleEl.textContent = title || '';
+        var msgEl = document.createElement('p');
+        msgEl.className = 'text-xs mb-0 break-words';
+        msgEl.textContent = message || '';
+        textWrap.appendChild(titleEl);
+        textWrap.appendChild(msgEl);
+        left.appendChild(icon);
+        left.appendChild(textWrap);
+
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'btn-close text-xs flex-shrink-0';
+        close.setAttribute('aria-label', 'Dismiss');
+        close.addEventListener('click', function () { toast.remove(); });
+
+        toast.appendChild(left);
+        toast.appendChild(close);
+        stack.appendChild(toast);
+        setTimeout(function () { toast.remove(); }, 7000);
+    }
+    window.showAppToast = showAppToast;
+
+    // Realtime (Pusher, private channels)
     @if(auth()->check() && config('broadcasting.default') === 'pusher')
     var pusher = new Pusher('{{ config('broadcasting.connections.pusher.key') }}', {
         cluster: '{{ config('broadcasting.connections.pusher.options.cluster') }}',
@@ -901,23 +949,60 @@
         wssPort: {{ config('broadcasting.connections.pusher.options.port') }},
         forceTLS: {{ config('broadcasting.connections.pusher.options.scheme') === 'https' ? 'true' : 'false' }},
         disableStats: true,
-        enabledTransports: ['ws', 'wss']
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint: '/broadcasting/auth',
+        auth: {
+            headers: {
+                'X-CSRF-TOKEN': window.APP_CSRF_TOKEN,
+                'Accept': 'application/json'
+            }
+        }
     });
 
     @if(auth()->user()->isAdmin() || auth()->user()->isStaff())
-    var staffBookingChannel = pusher.subscribe('staff-bookings');
+    var staffBookingChannel = pusher.subscribe('private-staff-bookings');
     staffBookingChannel.bind('booking.created', function(data) {
         window.dispatchEvent(new CustomEvent('booking-created', { detail: data }));
+        var who = (data && data.guest_name) ? data.guest_name : 'A guest';
+        var unit = (data && data.unit_label) ? ' for ' + data.unit_label : '';
+        var ref = (data && data.reference_no) ? ' (' + data.reference_no + ')' : '';
+        showAppToast('New booking received', who + ' booked' + unit + ref + '.', 'info');
+    });
+    staffBookingChannel.bind('booking.updated', function(data) {
+        window.dispatchEvent(new CustomEvent('booking-updated', { detail: data }));
     });
 
     @if(auth()->user()->isAdmin())
-    var adminPaymentChannel = pusher.subscribe('admin-payments');
+    var adminPaymentChannel = pusher.subscribe('private-admin-payments');
     adminPaymentChannel.bind('payment.received', function(data) {
         window.dispatchEvent(new CustomEvent('payment-received', { detail: data }));
     });
     @endif
     @endif
     @endif
+
+    // Flash auto-dismiss
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-flash="success"]').forEach(function (el) {
+            setTimeout(function () { el.remove(); }, 6000);
+        });
+    });
+
+    // Submit loading state for forms marked data-loading
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-loading')) return;
+        if (e.defaultPrevented) return;
+        var btn = form.querySelector('button[type="submit"]');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+        var spinner = document.createElement('span');
+        spinner.className = 'spinner-border spinner-border-sm me-2';
+        spinner.setAttribute('role', 'status');
+        spinner.setAttribute('aria-hidden', 'true');
+        btn.insertBefore(spinner, btn.firstChild);
+    });
 
     // Chatbot functionality
     function formatChatMessage(text) {
@@ -961,7 +1046,7 @@
         }, 50);
 
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const csrfToken = window.APP_CSRF_TOKEN || document.querySelector('meta[name="csrf-token"]')?.content || '';
             const history = alpine.chatMessages.map(m => ({
                 role: m.type === 'user' ? 'user' : 'bot',
                 text: m.text

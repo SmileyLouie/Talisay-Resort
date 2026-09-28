@@ -29,11 +29,6 @@
 </div>
 
 {{-- Financial Summary KPI Cards --}}
-@php
-    $totalSuccess = \App\Models\Payment::where('status', 'success')->sum('amount');
-    $totalPending = \App\Models\Payment::where('status', 'pending')->sum('amount');
-    $pendingCount = \App\Models\Payment::where('status', 'pending')->count();
-@endphp
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
     
     {{-- Total Revenue --}}

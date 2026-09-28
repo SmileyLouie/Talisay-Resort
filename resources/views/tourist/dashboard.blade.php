@@ -172,7 +172,14 @@
             <div class="bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden flex flex-col hover:shadow-xl transition group">
                 {{-- Accommodation Image Header --}}
                 <div class="h-48 bg-slate-200 relative overflow-hidden">
-                    <img src="{{ !empty($unit->images) ? asset('storage/' . $unit->images[0]) : 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80' }}" alt="{{ $unit->unit_number }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    @if(!empty($unit->images))
+                    <img src="{{ asset('storage/' . $unit->images[0]) }}" alt="{{ $unit->unit_number }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    @else
+                    <div class="w-full h-full bg-sky-900 flex flex-col items-center justify-center text-white">
+                        <i class="bi {{ $unit->unit_type === 'room' ? 'bi-door-open' : 'bi-house' }} text-3xl mb-1" aria-hidden="true"></i>
+                        <span class="text-xs font-bold">{{ $unit->unit_number }}</span>
+                    </div>
+                    @endif
                     <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
                     <div class="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-ocean-900 shadow">
                         Max {{ $unit->max_occupancy }} Pax
@@ -201,7 +208,7 @@
                         <a href="{{ route('tourist.accommodations.detail', $unit->id) }}" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl text-center no-underline transition flex items-center justify-center gap-1">
                             <i class="bi bi-eye"></i>Details
                         </a>
-                        <button @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: '{{ addslashes($unit->unit_number) }}', unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" class="flex-1 bg-ocean-600 hover:bg-ocean-800 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
+                        <button @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: {{ Js::from($unit->unit_number) }}, unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" class="flex-1 bg-ocean-600 hover:bg-ocean-800 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
                             <i class="bi bi-calendar-plus"></i>Book Now
                         </button>
                     </div>
@@ -304,7 +311,7 @@
             <button @click="open = false" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4">
+        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4" data-loading>
             @csrf
             <input type="hidden" name="accommodation_unit_id" :value="unitId">
 

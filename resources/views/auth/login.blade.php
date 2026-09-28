@@ -7,15 +7,22 @@
 @push('styles')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
 <style>
+:root {
+    --auth-primary: #0284c7;
+    --auth-primary-hover: #0369a1;
+    --auth-primary-ring: rgba(2, 132, 199, 0.12);
+    --auth-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 /* ── Global Auth Styles ────────────────────────────────────────────── */
 .auth-split-screen {
     display: flex;
     min-height: 100vh;
     width: 100vw;
     overflow-x: hidden;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--auth-font);
     background: #061430;
 }
 
@@ -367,14 +374,14 @@
 }
 
 .auth-field-input:focus {
-    border-color: #0084B4;
+    border-color: var(--auth-primary);
     background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(0, 132, 180, 0.12);
+    box-shadow: 0 0 0 3px var(--auth-primary-ring);
 }
 
 .auth-field-input:focus + .auth-input-icon,
 .auth-input-wrap:focus-within .auth-input-icon {
-    color: #0084B4;
+    color: var(--auth-primary);
 }
 
 .auth-input-wrap.password-wrap .auth-field-input {
@@ -423,20 +430,20 @@
 .auth-remember input[type="checkbox"] {
     width: 15px;
     height: 15px;
-    accent-color: #0084B4;
+    accent-color: var(--auth-primary);
     border-radius: 4px;
     cursor: pointer;
 }
 
 .auth-forgot {
-    color: #0084B4;
+    color: var(--auth-primary);
     text-decoration: none;
     font-weight: 600;
     transition: color 0.15s;
 }
 
 .auth-forgot:hover {
-    color: #006b92;
+    color: var(--auth-primary-hover);
     text-decoration: underline;
 }
 
@@ -445,7 +452,7 @@
     width: 100%;
     height: 46px;
     border-radius: 9999px;
-    background: #0084B4;
+    background: var(--auth-primary);
     border: none;
     color: #ffffff;
     font-size: 14px;
@@ -456,19 +463,26 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    box-shadow: 0 4px 14px rgba(0, 132, 180, 0.28);
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: inherit;
 }
 
 .auth-submit-pill:hover {
-    background: #00739e;
+    background: var(--auth-primary-hover);
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(0, 132, 180, 0.35);
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35);
     color: #ffffff;
 }
 
 .auth-submit-pill:active {
     transform: translateY(0);
+}
+
+.auth-submit-pill:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* Portal Switcher */
@@ -490,7 +504,7 @@
 }
 
 .portal-switch-box a {
-    color: #0084B4;
+    color: var(--auth-primary);
     font-weight: 700;
     text-decoration: none;
     display: inline-flex;
@@ -500,7 +514,7 @@
 }
 
 .portal-switch-box a:hover {
-    color: #006b92;
+    color: var(--auth-primary-hover);
     text-decoration: underline;
 }
 
@@ -627,12 +641,15 @@
         <div class="auth-form-inner">
 
             @php
-                $currentPortal = old('portal', request('portal'));
+                $currentPortal = old('portal', request('portal', 'client'));
+                if (!in_array($currentPortal, ['admin', 'client'], true)) {
+                    $currentPortal = 'client';
+                }
             @endphp
 
             {{-- Brand & Header --}}
             <div class="auth-brand-row">
-                <img src="{{ asset('logo.png') }}" class="auth-brand-logo" alt="Talisay Beach Resort Logo">
+                <img src="{{ asset('images/logo.png') }}" class="auth-brand-logo" alt="Talisay Beach Resort Logo">
                 <div>
                     <div class="auth-brand-name">Talisay Beach Resort</div>
                     <div class="auth-brand-sub">Smart Tourism System</div>
@@ -652,16 +669,16 @@
 
             {{-- Error Alert --}}
             @if($errors->any())
-            <div class="auth-alert">
-                <i class="bi bi-exclamation-circle-fill flex-shrink-0 text-rose-500"></i>
-                <span>{{ $errors->first() }}</span>
+            <div class="auth-alert" role="alert" id="loginErrorAlert">
+                <i class="bi bi-exclamation-circle-fill flex-shrink-0 text-rose-500" aria-hidden="true"></i>
+                <span>{{ $errors->first('email') ?: $errors->first() }}</span>
             </div>
             @endif
 
             {{-- Success Flash Message --}}
             @if(session('status'))
-            <div class="auth-alert auth-alert-success">
-                <i class="bi bi-check-circle-fill flex-shrink-0 text-emerald-500"></i>
+            <div class="auth-alert auth-alert-success" role="status">
+                <i class="bi bi-check-circle-fill flex-shrink-0 text-emerald-500" aria-hidden="true"></i>
                 <span>{{ session('status') }}</span>
             </div>
             @endif
@@ -677,7 +694,7 @@
                         Email Address or Username
                     </label>
                     <div class="auth-input-wrap">
-                        <i class="bi bi-envelope auth-input-icon"></i>
+                        <i class="bi bi-envelope auth-input-icon" aria-hidden="true"></i>
                         <input
                             type="text"
                             name="email"
@@ -685,6 +702,8 @@
                             class="auth-field-input"
                             placeholder="Email address or username"
                             value="{{ old('email') }}"
+                            autocomplete="username"
+                            @if($errors->has('email')) aria-invalid="true" aria-describedby="loginErrorAlert" @endif
                             required
                             autofocus
                         >
@@ -697,38 +716,38 @@
                         Password
                     </label>
                     <div class="auth-input-wrap password-wrap">
-                        <i class="bi bi-lock auth-input-icon"></i>
+                        <i class="bi bi-lock auth-input-icon" aria-hidden="true"></i>
                         <input
                             type="password"
                             name="password"
                             id="passwordField"
                             class="auth-field-input"
                             placeholder="Password"
+                            autocomplete="current-password"
                             required
                         >
-                        <button type="button" class="auth-pw-toggle" onclick="togglePassword()" aria-label="Toggle password visibility">
-                            <i class="bi bi-eye" id="toggleIcon"></i>
+                        <button type="button" class="auth-pw-toggle" onclick="togglePassword()" aria-label="Toggle password visibility" aria-controls="passwordField" aria-pressed="false" id="togglePasswordBtn">
+                            <i class="bi bi-eye" id="toggleIcon" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
 
                 {{-- Remember Me & Forgot Password --}}
                 <div class="auth-row-between">
-                    <label class="auth-remember">
-                        <input type="checkbox" name="remember">
+                    <label class="auth-remember" for="rememberMe">
+                        <input type="checkbox" name="remember" id="rememberMe">
                         <span>Remember me</span>
                     </label>
                     <a href="{{ route('password.request') }}" class="auth-forgot">Forgot password?</a>
                 </div>
 
                 {{-- Solid Ocean Blue Pill Button --}}
-                <button type="submit" class="auth-submit-pill">
-                    <i class="bi bi-box-arrow-in-right"></i>
+                <button type="submit" class="auth-submit-pill" id="loginSubmitBtn">
+                    <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
                     <span>Log In</span>
                 </button>
             </form>
 
-            {{-- Register Prompt (Only for Client/Tourist, hidden on Admin portal) --}}
             @if($currentPortal !== 'admin')
             <div class="auth-register-footer">
                 <span>Don't have an account yet?</span>
@@ -749,14 +768,30 @@
 function togglePassword() {
     const field = document.getElementById('passwordField');
     const icon  = document.getElementById('toggleIcon');
+    const btn   = document.getElementById('togglePasswordBtn');
     if (field.type === 'password') {
         field.type = 'text';
         icon.classList.replace('bi-eye', 'bi-eye-slash');
+        if (btn) btn.setAttribute('aria-pressed', 'true');
     } else {
         field.type = 'password';
         icon.classList.replace('bi-eye-slash', 'bi-eye');
+        if (btn) btn.setAttribute('aria-pressed', 'false');
     }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    const form      = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('loginSubmitBtn');
+
+    if (form && submitBtn) {
+        form.addEventListener('submit', function () {
+            submitBtn.disabled = true;
+            submitBtn.setAttribute('aria-busy', 'true');
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Logging in...';
+        });
+    }
+});
 </script>
 @endpush
 @endsection

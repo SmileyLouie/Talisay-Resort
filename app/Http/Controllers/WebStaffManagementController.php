@@ -118,7 +118,7 @@ class WebStaffManagementController extends Controller
         // Auto-generate staff_id if empty
         $staffId = !empty($data['staff_id'])
             ? trim($data['staff_id'])
-            : ('TBR-STF-' . str_pad((User::where('role', 'staff')->count() + 1), 3, '0', STR_PAD_LEFT));
+            : User::nextStaffId();
 
         $user = DB::transaction(function () use ($data, $staffId, $request) {
             $isActive = in_array($data['account_status'], ['active', 'on_leave']);

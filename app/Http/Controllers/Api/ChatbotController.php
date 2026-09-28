@@ -49,7 +49,8 @@ class ChatbotController extends Controller
             'history.*.role' => 'nullable|string|in:user,bot',
             'history.*.text' => 'nullable|string|max:1000',
         ]);
-        $sessionId  = $request->session_id ?? ('session_' . md5(session()->getId() ?: uniqid()));
+        $sessionId = $request->input('session_id')
+            ?: ($request->hasSession() ? 'session_'.md5((string) $request->session()->getId()) : 'session_'.uniqid());
         $rawMessage = trim($request->message);
         $message    = strtolower($rawMessage);
         $history    = $request->input('history', []);
@@ -75,7 +76,9 @@ class ChatbotController extends Controller
                 'response'   => $result['response'],
                 'intent'     => $result['intent'] ?? 'ai_response',
             ]);
-        } catch (\Throwable) {}
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to persist chatbot log', ['error' => $e->getMessage()]);
+        }
         return response()->json([
             'response'   => $result['response'],
             'reply'      => $result['response'],
@@ -150,7 +153,9 @@ class ChatbotController extends Controller
             try {
                 $aiResponse = $this->gemini->chat($systemPrompt, $raw, $history);
                 return ['response' => $aiResponse, 'intent' => 'ai_response', 'chips' => $this->getDefaultChips('guest'), 'ai_powered' => true];
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Chatbot AI fallback: ' . preg_replace('/key=[^&\s]+/', 'key=redacted', $e->getMessage()));
+            }
         }
         return $this->keywordFallbackGuest($message, $raw, $minRoom, $maxRoom, $minCottage, $maxCottage, $avail, $curr, $maxCap, $remaining);
     }
@@ -204,7 +209,9 @@ class ChatbotController extends Controller
             try {
                 $aiResponse = $this->gemini->chat($systemPrompt, $raw, $history);
                 return ['response' => $aiResponse, 'intent' => 'ai_response', 'chips' => $this->getDefaultChips('tourist'), 'ai_powered' => true];
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Chatbot AI fallback: ' . preg_replace('/key=[^&\s]+/', 'key=redacted', $e->getMessage()));
+            }
         }
         return $this->keywordFallbackTourist($message, $raw, $user, $avail, $minRoom, $maxRoom, $minCottage, $maxCottage, $myBookings, $myPayments, $myReviews);
     }
@@ -216,9 +223,24 @@ class ChatbotController extends Controller
             return ['response' => "That action requires **Administrator** access. Please contact your resort administrator.", 'intent' => 'permission_denied', 'chips' => ["Today's Bookings", 'Check Availability', 'Guest Lookup', 'Contact Admin'], 'ai_powered' => false];
         }
         $today = now()->format('Y-m-d');
-        $todayArrivals   = Booking::with(['user', 'accommodationUnit'])->whereDate('check_in_date', $today)->orWhereDate('booking_date', $today)->orderBy('check_in_date')->take(10)->get();
-        $todayDepartures = Booking::with(['user', 'accommodationUnit'])->whereDate('check_out_date', $today)->where('status', 'confirmed')->take(10)->get();
-        $pendingCount    = Booking::where('status', 'pending')->count();
+        $canSeeBookings = $user->isAdmin() || $user->hasModuleAccess('bookings');
+        $todayArrivals = $canSeeBookings
+            ? Booking::with(['user', 'accommodationUnit'])
+                ->where(function ($q) use ($today) {
+                    $q->whereDate('check_in_date', $today)->orWhereDate('booking_date', $today);
+                })
+                ->orderBy('check_in_date')
+                ->take(10)
+                ->get()
+            : collect();
+        $todayDepartures = $canSeeBookings
+            ? Booking::with(['user', 'accommodationUnit'])
+                ->whereDate('check_out_date', $today)
+                ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_CHECKED_IN])
+                ->take(10)
+                ->get()
+            : collect();
+        $pendingCount    = $canSeeBookings ? Booking::where('status', 'pending')->count() : 0;
         $avail           = AccommodationUnit::available()->count();
         $total           = AccommodationUnit::count();
         $cap             = CapacitySchedule::getCapacityForDate($today);
@@ -243,7 +265,9 @@ class ChatbotController extends Controller
             try {
                 $aiResponse = $this->gemini->chat($systemPrompt, $raw, $history);
                 return ['response' => $aiResponse, 'intent' => 'ai_response', 'chips' => $this->getDefaultChips('staff'), 'ai_powered' => true];
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Chatbot AI fallback: ' . preg_replace('/key=[^&\s]+/', 'key=redacted', $e->getMessage()));
+            }
         }
         return $this->keywordFallbackStaff($message, $raw, $user, $avail, $total, $currCount, $maxCap, $pendingCount, $today);
     }
@@ -253,7 +277,7 @@ class ChatbotController extends Controller
     {
         $totalBookings     = Booking::count();
         $pendingBookings   = Booking::where('status', 'pending')->count();
-        $confirmedBookings = Booking::where('status', 'confirmed')->count();
+        $confirmedBookings = Booking::whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_CHECKED_IN])->count();
         $cancelledBookings = Booking::where('status', 'cancelled')->count();
         $totalUsers        = User::count();
         $adminCount        = User::where('role', 'admin')->count();
@@ -296,7 +320,9 @@ class ChatbotController extends Controller
             try {
                 $aiResponse = $this->gemini->chat($systemPrompt, $raw, $history);
                 return ['response' => $aiResponse, 'intent' => 'ai_response', 'chips' => $this->getDefaultChips('admin'), 'ai_powered' => true];
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Chatbot AI fallback: ' . preg_replace('/key=[^&\s]+/', 'key=redacted', $e->getMessage()));
+            }
         }
         return $this->keywordFallbackAdmin($message, $raw, $user, $totalBookings, $pendingBookings, $confirmedBookings, $cancelledBookings, $totalUsers, $adminCount, $staffCount, $touristCount, $totalRevenue, $monthRevenue, $pendingPayments, $availUnits, $totalUnits, $today, $todayBookings, $currCount, $maxCap, $totalReviews, $avgRating);
     }
@@ -393,7 +419,10 @@ class ChatbotController extends Controller
             if ($count === 0) { $response = "**Today's Reservations (" . now()->format('M d, Y') . "):** No check-ins scheduled for today."; $chips = ['Check Availability', 'All Bookings', 'Guest Lookup']; }
             else { $list = $todayBookings->map(fn($b) => "* **" . ($b->reference_no ?? 'N/A') . "** — " . ($b->user->name ?? 'Guest') . " at " . ($b->accommodationUnit->unit_number ?? 'TBA'))->join("\n"); $response = "**Today's Reservations ({$count} guests):**\n{$list}"; $chips = ['Check-Out Today', 'Check Availability', 'Guest Lookup']; }
             $intent = 'staff_reservations';
-        } elseif (preg_match('/(TBRS?-[A-Z0-9]{4,10})/i', $raw, $matches)) {
+        } else        if (preg_match('/(TBRS?-[A-Z0-9]{4,10})/i', $raw, $matches)) {
+            if (!$user->isAdmin() && !$user->hasPermission('bookings', 'view')) {
+                return ['response' => 'Booking lookups require the Bookings permission. Please contact the administrator if you need access.', 'intent' => 'permission_denied', 'chips' => $chips, 'ai_powered' => false];
+            }
             $refNo = strtoupper($matches[1]);
             $booking = Booking::where('reference_no', $refNo)->with(['user', 'accommodationUnit', 'payment'])->first();
             if ($booking) {

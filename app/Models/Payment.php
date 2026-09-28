@@ -66,7 +66,8 @@ class Payment extends Model
 
             // Cast metadata JSON string to PHP array automatically
             // Allows: $payment->metadata['currency'] or $payment->metadata['paid_at']
-            'metadata' => 'array',
+            'metadata'            => 'array',
+            'is_cash_on_arrival'  => 'boolean',
         ];
     }
 

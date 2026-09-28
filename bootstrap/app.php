@@ -13,25 +13,30 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Lets the browser widgets (chatbot, notifications) call /api with the web session.
         $middleware->statefulApi();
-        
+
         $middleware->alias([
-            'role'       => \App\Http\Middleware\CheckRole::class,
-            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'role'        => \App\Http\Middleware\CheckRole::class,
+            'permission'  => \App\Http\Middleware\CheckPermission::class,
+            'integration' => \App\Http\Middleware\VerifyIntegrationToken::class,
         ]);
 
+        // Stripe is signed. The mobile integration routes are server-to-server
+        // and are authenticated by the integration token, not a browser session.
         $middleware->validateCsrfTokens(except: [
-            'api/*',
+            'api/stripe/webhook',
+            'api/integration/*',
         ]);
 
         $middleware->redirectTo(
             guests: '/login',
-            users: '/',      // Routes through '/' which redirects by role: admin/staff/tourist
+            users: '/',      // '/' redirects by role: admin / staff / tourist
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
     })
     ->withProviders([

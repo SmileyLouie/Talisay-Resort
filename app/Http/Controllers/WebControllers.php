@@ -11,7 +11,10 @@ namespace App\Http\Controllers;
 
 use App\Events\BookingUpdated;
 use App\Events\CapacityUpdated;
+use App\Exceptions\BookingConflictException;
+use App\Exceptions\InvalidBookingTransitionException;
 use App\Models\AuditLog;
+use App\Services\BookingService;
 use App\Models\Booking;
 use App\Models\CapacitySchedule;
 use App\Models\ChatbotConfig;
@@ -42,6 +45,8 @@ class WebControllers extends Controller
         $capacity = CapacitySchedule::getCapacityForDate($today);
         $totalUnits = AccommodationUnit::count();
         $activeUnits = AccommodationUnit::available()->count();
+        $roomCount = AccommodationUnit::rooms()->count();
+        $cottageCount = AccommodationUnit::cottages()->count();
         $monthStart = now()->startOfMonth();
         $monthlyRevenue = Payment::where('status', 'success')
             ->where('created_at', '>=', $monthStart)
@@ -104,6 +109,7 @@ class WebControllers extends Controller
 
         return view('dashboard.index', compact(
             'todaysBookings', 'capacity', 'totalUnits', 'activeUnits',
+            'roomCount', 'cottageCount',
             'monthlyRevenue', 'recentBookings', 'occupancyData',
             'upcomingReservations',
             'recentReviews', 'quickStats', 'revenueTrends',
@@ -120,46 +126,66 @@ class WebControllers extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email'    => 'required|string',
-            'password' => 'required',
+            'email'    => 'required|string|max:255',
+            'password' => 'required|string',
+            'portal'   => 'nullable|in:admin,client',
         ]);
 
+        // Explicit admin portal is administrator-only. Explicit client portal is
+        // for guests and staff. A request with no portal (generic login) accepts any role.
+        $portal     = in_array($request->input('portal'), ['admin', 'client'], true)
+            ? $request->input('portal')
+            : null;
         $loginInput = trim($request->input('email'));
-        $targetEmail = $loginInput;
+        $failed     = fn () => back()
+            ->withErrors(['email' => 'The provided credentials do not match our records.'])
+            ->onlyInput('email', 'portal');
 
-        $userLookup = User::where('email', $loginInput)
-            ->orWhere('name', $loginInput)
-            ->orWhere('staff_id', $loginInput)
-            ->first();
+        // Staff may sign in with their Staff ID; everyone else with e-mail.
+        $user = User::where(function ($q) use ($loginInput) {
+            $q->where('email', $loginInput)->orWhere('staff_id', $loginInput);
+        })->first();
 
-        if ($userLookup) {
-            $targetEmail = $userLookup->email;
+        if (!$user) {
+            return $failed();
         }
 
-        $credentials = [
-            'email'    => $targetEmail,
-            'password' => $request->input('password'),
-        ];
+        $allowedOnPortal = match ($portal) {
+            'admin'  => $user->isAdmin(),
+            'client' => $user->isStaff() || $user->isTourist(),
+            default  => true,
+        };
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
-            $user = Auth::user();
-
-            if (!$user->is_active) {
-                Auth::logout();
-                return back()->withErrors(['email' => 'Your account has been deactivated. Please contact support.']);
-            }
-
-            AuditLog::log('user_login', $user);
-
-            if ($user->isAdmin())   return redirect()->intended(route('admin.dashboard'));
-            if ($user->isStaff())   return redirect()->intended(route('staff.dashboard'));
-            if ($user->isTourist()) return redirect()->intended(route('tourist.dashboard'));
-
-            return redirect()->intended('/');
+        if (!$allowedOnPortal) {
+            // Deliberately indistinguishable from a wrong password.
+            return $failed();
         }
 
-        return back()->withErrors(['email' => 'The provided credentials do not match our records.'])->onlyInput('email');
+        if (!Auth::attempt(['email' => $user->email, 'password' => $request->input('password')], $request->boolean('remember'))) {
+            return $failed();
+        }
+
+        if ($user->isStaff() && in_array($user->account_status, ['inactive', 'suspended'], true)) {
+            Auth::logout();
+            return back()
+                ->withErrors(['email' => 'Your staff account is currently ' . $user->account_status . '. Please contact the resort administrator.'])
+                ->onlyInput('email', 'portal');
+        }
+
+        if (!$user->is_active) {
+            Auth::logout();
+            return back()
+                ->withErrors(['email' => 'Your account has been deactivated. Please contact support.'])
+                ->onlyInput('email', 'portal');
+        }
+
+        $request->session()->regenerate();
+        AuditLog::log('user_login', $user);
+
+        if ($user->isAdmin()) return redirect()->intended(route('admin.dashboard'));
+        if ($user->isStaff()) return redirect()->intended(route('staff.dashboard'));
+
+        return redirect()->intended(route('tourist.dashboard'));
     }
 
     public function logout(Request $request)
@@ -305,84 +331,33 @@ class WebControllers extends Controller
             'accommodation_unit_id' => 'required|exists:accommodation_units,id',
             'booking_date'          => 'required|date',
             'check_out_date'        => 'nullable|date|after:booking_date',
-            'guests_count'          => 'required|integer|min:1',
+            'guests_count'          => 'required|integer|min:1|max:50',
             'payment_method'        => 'required|in:cash,gcash,card,paypal',
             'initial_status'        => 'required|in:pending,paid,checked_in',
             'special_requests'      => 'nullable|string|max:500',
         ]);
 
         $unit = AccommodationUnit::findOrFail($request->accommodation_unit_id);
-
-        if (!$unit->is_available) {
-            return back()->with('error', "{$unit->unit_number} is currently marked unavailable by management.")->withInput();
-        }
-
-        if ($request->guests_count > $unit->max_occupancy) {
-            return back()->with('error', "Guests count exceeds capacity limit of {$unit->max_occupancy} guests for {$unit->unit_number}.")->withInput();
-        }
-
-        $bookingDate  = $request->booking_date;
-        $checkOutDate = $request->check_out_date ?? \Carbon\Carbon::parse($bookingDate)->addDay()->format('Y-m-d');
-        $nights = (int) \Carbon\Carbon::parse($bookingDate)->diffInDays(\Carbon\Carbon::parse($checkOutDate));
-        if ($nights < 1) $nights = 1;
-
-        // Conflict check
-        $conflict = Booking::getConflictingBooking($unit->id, $bookingDate, $checkOutDate);
-        if ($conflict) {
-            $conflictIn  = $conflict->check_in_date ? $conflict->check_in_date->format('M d, Y') : $conflict->booking_date->format('M d, Y');
-            $conflictOut = $conflict->check_out_date ? $conflict->check_out_date->format('M d, Y') : \Carbon\Carbon::parse($conflictIn)->addDay()->format('M d, Y');
-
-            if ($conflict->booking_type === 'special_resort') {
-                return back()->with('error', "Reservation conflict: An exclusive Full-Resort booking is active from {$conflictIn} to {$conflictOut}.")->withInput();
-            }
-
-            return back()->with('error', "Reservation conflict: {$unit->unit_number} is already booked from {$conflictIn} to {$conflictOut} (Ref: {$conflict->reference_no}).")->withInput();
-        }
-
-        $totalAmount = $unit->price_per_night * $nights;
-        $status = $request->initial_status;
         $isRegistered = $request->guest_type === 'registered';
 
-        $userId = $isRegistered ? $request->user_id : null;
-        $guestNameManual = $isRegistered ? null : $request->guest_name;
-        $guestContactManual = $isRegistered ? null : $request->guest_contact;
-
-        $booking = Booking::create([
-            'reference_no'          => Booking::generateReferenceNo(),
-            'booking_type'          => 'regular',
-            'booking_source'        => 'manual',
-            'user_id'               => $userId,
-            'guest_name_manual'     => $guestNameManual,
-            'guest_contact_manual'  => $guestContactManual,
-            'accommodation_unit_id' => $unit->id,
-            'booking_date'          => $bookingDate,
-            'check_in_date'         => $bookingDate,
-            'check_out_date'        => $checkOutDate,
-            'nights_count'          => $nights,
-            'time_slot'             => '2:00 PM Check-in · 11:00 AM Check-out',
-            'guests_count'          => $request->guests_count,
-            'status'                => $status,
-            'total_amount'          => $totalAmount,
-            'special_requests'      => $request->special_requests,
-        ]);
-
-        $paymentMethod = $request->payment_method;
-        $isCash = $paymentMethod === 'cash';
-        $paymentStatus = ($status === 'paid' || $status === 'checked_in') ? 'success' : 'pending';
-
-        Payment::create([
-            'booking_id'         => $booking->id,
-            'amount'             => $totalAmount,
-            'gateway'            => $paymentMethod,
-            'payment_channel'    => $paymentMethod,
-            'transaction_id'     => $isCash ? ('CASH-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8))) : ('MNL-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8))),
-            'status'             => $paymentStatus,
-            'is_cash_on_arrival' => $isCash,
-            'metadata'           => ['source' => 'manual', 'created_by' => Auth::id()],
-        ]);
-
-        $capacity = CapacitySchedule::getCapacityForDate($bookingDate);
-        $capacity->increment('current_count', $request->guests_count);
+        try {
+            $booking = app(BookingService::class)->createRegular([
+                'unit'                => $unit,
+                'check_in'            => $request->booking_date,
+                'check_out'           => $request->check_out_date,
+                'guests_count'        => $request->guests_count,
+                'user_id'             => $isRegistered ? $request->user_id : null,
+                'guest_name_manual'   => $isRegistered ? null : $request->guest_name,
+                'guest_contact_manual'=> $isRegistered ? null : $request->guest_contact,
+                'special_requests'    => $request->special_requests,
+                'status'              => $request->initial_status,
+                'booking_source'      => 'manual',
+                'payment_method'      => $request->payment_method,
+                'created_by'          => Auth::id(),
+            ]);
+        } catch (BookingConflictException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
 
         AuditLog::log('manual_booking_created', $booking, null, [
             'created_by' => Auth::id(),
@@ -390,9 +365,9 @@ class WebControllers extends Controller
             'booking'    => $booking->toArray(),
         ]);
 
-        if ($userId) {
+        if ($booking->user_id) {
             \App\Models\NotificationModel::notifyUser(
-                $userId,
+                $booking->user_id,
                 'booking',
                 'Reservation Created by Front Desk',
                 "A reservation for {$unit->unit_number} ({$booking->reference_no}) was created for you by our resort staff.",
@@ -400,135 +375,73 @@ class WebControllers extends Controller
             );
         }
 
-        return redirect()->route('bookings.index')->with('success', "Manual booking {$booking->reference_no} created successfully for {$booking->guest_name}!");
+        return redirect()->route('bookings.index')->with('success', "Manual booking {$booking->reference_no} created successfully for {$booking->guest_name}.");
     }
 
     public function updateBookingStatus(Request $request, Booking $booking)
     {
         $request->validate([
-            'status'              => 'required|in:pending,paid,checked_in,checked_out,cancelled,completed',
-            'cancellation_reason' => 'required_if:status,cancelled',
+            'status'              => 'required|in:' . implode(',', Booking::STATUSES),
+            'cancellation_reason' => 'required_if:status,cancelled|nullable|string|max:255',
         ]);
 
-        $oldStatus = $booking->status;
-
-        if ($request->status === 'cancelled' && $oldStatus !== 'cancelled') {
-            $booking->update([
-                'status'              => 'cancelled',
-                'cancelled_at'        => now(),
-                'cancellation_reason' => $request->cancellation_reason,
+        try {
+            app(BookingService::class)->changeStatus($booking, $request->status, [
+                'reason' => $request->cancellation_reason,
             ]);
-
-            $capacity = CapacitySchedule::getCapacityForDate($booking->booking_date);
-            $capacity->decrement('current_count', max(0, $booking->guests_count));
-            broadcast(new CapacityUpdated($capacity));
-
-        } elseif ($oldStatus === 'cancelled' && $request->status !== 'cancelled') {
-            $booking->update($request->only('status'));
-
-            $capacity = CapacitySchedule::getCapacityForDate($booking->booking_date);
-            $capacity->increment('current_count', $booking->guests_count);
-            broadcast(new CapacityUpdated($capacity));
-
-        } else {
-            $booking->update($request->only('status'));
+        } catch (InvalidBookingTransitionException $e) {
+            return back()->with('error', $e->getMessage());
+        } catch (BookingConflictException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        AuditLog::log('booking_status_changed', $booking, ['status' => $oldStatus], ['status' => $booking->status]);
-        broadcast(new BookingUpdated($booking));
-
-        // Notify tourist
-        \App\Models\NotificationModel::notifyUser(
-            $booking->user_id,
-            'booking',
-            'Reservation Status Updated',
-            "Your reservation {$booking->reference_no} status has been updated to: " . ucfirst(str_replace('_', ' ', $booking->status)) . ".",
-            ['booking_id' => $booking->id, 'status' => $booking->status]
-        );
-
-
+        app(BookingService::class)->notifyGuestOfStatus($booking->fresh());
 
         return back()->with('success', 'Booking status updated successfully.');
     }
 
     public function approveSpecialResortBooking(Request $request, Booking $booking)
     {
-        if ($booking->booking_type !== 'special_resort') {
-            return back()->with('error', 'This is not a special full-resort booking.');
+        try {
+            $booking = app(BookingService::class)->approveSpecial($booking, Auth::id());
+        } catch (InvalidBookingTransitionException|BookingConflictException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        DB::transaction(function () use ($booking, $request) {
-            $booking->update([
-                'admin_approval_status' => 'approved',
-                'admin_approved_by'     => Auth::id(),
-                'status'                => 'paid',
-            ]);
+        if ($booking->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $booking->user_id,
+                'booking',
+                'Special Resort Booking Approved',
+                "Your exclusive full-resort booking ({$booking->reference_no}) has been approved. We look forward to hosting your event.",
+                ['booking_id' => $booking->id]
+            );
+        }
 
-            if ($booking->payment) {
-                $booking->payment->update(['status' => 'success']);
-            }
-
-            // Lock all resort capacity for each date in the range
-            $startDate = \Carbon\Carbon::parse($booking->check_in_date ?? $booking->booking_date);
-            $endDate = \Carbon\Carbon::parse($booking->check_out_date ?? $booking->booking_date);
-
-            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                $capacity = CapacitySchedule::getCapacityForDate($date->format('Y-m-d'));
-                $capacity->update([
-                    'current_count' => $capacity->max_capacity, // Lock full capacity
-                ]);
-                broadcast(new CapacityUpdated($capacity));
-            }
-
-            // Send notification to tourist
-            \App\Models\NotificationModel::create([
-                'user_id' => $booking->user_id,
-                'type'    => 'booking',
-                'title'   => 'Special Resort Booking Approved',
-                'message' => "Your exclusive full-resort booking ({$booking->reference_no}) has been approved by the Administrator. We look forward to hosting your exclusive event!",
-                'data'    => ['booking_id' => $booking->id],
-            ]);
-
-            AuditLog::log('special_resort_booking_approved', $booking, null, $booking->toArray());
-        });
-
-        return back()->with('success', "Special Full-Resort Booking {$booking->reference_no} has been APPROVED! Resort inventory locked for the selected dates.");
+        return back()->with('success', "Special full-resort booking {$booking->reference_no} has been approved. Resort inventory is locked for the selected dates.");
     }
 
     public function rejectSpecialResortBooking(Request $request, Booking $booking)
     {
-        if ($booking->booking_type !== 'special_resort') {
-            return back()->with('error', 'This is not a special full-resort booking.');
+        $reason = $request->input('reason', 'Special resort booking request was declined by management.');
+
+        try {
+            $booking = app(BookingService::class)->rejectSpecial($booking, Auth::id(), $reason);
+        } catch (InvalidBookingTransitionException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        $reason = $request->reason ?? 'Special resort booking request was declined by management.';
+        if ($booking->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $booking->user_id,
+                'booking',
+                'Special Resort Booking Update',
+                "Your special full-resort booking ({$booking->reference_no}) could not be accommodated: {$reason}",
+                ['booking_id' => $booking->id]
+            );
+        }
 
-        DB::transaction(function () use ($booking, $reason) {
-            $booking->update([
-                'admin_approval_status' => 'rejected',
-                'admin_approved_by'     => Auth::id(),
-                'status'                => 'cancelled',
-                'cancelled_at'          => now(),
-                'cancellation_reason'   => $reason,
-            ]);
-
-            if ($booking->payment) {
-                $booking->payment->update(['status' => 'failed']);
-            }
-
-            // Send notification to tourist
-            \App\Models\NotificationModel::create([
-                'user_id' => $booking->user_id,
-                'type'    => 'booking',
-                'title'   => 'Special Resort Booking Update',
-                'message' => "Your special full-resort booking ({$booking->reference_no}) could not be accommodated: {$reason}",
-                'data'    => ['booking_id' => $booking->id],
-            ]);
-
-            AuditLog::log('special_resort_booking_rejected', $booking, null, ['reason' => $reason]);
-        });
-
-        return back()->with('success', "Special Booking {$booking->reference_no} has been rejected.");
+        return back()->with('success', "Special booking {$booking->reference_no} has been rejected.");
     }
 
     // ─── Payment Logic ────────────────────────────────────────
@@ -553,7 +466,12 @@ class WebControllers extends Controller
         }
 
         $payments = $query->orderBy('created_at', 'desc')->paginate(15);
-        return view('payments.index', compact('payments'));
+
+        $totalSuccess = Payment::where('status', 'success')->sum('amount');
+        $totalPending = Payment::where('status', 'pending')->sum('amount');
+        $pendingCount = Payment::where('status', 'pending')->count();
+
+        return view('payments.index', compact('payments', 'totalSuccess', 'totalPending', 'pendingCount'));
     }
 
     public function paymentShow(Payment $payment)
@@ -564,40 +482,38 @@ class WebControllers extends Controller
 
     public function approvePayment(Payment $payment)
     {
-        if ($payment->status !== 'pending') {
-            return back()->with('error', 'Payment is not in pending status.');
+        try {
+            $payment = app(BookingService::class)->approvePayment($payment);
+        } catch (InvalidBookingTransitionException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        $payment->update(['status' => 'success']);
-        $payment->booking->update(['status' => 'paid']);
-
-        // Notify the tourist that their payment has been confirmed
-        \App\Models\NotificationModel::create([
-            'user_id' => $payment->booking->user_id,
-            'type'    => 'payment',
-            'title'   => 'Payment Confirmed',
-            'message' => 'Your payment of ₱' . number_format($payment->amount, 2) . ' for booking ' . $payment->booking->reference_no . ' has been confirmed. Your reservation is now active!',
-            'data'    => ['booking_id' => $payment->booking_id],
-        ]);
-
-        AuditLog::log('payment_approved', $payment);
+        if ($payment->booking?->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $payment->booking->user_id,
+                'payment',
+                'Payment Confirmed',
+                'Your payment of ₱' . number_format($payment->amount, 2) . ' for booking ' . $payment->booking->reference_no . ' has been confirmed.',
+                ['booking_id' => $payment->booking_id]
+            );
+        }
 
         return back()->with('success', 'Payment approved successfully.');
     }
 
     public function rejectPayment(Payment $payment)
     {
-        $payment->update(['status' => 'failed']);
-        AuditLog::log('payment_rejected', $payment);
+        $payment = app(BookingService::class)->rejectPayment($payment);
 
-        // Notify tourist
-        \App\Models\NotificationModel::notifyUser(
-            $payment->booking->user_id,
-            'payment',
-            'Payment Proof Verification Issue',
-            "Your payment proof for booking {$payment->booking->reference_no} could not be verified. Please re-upload a clear receipt or contact front desk.",
-            ['booking_id' => $payment->booking_id, 'payment_id' => $payment->id]
-        );
+        if ($payment->booking?->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $payment->booking->user_id,
+                'payment',
+                'Payment Proof Verification Issue',
+                "Your payment proof for booking {$payment->booking->reference_no} could not be verified. Please re-upload a clear receipt or contact the front desk.",
+                ['booking_id' => $payment->booking_id, 'payment_id' => $payment->id]
+            );
+        }
 
         return back()->with('success', 'Payment rejected.');
     }
@@ -679,20 +595,16 @@ class WebControllers extends Controller
     public function chatbotStore(Request $request)
     {
         $request->validate([
-            'intent_name' => 'required|string|max:100|unique:chatbot_intents,intent_name',
-            'category'    => 'required|string|max:100',
-            'keywords'    => 'required|string',
-            'response'    => 'required|string',
+            'keyword'  => 'required|string|max:255',
+            'category' => 'required|in:' . implode(',', ChatbotIntent::CATEGORIES),
+            'response' => 'required|string|max:2000',
         ]);
 
-        $keywords = array_filter(array_map('trim', explode(',', $request->keywords)));
-
         $intent = ChatbotIntent::create([
-            'intent_name' => $request->intent_name,
-            'category'    => $request->category,
-            'keywords'    => $keywords,
-            'response'    => $request->response,
-            'is_active'   => true,
+            'keyword'   => $request->keyword,
+            'category'  => $request->category,
+            'response'  => $request->response,
+            'is_active' => true,
         ]);
 
         AuditLog::log('chatbot_intent_created', $intent, null, $intent->toArray());
@@ -703,22 +615,18 @@ class WebControllers extends Controller
     public function chatbotUpdate(Request $request, ChatbotIntent $intent)
     {
         $request->validate([
-            'intent_name' => 'required|string|max:100|unique:chatbot_intents,intent_name,' . $intent->id,
-            'category'    => 'required|string|max:100',
-            'keywords'    => 'required|string',
-            'response'    => 'required|string',
-            'is_active'   => 'boolean',
+            'keyword'   => 'required|string|max:255',
+            'category'  => 'required|in:' . implode(',', ChatbotIntent::CATEGORIES),
+            'response'  => 'required|string|max:2000',
+            'is_active' => 'boolean',
         ]);
 
         $oldValues = $intent->toArray();
-        $keywords  = array_filter(array_map('trim', explode(',', $request->keywords)));
-
         $intent->update([
-            'intent_name' => $request->intent_name,
-            'category'    => $request->category,
-            'keywords'    => $keywords,
-            'response'    => $request->response,
-            'is_active'   => $request->boolean('is_active', true),
+            'keyword'   => $request->keyword,
+            'category'  => $request->category,
+            'response'  => $request->response,
+            'is_active' => $request->boolean('is_active', true),
         ]);
 
         AuditLog::log('chatbot_intent_updated', $intent, $oldValues, $intent->toArray());
@@ -753,10 +661,12 @@ class WebControllers extends Controller
         $request->validate([
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
-            'panorama'    => 'required|file|image|max:10240',
+            'panorama'    => 'required|file|mimes:jpg,jpeg,png,webp,mp4,webm,ogv|max:51200',
             'type'        => 'required|in:image,video',
             'sort_order'  => 'required|integer',
         ]);
+
+        $this->assertTourFileMatchesType($request->file('panorama'), $request->type);
 
         if ($request->hasFile('panorama')) {
             $path = $request->file('panorama')->store('tour-assets', 'public');
@@ -784,11 +694,13 @@ class WebControllers extends Controller
         $request->validate([
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
-            'panorama'    => 'nullable|file|max:20480',
+            'panorama'    => 'nullable|file|mimes:jpg,jpeg,png,webp,mp4,webm,ogv|max:51200',
             'type'        => 'required|in:image,video',
             'sort_order'  => 'required|integer',
             'is_active'   => 'nullable',
         ]);
+
+        $this->assertTourFileMatchesType($request->file('panorama'), $request->type);
 
         $oldValues = $asset->toArray();
 
@@ -826,6 +738,29 @@ class WebControllers extends Controller
         AuditLog::log('tour_asset_deleted', null, $oldValues, null);
 
         return back()->with('success', 'Tour asset deleted successfully.');
+    }
+
+    protected function assertTourFileMatchesType($file, string $type): void
+    {
+        if (!$file) {
+            return;
+        }
+
+        $mime = (string) $file->getMimeType();
+        $isImage = str_starts_with($mime, 'image/');
+        $isVideo = str_starts_with($mime, 'video/');
+
+        if ($type === 'image' && !$isImage) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'panorama' => 'Please upload an image file (JPG, PNG, or WebP) for image scenes.',
+            ]);
+        }
+
+        if ($type === 'video' && !$isVideo) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'panorama' => 'Please upload a video file (MP4, WebM, or OGV) for video scenes.',
+            ]);
+        }
     }
 
     // ─── Review Logic ─────────────────────────────────────────
@@ -880,6 +815,7 @@ class WebControllers extends Controller
             'is_comment_blocked' => true,
             'reason'             => $reason,
         ]);
+        app(\App\Services\SupabaseSyncService::class)->pushReview($review);
 
         $refNo = $review->booking->reference_no ?? 'Stay';
         \App\Models\NotificationModel::notifyUser(
@@ -904,6 +840,7 @@ class WebControllers extends Controller
         AuditLog::log('review_comment_unblocked', $review, ['is_comment_blocked' => true], [
             'is_comment_blocked' => false,
         ]);
+        app(\App\Services\SupabaseSyncService::class)->pushReview($review);
 
         $refNo = $review->booking->reference_no ?? 'Stay';
         \App\Models\NotificationModel::notifyUser(
@@ -991,7 +928,7 @@ class WebControllers extends Controller
         $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
         $dateTo   = $request->date_to ?? now()->format('Y-m-d');
 
-        $paymentQuery   = Payment::successful();
+        $paymentQuery   = Payment::successful()->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59']);
         $totalRevenue   = $paymentQuery->clone()->sum('amount');
         $driver         = DB::getDriverName();
         $select         = $driver === 'sqlite'
@@ -1039,7 +976,7 @@ class WebControllers extends Controller
         $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
         $dateTo   = $request->date_to ?? now()->format('Y-m-d');
 
-        $totalRevenue   = Payment::successful()->sum('amount');
+        $totalRevenue   = Payment::successful()->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59'])->sum('amount');
         $pendingAmount  = Payment::where('status', 'pending')->sum('amount');
         $refundedAmount = Payment::where('status', 'refunded')->sum('amount');
 
@@ -1204,7 +1141,7 @@ class WebControllers extends Controller
         $user->delete();
 
         return redirect()->route('users.index')
-            ->with('success', "Account for \"{$userName}\" has been permanently deleted.");
+            ->with('success', "Account for \"{$userName}\" has been removed.");
     }
 
     public function userToggleStatus(User $user)
@@ -1363,13 +1300,21 @@ class WebControllers extends Controller
             'settings' => 'required|array',
         ]);
 
+        $secretKeys = ['stripe_secret', 'stripe_webhook_secret'];
+        $saved      = [];
+
         foreach ($request->input('settings', []) as $key => $value) {
-            if ($value !== null) {
-                SystemSetting::set($key, $value);
+            if ($value === null) {
+                continue;
             }
+            if (in_array($key, $secretKeys, true) && (trim((string) $value) === '' || str_contains((string) $value, '•'))) {
+                continue;
+            }
+            SystemSetting::set($key, $value);
+            $saved[$key] = in_array($key, $secretKeys, true) ? '[redacted]' : $value;
         }
 
-        AuditLog::log('settings_updated', null, null, $request->input('settings'));
+        AuditLog::log('settings_updated', null, null, $saved);
 
         return back()->with('success', 'Settings updated successfully.');
     }

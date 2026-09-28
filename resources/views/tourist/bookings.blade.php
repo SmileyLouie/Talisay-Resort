@@ -24,21 +24,6 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
-    {{-- Flash Notifications --}}
-    @if(session('success'))
-    <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center gap-3 text-sm shadow-sm">
-        <i class="bi bi-check-circle-fill text-emerald-500 text-lg"></i>
-        <span>{{ session('success') }}</span>
-    </div>
-    @endif
-
-    @if(session('error'))
-    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-2xl flex items-center gap-3 text-sm shadow-sm">
-        <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg"></i>
-        <span>{{ session('error') }}</span>
-    </div>
-    @endif
-
     {{-- Bookings List --}}
     @if($bookings->isEmpty())
     <div class="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
@@ -149,7 +134,7 @@
                     {{-- Modification button for active bookings --}}
                     @if(in_array($booking->status, ['pending', 'paid', 'checked_in']) && $booking->booking_type !== 'special_resort')
                     <button type="button" 
-                            onclick="openModifyModal({{ $booking->id }}, '{{ $booking->reference_no }}', {{ $booking->accommodation_unit_id }}, '{{ addslashes($booking->accommodationUnit->unit_number ?? '') }}', {{ $booking->guests_count }}, {{ $booking->nights_count ?? 1 }}, {{ $booking->total_amount }})" 
+                            onclick="openModifyModal({{ $booking->id }}, {{ Js::from($booking->reference_no) }}, {{ $booking->accommodation_unit_id ?? 'null' }}, {{ Js::from($booking->accommodationUnit->unit_number ?? '') }}, {{ $booking->guests_count }}, {{ $booking->nights_count ?? 1 }}, {{ $booking->total_amount }})" 
                             class="bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-sky-200 transition flex items-center gap-1">
                         <i class="bi bi-arrow-left-right text-sky-600"></i>Change Unit
                     </button>
@@ -174,12 +159,9 @@
 
                     {{-- Cancel Stay Option --}}
                     @if(in_array($booking->status, ['pending', 'paid']))
-                    <form action="{{ route('tourist.bookings.cancel', $booking->id) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to cancel reservation {{ $booking->reference_no }}?');">
-                        @csrf
-                        <button type="submit" class="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 transition flex items-center gap-1">
-                            <i class="bi bi-x-circle"></i>Cancel
-                        </button>
-                    </form>
+                    <button type="button" onclick="openCancelModal({{ $booking->id }}, {{ Js::from($booking->reference_no) }})" class="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 transition flex items-center gap-1">
+                        <i class="bi bi-x-circle" aria-hidden="true"></i>Cancel
+                    </button>
                     @endif
                 </div>
             </div>
@@ -206,7 +188,7 @@
             <button onclick="document.getElementById('newBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4">
+        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4" data-loading>
             @csrf
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Select Accommodation (Room / Cottage)</label>
@@ -295,7 +277,7 @@
             <button onclick="document.getElementById('modifyBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form id="modifyBookingForm" action="" method="POST" class="space-y-4">
+        <form id="modifyBookingForm" action="" method="POST" class="space-y-4" data-loading onsubmit="return confirm('Change this reservation to the selected room or cottage?');">
             @csrf
             
             <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 space-y-1">
@@ -354,7 +336,7 @@
             <button onclick="document.getElementById('specialBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.special-resort') }}" method="POST" class="space-y-4">
+        <form action="{{ route('tourist.bookings.special-resort') }}" method="POST" class="space-y-4" data-loading>
             @csrf
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -446,6 +428,27 @@
     </div>
 </div>
 
+<div id="cancelBookingModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="cancelBookingTitle">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 id="cancelBookingTitle" class="text-lg font-extrabold text-slate-900 mb-0">Cancel Reservation</h3>
+            <button type="button" onclick="document.getElementById('cancelBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+        </div>
+        <p class="text-sm text-slate-600 mb-0">Cancel reservation <strong id="cancelBookingRef"></strong>? This will release the room or cottage for other guests.</p>
+        <form id="cancelBookingForm" method="POST" class="space-y-4" data-loading onsubmit="return confirm('Confirm cancellation of this reservation?');">
+            @csrf
+            <div>
+                <label for="cancellation_reason" class="block text-xs font-bold text-slate-700 mb-1">Reason (optional)</label>
+                <textarea id="cancellation_reason" name="cancellation_reason" rows="3" maxlength="500" class="w-full form-control rounded-xl text-sm" placeholder="Change of plans, weather, etc."></textarea>
+            </div>
+            <div class="flex gap-2">
+                <button type="button" onclick="document.getElementById('cancelBookingModal').classList.add('hidden')" class="flex-1 btn btn-light rounded-xl font-bold text-sm">Keep Booking</button>
+                <button type="submit" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm py-2.5 rounded-xl shadow">Cancel Reservation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -504,12 +507,12 @@ async function calculateBookingTotal() {
             if (data.available) {
                 feedback.className = 'p-3 rounded-xl text-xs flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800';
                 icon.className = 'bi bi-check-circle-fill text-emerald-600 text-sm';
-                text.innerHTML = `<strong>Available!</strong> No conflicting reservations for these dates.`;
+                text.textContent = 'Available. No conflicting reservations for these dates.';
                 submitBtn.disabled = false;
             } else {
                 feedback.className = 'p-3 rounded-xl text-xs flex items-center gap-2 bg-red-50 border border-red-200 text-red-700';
                 icon.className = 'bi bi-exclamation-octagon-fill text-red-500 text-sm';
-                text.innerHTML = `<strong>Conflict:</strong> ${data.conflict_message || 'Unit is already booked for these dates.'}`;
+                text.textContent = data.conflict_message || 'This room or cottage is already booked for these dates.';
                 submitBtn.disabled = true;
             }
         } catch (e) {
@@ -579,6 +582,14 @@ function calculateSpecialTotal() {
     document.getElementById('specialDurationText').textContent = days + (days === 1 ? ' Night' : ' Nights');
     const total = unitTotalSum * days;
     document.getElementById('specialCalculatedTotal').textContent = '₱' + total.toLocaleString('en-US', { minimumFractionDigits: 2 });
+}
+
+function openCancelModal(bookingId, refNo) {
+    const form = document.getElementById('cancelBookingForm');
+    form.action = '/tourist/bookings/' + bookingId + '/cancel';
+    document.getElementById('cancelBookingRef').textContent = refNo || '';
+    document.getElementById('cancellation_reason').value = '';
+    document.getElementById('cancelBookingModal').classList.remove('hidden');
 }
 
 function openUploadModal(paymentId) {

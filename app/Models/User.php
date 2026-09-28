@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 // Import the base Authenticatable class (extends Model with auth features)
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 // Import the Notifiable trait for sending email/push notifications
@@ -34,7 +35,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 // Declare which fields are allowed to be mass-assigned (for create/update)
 // This prevents mass-assignment vulnerabilities
-#[Fillable(['name', 'email', 'phone', 'password', 'role', 'avatar', 'is_active', 'fcm_token', 'position', 'department', 'duty_status', 'duty_notes', 'staff_id', 'account_status'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'avatar', 'is_active', 'fcm_token', 'position', 'department', 'duty_status', 'duty_notes', 'staff_id', 'account_status', 'external_id'])]
 
 // Hide sensitive fields from JSON serialization (API responses)
 #[Hidden(['password', 'remember_token'])]
@@ -60,7 +61,24 @@ class User extends Authenticatable
     // HasApiTokens — provides createToken(), tokens() relationship for Sanctum
     // HasFactory  — enables User::factory() for tests and seeders
     // Notifiable  — enables $user->notify() for sending notifications
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+
+    public static function nextStaffId(): string
+    {
+        $used = static::withTrashed()
+            ->where('staff_id', 'like', 'TBR-STF-%')
+            ->pluck('staff_id')
+            ->map(fn ($id) => (int) preg_replace('/\D+/', '', (string) $id))
+            ->filter()
+            ->max() ?? 0;
+
+        do {
+            $used++;
+            $candidate = 'TBR-STF-' . str_pad((string) $used, 3, '0', STR_PAD_LEFT);
+        } while (static::withTrashed()->where('staff_id', $candidate)->exists());
+
+        return $candidate;
+    }
 
     /**
      * Define type casts for model attributes.

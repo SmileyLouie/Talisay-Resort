@@ -111,15 +111,24 @@
                 </select>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Star Rating</label>
-                <select name="rating" class="w-full form-select text-sm rounded-xl" required>
-                    <option value="5">5 Stars - Outstanding</option>
-                    <option value="4">4 Stars - Very Good</option>
-                    <option value="3">3 Stars - Good / Average</option>
-                    <option value="2">2 Stars - Needs Improvement</option>
-                    <option value="1">1 Star - Poor</option>
-                </select>
+            <div x-data="{ rating: 5 }">
+                <label class="block text-xs font-bold text-slate-700 mb-2">Star Rating</label>
+                <input type="hidden" name="rating" :value="rating">
+                <div class="flex items-center gap-1" role="radiogroup" aria-label="Star rating">
+                    @for($i = 1; $i <= 5; $i++)
+                    <button
+                        type="button"
+                        @click="rating = {{ $i }}"
+                        class="text-3xl leading-none p-0 border-0 bg-transparent"
+                        :class="rating >= {{ $i }} ? 'text-amber-400' : 'text-slate-300'"
+                        :aria-checked="rating === {{ $i }}"
+                        role="radio"
+                        aria-label="{{ $i }} {{ $i === 1 ? 'star' : 'stars' }}"
+                    >
+                        <i class="bi" :class="rating >= {{ $i }} ? 'bi-star-fill' : 'bi-star'"></i>
+                    </button>
+                    @endfor
+                </div>
             </div>
 
             <div>

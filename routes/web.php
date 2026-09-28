@@ -41,13 +41,13 @@ Route::get('/', function () {
 
 // Authentication Routes
 Route::get('/login', [WebAuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [WebAuthController::class, 'login'])->name('login.post');
+Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:login')->name('login.post');
 Route::get('/register', [WebAuthController::class, 'showRegister'])->name('register');
-Route::post('/register', [WebAuthController::class, 'register'])->name('register.post');
+Route::post('/register', [WebAuthController::class, 'register'])->middleware('throttle:register')->name('register.post');
 Route::get('/forgot-password', [WebAuthController::class, 'showForgotPassword'])->name('password.request');
-Route::post('/forgot-password', [WebAuthController::class, 'sendResetLink'])->name('password.email');
+Route::post('/forgot-password', [WebAuthController::class, 'sendResetLink'])->middleware('throttle:5,1')->name('password.email');
 Route::get('/reset-password/{token}', [WebAuthController::class, 'showResetPassword'])->name('password.reset');
-Route::post('/reset-password', [WebAuthController::class, 'resetPassword'])->name('password.update');
+Route::post('/reset-password', [WebAuthController::class, 'resetPassword'])->middleware('throttle:5,1')->name('password.update');
 
 // Public Routes
 Route::get('/tour', [WebTourController::class, 'viewer'])->name('tour.viewer');

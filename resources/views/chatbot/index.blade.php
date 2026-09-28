@@ -40,12 +40,12 @@
 </div>
 
 @if(session('success'))
-<div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-xs">
+<div data-flash="success" role="status" class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-xs">
     <div class="flex items-center gap-2">
-        <i class="bi bi-check-circle-fill text-emerald-500"></i>
+        <i class="bi bi-check-circle-fill text-emerald-500" aria-hidden="true"></i>
         <span>{{ session('success') }}</span>
     </div>
-    <button type="button" class="btn-close text-xs" data-bs-dismiss="alert" aria-label="Close"></button>
+    <button type="button" class="btn-close text-xs" aria-label="Dismiss" onclick="this.closest('[data-flash]').remove()"></button>
 </div>
 @endif
 
@@ -85,7 +85,7 @@
                         </div>
                     </div>
 
-                    <div class="table-responsive border border-slate-100 rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto border border-slate-100 rounded-xl">
                         <table class="table-clean w-full">
                             <thead>
                                 <tr class="bg-slate-50/80">
@@ -155,39 +155,39 @@
 
                 {{-- TAB 2: AI KNOWLEDGE & INSTRUCTIONS STUDIO --}}
                 <div class="tab-pane fade" id="personaPane" role="tabpanel">
-                    <form method="POST" action="{{ route('chatbot.settings.update') }}" class="space-y-4">
+                    <form method="POST" action="{{ route('chatbot.settings.update') }}" class="space-y-4" data-loading>
                         @csrf
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            <label for="chatbot_persona" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                                 AI Assistant Persona & Greeting Style
                             </label>
                             <p class="text-xs text-slate-400 mb-1.5">Define how the AI introduces itself, its tone of voice, and hospitality demeanor.</p>
-                            <textarea name="chatbot_persona" rows="3" class="form-input text-xs w-full" placeholder="e.g. You are the friendly, welcoming, and knowledgeable resort concierge assistant for Talisay Beach Resort...">{{ old('chatbot_persona', $persona) }}</textarea>
+                            <textarea id="chatbot_persona" name="chatbot_persona" rows="3" class="form-input text-xs w-full" placeholder="e.g. You are the friendly, welcoming, and knowledgeable resort concierge assistant for Talisay Beach Resort...">{{ old('chatbot_persona', $persona) }}</textarea>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            <label for="chatbot_custom_rules" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                                 Resort Policies & Operational Rules (Injected into AI Context)
                             </label>
                             <p class="text-xs text-slate-400 mb-1.5">Specific rules the AI must enforce (e.g. pool hours, pet rules, dining schedule, cancellation policies).</p>
-                            <textarea name="chatbot_custom_rules" rows="4" class="form-input text-xs w-full font-mono" placeholder="Check-in time is 2:00 PM. Check-out is 12:00 PM. Day tour hours are 7:00 AM to 5:00 PM...">{{ old('chatbot_custom_rules', $customRules) }}</textarea>
+                            <textarea id="chatbot_custom_rules" name="chatbot_custom_rules" rows="4" class="form-input text-xs w-full font-mono" placeholder="Check-in time is 2:00 PM. Check-out is 12:00 PM. Day tour hours are 7:00 AM to 5:00 PM...">{{ old('chatbot_custom_rules', $customRules) }}</textarea>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            <label for="chatbot_announcement" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                                 Active Announcement / Seasonal Notice
                             </label>
                             <p class="text-xs text-slate-400 mb-1.5">Special notices or announcements the AI can share with visitors (e.g. promos, maintenance, upcoming events).</p>
-                            <input type="text" name="chatbot_announcement" value="{{ old('chatbot_announcement', $announcement) }}" class="form-input text-xs w-full" placeholder="e.g. Summer Promo 2026 is now ongoing! Free snorkeling gear with any cottage booking.">
+                            <input type="text" id="chatbot_announcement" name="chatbot_announcement" value="{{ old('chatbot_announcement', $announcement) }}" class="form-input text-xs w-full" placeholder="e.g. Summer Promo 2026 is now ongoing! Free snorkeling gear with any cottage booking.">
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            <label for="chatbot_chips" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                                 Suggested Prompt Chips for Public Guests
                             </label>
                             <p class="text-xs text-slate-400 mb-1.5">Comma-separated list of quick clickable starter questions presented to visitors.</p>
-                            <input type="text" name="chatbot_chips" value="{{ old('chatbot_chips', $quickChips) }}" class="form-input text-xs w-full" placeholder="Room Rates, Cottage Rates, Day Tour Slots, Check-in Times, Amenities, How to Book">
+                            <input type="text" id="chatbot_chips" name="chatbot_chips" value="{{ old('chatbot_chips', $quickChips) }}" class="form-input text-xs w-full" placeholder="Room Rates, Cottage Rates, Day Tour Slots, Check-in Times, Amenities, How to Book">
                         </div>
 
                         <div class="pt-2 flex justify-end">
@@ -238,10 +238,10 @@
             <div class="px-4 py-2 border-t border-slate-100 bg-white">
                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Suggested Prompts</div>
                 <div class="flex flex-wrap gap-1.5" id="quickTestPrompts">
-                    <button type="button" onclick="testChipClick('What are your room rates?')" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Room Rates</button>
-                    <button type="button" onclick="testChipClick('Tell me about your cottages and amenities')" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Cottages & Amenities</button>
-                    <button type="button" onclick="testChipClick('What time is check in and check out?')" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Check-in / Check-out</button>
-                    <button type="button" onclick="testChipClick('Can we hold an event or full-resort booking?')" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Full Resort Booking</button>
+                    <button type="button" data-chip="What are your room rates?" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Room Rates</button>
+                    <button type="button" data-chip="Tell me about your cottages and amenities" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Cottages & Amenities</button>
+                    <button type="button" data-chip="What time is check in and check out?" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Check-in / Check-out</button>
+                    <button type="button" data-chip="Can we hold an event or full-resort booking?" class="text-[11px] font-medium bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200/80 px-2.5 py-0.5 rounded-full transition">Full Resort Booking</button>
                 </div>
             </div>
 
@@ -303,9 +303,18 @@
 <script>
 let conversationHistory = [];
 
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function formatSimulatorMessage(text) {
     if (!text) return '';
-    let escaped = text
+    let escaped = String(text)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
@@ -333,11 +342,11 @@ function resetSimulatorChat() {
 
     let greeting = '';
     if (role === 'guest') {
-        greeting = `👋 <strong>Hello, Visitor!</strong> I am your AI resort concierge for Talisay Beach Resort. Ask me anything naturally about room rates, cottages, check-in rules, or amenities!`;
+        greeting = `<strong>Hello, Visitor!</strong> I am your AI resort concierge for Talisay Beach Resort. Ask me anything naturally about room rates, cottages, check-in rules, or amenities!`;
     } else if (role === 'tourist') {
-        greeting = `👋 <strong>Hello, Tourist!</strong> I am your personalized vacation assistant. Ask me about your bookings, payments, or activities at the resort.`;
+        greeting = `<strong>Hello, Tourist!</strong> I am your personalized vacation assistant. Ask me about your bookings, payments, or activities at the resort.`;
     } else {
-        greeting = `👋 <strong>Hello, Staff/Admin!</strong> I am your resort operational AI. Ask me about today's capacity, schedules, or facility statuses.`;
+        greeting = `<strong>Hello, Staff/Admin!</strong> I am your resort operational AI. Ask me about today's capacity, schedules, or facility statuses.`;
     }
 
     if (!box) return;
@@ -360,7 +369,7 @@ async function testChat() {
     const box = document.getElementById('testChatBox');
     
     // User message bubble
-    box.innerHTML += `<div class="bg-gradient-to-r from-sky-600 to-sky-500 text-white p-2.5 px-3 rounded-2xl rounded-br-sm text-xs ms-auto max-w-[85%] shadow-xs leading-relaxed">${msg}</div>`;
+    box.innerHTML += `<div class="bg-gradient-to-r from-sky-600 to-sky-500 text-white p-2.5 px-3 rounded-2xl rounded-br-sm text-xs ms-auto max-w-[85%] shadow-xs leading-relaxed">${escapeHtml(msg)}</div>`;
     input.value = '';
     input.disabled = true;
     if (sendBtn) sendBtn.disabled = true;
@@ -382,7 +391,8 @@ async function testChat() {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json', 
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
             },
             body: JSON.stringify({ 
                 message: msg, 
@@ -413,7 +423,8 @@ async function testChat() {
         if (data.chips && Array.isArray(data.chips) && data.chips.length > 0) {
             let chipsHtml = `<div class="flex flex-wrap gap-1.5 mt-1" id="simulatorChips">`;
             data.chips.forEach(c => {
-                chipsHtml += `<button type="button" onclick="testChipClick('${c.replace(/'/g, "\\'")}')" class="text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-1 rounded-full hover:bg-sky-100 transition">${c}</button>`;
+                const label = escapeHtml(c);
+                chipsHtml += `<button type="button" data-chip="${label}" class="text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-1 rounded-full hover:bg-sky-100 transition">${label}</button>`;
             });
             chipsHtml += `</div>`;
             box.innerHTML += chipsHtml;
@@ -440,6 +451,15 @@ function showLogDetail(question, response, timestamp, visitor) {
         modal.show();
     }
 }
+
+document.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-chip]');
+    if (!chip) return;
+    const testBox = document.getElementById('testChatBox');
+    const quickPrompts = document.getElementById('quickTestPrompts');
+    if (!(testBox && testBox.contains(chip)) && !(quickPrompts && quickPrompts.contains(chip))) return;
+    testChipClick(chip.getAttribute('data-chip') || chip.textContent.trim());
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     resetSimulatorChat();

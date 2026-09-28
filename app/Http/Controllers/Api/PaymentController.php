@@ -2,158 +2,109 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\PaymentReceived;
 use App\Http\Controllers\Controller;
-use App\Models\Payment;
-use App\Models\Booking;
 use App\Models\AuditLog;
-use Illuminate\Http\Request;
+use App\Models\Booking;
+use App\Models\NotificationModel;
+use App\Models\Payment;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class PaymentController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = Payment::with(['booking.user', 'booking.package']);
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->has('date_from')) {
-            $query->where('created_at', '>=', $request->date_from);
-        }
-        if ($request->has('date_to')) {
-            $query->where('created_at', '<=', $request->date_to);
-        }
-        if ($request->has('gateway')) {
-            $query->where('gateway', $request->gateway);
-        }
-
-        return response()->json($query->orderBy('created_at', 'desc')->paginate(15));
-    }
-
-    public function process(Request $request)
-    {
-        $request->validate([
-            'booking_id' => 'required|exists:bookings,id',
-            'gateway' => 'required|in:stripe,cash,bank_transfer',
-        ]);
-
-        $booking = Booking::findOrFail($request->booking_id);
-
-        if ($booking->user_id !== $request->user()->id && !$request->user()->isAdmin()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        if ($booking->status !== 'pending') {
-            return response()->json(['error' => 'Booking is not in pending status'], 422);
-        }
-
-        $payment = Payment::create([
-            'booking_id' => $booking->id,
-            'amount' => $booking->total_amount,
-            'gateway' => $request->gateway,
-            'status' => 'pending',
-        ]);
-
-        if ($request->gateway === 'stripe') {
-            try {
-                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-                $stripePaymentIntent = \Stripe\PaymentIntent::create([
-                    'amount' => (int)($booking->total_amount * 100),
-                    'currency' => 'php',
-                    'metadata' => [
-                        'booking_id' => $booking->id,
-                        'reference_no' => $booking->reference_no,
-                    ],
-                ]);
-
-                $payment->update([
-                    'transaction_id' => $stripePaymentIntent->id,
-                    'metadata' => ['stripe_client_secret' => $stripePaymentIntent->client_secret],
-                ]);
-
-                return response()->json([
-                    'payment' => $payment,
-                    'client_secret' => $stripePaymentIntent->client_secret,
-                    'message' => 'Payment intent created.',
-                ]);
-            } catch (\Exception $e) {
-                $payment->update(['status' => 'failed']);
-                return response()->json(['error' => 'Payment processing failed: ' . $e->getMessage()], 500);
-            }
-        }
-
-        return response()->json([
-            'payment' => $payment,
-            'message' => 'Payment recorded. Please upload proof of payment.',
-        ]);
-    }
-
     public function show(Payment $payment)
     {
-        $payment->load(['booking.user', 'booking.package']);
-        return response()->json($payment);
+        Gate::authorize('view', $payment);
+
+        return response()->json($payment->load(['booking.accommodationUnit']));
     }
 
+    /**
+     * Guest uploads proof of a manual payment (GCash / bank transfer).
+     */
     public function uploadProof(Request $request, Payment $payment)
     {
+        Gate::authorize('uploadProof', $payment);
+
         $request->validate([
-            'proof' => 'required|image|max:5120',
+            'proof' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
-        $path = $request->file('proof')->store('payment_proofs', 'public');
+        if ($payment->status === 'success') {
+            return response()->json(['error' => 'This payment has already been verified.'], 422);
+        }
+
+        if ($payment->proof_path) {
+            Storage::disk('public')->delete($payment->proof_path);
+        }
 
         $payment->update([
-            'proof_path' => $path,
-            'status' => 'pending',
+            'proof_path' => $request->file('proof')->store('payments', 'public'),
+            'status'     => 'pending',
         ]);
 
         AuditLog::log('payment_proof_uploaded', $payment);
 
+        NotificationModel::notifyAdminsAndStaff(
+            'payment',
+            'Payment Proof Uploaded',
+            "Proof of payment uploaded for booking {$payment->booking->reference_no} (₱" . number_format($payment->amount, 2) . ').',
+            ['booking_id' => $payment->booking_id, 'payment_id' => $payment->id]
+        );
+
         return response()->json(['message' => 'Proof uploaded successfully. Awaiting verification.']);
     }
 
+    /**
+     * Stripe webhook. Signature verification is mandatory; when no secret is
+     * configured the endpoint refuses every request rather than trusting input.
+     */
     public function webhook(Request $request)
     {
-        $payload = $request->getContent();
-        $sigHeader = $request->header('Stripe-Signature');
         $endpointSecret = config('services.stripe.webhook_secret');
+        if (empty($endpointSecret)) {
+            return response()->json(['error' => 'Webhook not configured'], 503);
+        }
 
         try {
-            $event = \Stripe\Webhook::constructEvent($payload, $sigHeader, $endpointSecret);
-        } catch (\Exception $e) {
+            $event = \Stripe\Webhook::constructEvent(
+                $request->getContent(),
+                $request->header('Stripe-Signature', ''),
+                $endpointSecret
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Stripe webhook rejected: ' . $e->getMessage());
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
-        if ($event->type === 'payment_intent.succeeded') {
-            $paymentIntent = $event->data->object;
-            $payment = Payment::where('transaction_id', $paymentIntent->id)->first();
+        $intent  = $event->data->object ?? null;
+        $payment = $intent ? Payment::where('transaction_id', $intent->id)->first() : null;
 
-            if ($payment) {
-                $payment->update(['status' => 'success']);
-                $payment->booking->update(['status' => 'paid']);
-                AuditLog::log('payment_completed', $payment);
-                broadcast(new \App\Events\PaymentReceived($payment));
+        if ($payment && $event->type === 'payment_intent.succeeded') {
+            $payment->update(['status' => 'success']);
+            if ($payment->booking && $payment->booking->status === Booking::STATUS_PENDING) {
+                $payment->booking->update(['status' => Booking::STATUS_PAID]);
             }
-        } elseif ($event->type === 'payment_intent.payment_failed') {
-            $paymentIntent = $event->data->object;
-            $payment = Payment::where('transaction_id', $paymentIntent->id)->first();
-
-            if ($payment) {
-                $payment->update(['status' => 'failed']);
-                AuditLog::log('payment_failed', $payment);
-            }
+            AuditLog::log('payment_completed', $payment);
+            broadcast(new PaymentReceived($payment));
+        } elseif ($payment && $event->type === 'payment_intent.payment_failed') {
+            $payment->update(['status' => 'failed']);
+            AuditLog::log('payment_failed', $payment);
         }
 
         return response()->json(['status' => 'ok']);
     }
 
-    public function generateReceipt(Booking $booking)
+    public function receipt(Booking $booking)
     {
-        $booking->load(['user', 'accommodationUnit', 'payment']);
-        $pdf = Pdf::loadView('pdf.receipt', compact('booking'));
+        Gate::authorize('view', $booking);
 
-        return $pdf->download("receipt-{$booking->reference_no}.pdf");
+        $booking->load(['user', 'accommodationUnit', 'payment']);
+
+        return Pdf::loadView('pdf.receipt', compact('booking'))->download("receipt-{$booking->reference_no}.pdf");
     }
 }

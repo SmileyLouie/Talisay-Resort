@@ -90,12 +90,11 @@ class DashboardController extends WebControllers
 
         // 5. Reviews Moderation Data (if assigned)
         if ($staff->hasModuleAccess('reviews')) {
-            $data['pendingReviews'] = Review::where('is_approved', false)
-                ->with(['user', 'booking.accommodationUnit'])
+            $data['pendingReviews'] = Review::with(['user', 'booking.accommodationUnit'])
                 ->latest()
                 ->take(5)
                 ->get();
-            $data['pendingReviewsCount'] = Review::where('is_approved', false)->count();
+            $data['pendingReviewsCount'] = Review::count();
         }
 
         return view('staff.dashboard', $data);

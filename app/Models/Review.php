@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Model;
     'is_comment_blocked', // Whether comment text is blocked due to inappropriate language / bad words
     'block_reason',       // Reason why the comment text was blocked
     'comment_blocked_at', // When the comment was blocked
+    'external_id',        // UUID shared with the Supabase client review
 ])]
 
 /**

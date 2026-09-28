@@ -32,7 +32,7 @@
         </a>
         <a href="{{ route('accommodations.index') }}" class="btn-ocean">
             <i class="bi bi-building"></i>
-            <span>Manage Units (20)</span>
+            <span>Manage Units ({{ $totalUnits }})</span>
         </a>
     </div>
 </div>
@@ -47,7 +47,7 @@
                 <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Today's Bookings</p>
                 <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ $todaysBookings }}</h2>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center text-xl font-bold shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-ocean-800 text-white flex items-center justify-center">
                 <i class="bi bi-calendar-check-fill"></i>
             </div>
         </div>
@@ -73,7 +73,7 @@
                     </span>
                 </div>
             </div>
-            <div class="w-12 h-12 rounded-2xl {{ $capacity->getUtilizationPercent() > 90 ? 'bg-rose-50 text-rose-600 border-rose-100' : ($capacity->getUtilizationPercent() > 70 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-teal-50 text-teal-600 border-teal-100') }} border flex items-center justify-center text-xl font-bold shadow-sm">
+            <div class="w-10 h-10 rounded-lg {{ $capacity->getUtilizationPercent() > 90 ? 'bg-rose-700' : ($capacity->getUtilizationPercent() > 70 ? 'bg-amber-600' : 'bg-ocean-600') }} text-white flex items-center justify-center">
                 <i class="bi bi-pie-chart-fill"></i>
             </div>
         </div>
@@ -93,7 +93,7 @@
                     ₱{{ number_format($monthlyRevenue, 2) }}
                 </h2>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xl font-bold shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center">
                 <i class="bi bi-wallet2"></i>
             </div>
         </div>
@@ -115,14 +115,33 @@
                     <span class="text-sm font-semibold text-slate-400">/ {{ $totalUnits }} Available</span>
                 </div>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-xl font-bold shadow-sm">
+            <div class="w-10 h-10 rounded-lg bg-ocean-800 text-white flex items-center justify-center">
                 <i class="bi bi-house-door-fill"></i>
             </div>
         </div>
         <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span class="font-medium text-indigo-600">10 Rooms • 10 Cottages</span>
+            <span class="font-medium text-slate-600">{{ $roomCount }} Rooms • {{ $cottageCount }} Cottages</span>
             <a href="{{ route('accommodations.index') }}" class="text-sky-600 font-semibold hover:underline no-underline">View</a>
         </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <a href="{{ route('bookings.index', ['status' => 'pending']) }}" class="stat-card-clean no-underline">
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Pending Bookings</p>
+        <h2 class="text-2xl font-extrabold text-amber-700 mb-0">{{ $quickStats['pendingBookings'] }}</h2>
+    </a>
+    <div class="stat-card-clean">
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Guests Checked In</p>
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-0">{{ $quickStats['checkedInGuests'] }}</h2>
+    </div>
+    <a href="{{ route('reviews.index') }}" class="stat-card-clean no-underline">
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Reviews to Check</p>
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-0">{{ $quickStats['pendingReviews'] }}</h2>
+    </a>
+    <div class="stat-card-clean">
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Registered Accounts</p>
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-0">{{ $quickStats['totalUsers'] }}</h2>
     </div>
 </div>
 
@@ -281,11 +300,11 @@
                 @forelse($upcomingReservations as $res)
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
-                            {{ strtoupper(substr($res->user->name, 0, 2)) }}
+                        <div class="w-9 h-9 rounded-lg bg-ocean-800 text-white font-bold flex items-center justify-center text-xs flex-shrink-0">
+                            {{ strtoupper(substr($res->guest_name ?: ($res->user->name ?? 'G'), 0, 2)) }}
                         </div>
                         <div class="min-w-0">
-                            <p class="text-xs font-bold text-slate-900 truncate mb-0">{{ $res->user->name }}</p>
+                            <p class="text-xs font-bold text-slate-900 truncate mb-0">{{ $res->guest_name ?: ($res->user->name ?? 'Guest') }}</p>
                             <p class="text-[11px] text-slate-500 truncate mb-0">
                                 {{ $res->accommodationUnit->unit_number ?? 'Exclusive Resort' }} • {{ $res->booking_date->format('M d') }}
                             </p>
@@ -364,7 +383,7 @@
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h3 class="text-base font-bold text-slate-900 mb-0.5 flex items-center gap-2">
-                    <i class="bi bi-emoji-smile-fill text-emerald-500"></i>
+                    <i class="bi bi-chat-heart text-emerald-600"></i>
                     <span>Guest Feedback Sentiment</span>
                 </h3>
                 <p class="text-xs text-slate-400 mb-0">Review ratings ratio and guest satisfaction</p>
@@ -507,7 +526,7 @@ const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
 new Chart(sentimentCtx, {
     type: 'pie',
     data: {
-        labels: ['Positive (4-5★)', 'Neutral (3★)', 'Negative (1-2★)'],
+        labels: ['Positive (4-5 stars)', 'Neutral (3 stars)', 'Negative (1-2 stars)'],
         datasets: [{
             data: [sentimentData.positive, sentimentData.neutral, sentimentData.negative],
             backgroundColor: [
@@ -528,50 +547,72 @@ new Chart(sentimentCtx, {
     }
 });
 
-// Real-time booking feed via Pusher
-const bookingPusher = new Pusher('{{ config("broadcasting.connections.pusher.key", "talisay-key") }}', {
-    cluster: '{{ config("broadcasting.connections.pusher.options.cluster", "mt1") }}',
-    wsHost: '{{ config("broadcasting.connections.pusher.options.host", "127.0.0.1") }}',
-    wsPort: {{ config("broadcasting.connections.pusher.options.port", 6001) }},
-    forceTLS: false,
-    disableStats: true,
-});
+// Real-time booking feed (events dispatched by the layout's Pusher subscription)
+const feedBadgeStyles = {
+    pending: 'bg-amber-50 text-amber-700 border-amber-200',
+    paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    checked_in: 'bg-sky-50 text-sky-700 border-sky-200',
+    checked_out: 'bg-slate-100 text-slate-700 border-slate-200',
+    completed: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    cancelled: 'bg-rose-50 text-rose-700 border-rose-200'
+};
 
-const bookingChannel = bookingPusher.subscribe('staff-bookings');
-bookingChannel.bind('App\\Events\\BookingCreated', function(data) {
-    const tbody = document.querySelector('#bookingFeedTable tbody');
-    const badgeStyles = {
-        pending: 'bg-amber-50 text-amber-700 border-amber-200',
-        paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        checked_in: 'bg-sky-50 text-sky-700 border-sky-200',
-        checked_out: 'bg-slate-100 text-slate-700 border-slate-200',
-        completed: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-        cancelled: 'bg-rose-50 text-rose-700 border-rose-200'
-    };
+function feedCell(className, text) {
+    const td = document.createElement('td');
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text == null ? '' : String(text);
+    td.appendChild(span);
+    return td;
+}
 
+function feedStatusLabel(status) {
+    const s = String(status || '').replace(/_/g, ' ');
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
+function buildBookingFeedRow(data) {
     const row = document.createElement('tr');
     row.className = 'booking-row';
     row.dataset.id = data.id;
-    row.style.animation = 'fadeIn 0.5s ease';
-    row.innerHTML = `
-        <td>
-            <span class="font-mono text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200/60">${data.reference_no}</span>
-        </td>
-        <td>
-            <div class="font-semibold text-slate-800">${data.guest_name}</div>
-        </td>
-        <td>
-            <span class="font-medium text-slate-700">${data.accommodation_unit_name || data.unit_name || 'Accommodation'}</span>
-        </td>
-        <td><span class="text-xs font-medium text-slate-600">${data.booking_date}</span></td>
-        <td><span class="text-xs font-semibold text-slate-700">${data.guests_count}</span></td>
-        <td>
-            <span class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${badgeStyles[data.status] || 'bg-slate-100 text-slate-600'}">
-                ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}
-            </span>
-        </td>
-    `;
-    tbody.insertBefore(row, tbody.firstChild);
+
+    row.appendChild(feedCell('font-mono text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200/60', data.reference_no));
+
+    const guestTd = document.createElement('td');
+    const guestDiv = document.createElement('div');
+    guestDiv.className = 'font-semibold text-slate-800';
+    guestDiv.textContent = data.guest_name || '';
+    guestTd.appendChild(guestDiv);
+    row.appendChild(guestTd);
+
+    row.appendChild(feedCell('font-medium text-slate-700', data.unit_label || 'Room / Cottage'));
+    row.appendChild(feedCell('text-xs font-medium text-slate-600', data.booking_date));
+    row.appendChild(feedCell('text-xs font-semibold text-slate-700', data.guests_count));
+    row.appendChild(feedCell(
+        'px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ' + (feedBadgeStyles[data.status] || 'bg-slate-100 text-slate-600 border-slate-200'),
+        feedStatusLabel(data.status)
+    ));
+    return row;
+}
+
+window.addEventListener('booking-created', function (e) {
+    const data = e.detail || {};
+    const tbody = document.querySelector('#bookingFeedTable tbody');
+    if (!tbody || !data.id) return;
+    if (tbody.querySelector('.booking-row[data-id="' + String(data.id).replace(/"/g, '') + '"]')) return;
+
+    const emptyRow = tbody.querySelector('tr:not(.booking-row)');
+    if (emptyRow && !tbody.querySelector('.booking-row')) emptyRow.remove();
+
+    tbody.insertBefore(buildBookingFeedRow(data), tbody.firstChild);
+});
+
+window.addEventListener('booking-updated', function (e) {
+    const data = e.detail || {};
+    if (!data.id) return;
+    const existing = document.querySelector('#bookingFeedTable tbody .booking-row[data-id="' + String(data.id).replace(/"/g, '') + '"]');
+    if (!existing) return;
+    existing.replaceWith(buildBookingFeedRow(data));
 });
 </script>
 @endpush

@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Broadcast;
 |
 */
 
-// Staff-only channel for booking updates
+// Staff-only channel for booking updates (staff need the bookings module)
 Broadcast::channel('staff-bookings', function ($user) {
-    return $user->isAdmin() || $user->isStaff();
+    return $user->isAdmin() || ($user->isStaff() && $user->hasModuleAccess('bookings'));
 });
 
 // Admin-only channel for payment notifications

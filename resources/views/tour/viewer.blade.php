@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Virtual 360° Tour & Interactive Resort Map – Talisay Beach Resort</title>
 
     {{-- Universal Fonts --}}
@@ -505,7 +506,7 @@
                         <h4 class="text-white font-bold text-xs sm:text-sm leading-tight mb-1 truncate group-hover:text-sky-300 transition">{{ $asset->title }}</h4>
                         <p class="text-slate-400 text-[11px] line-clamp-1 leading-snug mb-1.5">{{ $asset->description }}</p>
                         <div class="flex items-center justify-between pt-1 border-t border-white/5 text-[10px] text-slate-500 font-mono">
-                            <span>📍 {{ number_format($meta['lat'], 4) }}, {{ number_format($meta['lng'], 4) }}</span>
+                            <span><i class="bi bi-geo-alt-fill"></i> {{ number_format($meta['lat'], 4) }}, {{ number_format($meta['lng'], 4) }}</span>
                             <span class="text-sky-400 font-bold group-hover:underline">Explore &rarr;</span>
                         </div>
                     </div>
@@ -537,8 +538,8 @@
             'scene_{{ $asset->id }}': {
                 id: {{ $asset->id }},
                 key: 'scene_{{ $asset->id }}',
-                title: "{{ addslashes($asset->title) }}",
-                description: "{{ addslashes($asset->description) }}",
+                title: {{ Js::from($asset->title) }},
+                description: {{ Js::from($asset->description) }},
                 lat: {{ $sceneMeta[$asset->id]['lat'] ?? (10.5807 + ($loop->index * 0.0003)) }},
                 lng: {{ $sceneMeta[$asset->id]['lng'] ?? (124.7656 - ($loop->index * 0.0003)) }},
                 icon: "{{ $sceneMeta[$asset->id]['icon'] ?? 'bi-geo-alt-fill' }}"
@@ -563,7 +564,7 @@
         // Build database-driven multi-scene configuration array for Pannellum
         @foreach($assets as $asset)
         tourScenes['scene_{{ $asset->id }}'] = {
-            title: "{{ addslashes($asset->title) }}",
+            title: {{ Js::from($asset->title) }},
             type: "equirectangular",
             panorama: "{{ $asset->panorama_path ? (Str::startsWith($asset->panorama_path, 'http') ? $asset->panorama_path : Storage::url($asset->panorama_path)) : '' }}",
             autoLoad: true,
@@ -584,7 +585,7 @@
                     pitch: {{ $hotspot['pitch'] ?? 0 }},
                     yaw: {{ $hotspot['yaw'] ?? 0 }},
                     type: "{{ ($hotspot['type'] ?? 'info') === 'scene' ? 'scene' : 'info' }}",
-                    text: "{{ addslashes($hotspot['text'] ?? '') }}",
+                    text: {{ Js::from($hotspot['text'] ?? '') }},
                     @if(($hotspot['type'] ?? 'info') === 'scene')
                     sceneId: "{{ $targetScene }}",
                     @endif

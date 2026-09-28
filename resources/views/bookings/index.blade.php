@@ -106,7 +106,7 @@
         <table class="table-clean">
             <thead>
                 <tr>
-                    <th>Ref # &amp; Source</th>
+                    <th>Ref #</th>
                     <th>Guest Details</th>
                     <th>Room &amp; Cottage</th>
                     <th>Scheduled Stay</th>
@@ -124,14 +124,11 @@
                         <span class="font-mono text-xs font-extrabold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200/70 inline-block">
                             {{ $booking->reference_no }}
                         </span>
+                        @if($booking->isManual() || $booking->booking_type === 'special_resort')
                         <div class="mt-1 flex flex-wrap items-center gap-1">
                             @if($booking->isManual())
                                 <span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded uppercase">
                                     <i class="bi bi-pencil-square text-amber-600"></i> Manual
-                                </span>
-                            @else
-                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded uppercase">
-                                    <i class="bi bi-globe2 text-sky-600"></i> Online
                                 </span>
                             @endif
 
@@ -141,6 +138,7 @@
                                 </span>
                             @endif
                         </div>
+                        @endif
                     </td>
 
                     {{-- Guest --}}
@@ -272,7 +270,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
             {{-- Header --}}
-            <div class="p-5 bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-amber-300 text-lg">
                         <i class="bi bi-pencil-square"></i>
@@ -288,7 +286,7 @@
             </div>
 
             {{-- Form Body --}}
-            <form method="POST" action="{{ route('bookings.manual-store') }}" id="manualBookingForm">
+            <form method="POST" action="{{ route('bookings.manual-store') }}" id="manualBookingForm" data-loading>
                 @csrf
                 <div class="modal-body p-6 bg-slate-50/60 max-h-[75vh] overflow-y-auto space-y-6">
 
@@ -496,7 +494,7 @@
 <div class="modal fade" id="bookingDetailModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-slate-900 to-sky-950 text-white flex items-center justify-between">
+            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
                         <i class="bi bi-calendar2-check-fill"></i>
@@ -607,31 +605,40 @@ document.addEventListener('DOMContentLoaded', function () {
     toggleGuestTypeFields();
 });
 
+function escapeBookingHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function viewBooking(button) {
-    const id = button.getAttribute('data-id');
-    const ref = button.getAttribute('data-ref');
+    const id = escapeBookingHtml(button.getAttribute('data-id'));
+    const ref = escapeBookingHtml(button.getAttribute('data-ref'));
     const source = button.getAttribute('data-source') || 'online';
     const type = button.getAttribute('data-type');
     const approval = button.getAttribute('data-approval');
-    const name = button.getAttribute('data-name');
-    const phone = button.getAttribute('data-phone');
-    const email = button.getAttribute('data-email');
-    const unit = button.getAttribute('data-unit');
-    const date = button.getAttribute('data-date');
-    const checkin = button.getAttribute('data-checkin');
-    const checkout = button.getAttribute('data-checkout');
-    const nights = button.getAttribute('data-nights');
-    const guests = button.getAttribute('data-guests');
-    const amount = button.getAttribute('data-amount');
-    const status = button.getAttribute('data-status');
-    const requests = button.getAttribute('data-requests');
-    const reason = button.getAttribute('data-reason');
+    const name = escapeBookingHtml(button.getAttribute('data-name'));
+    const phone = escapeBookingHtml(button.getAttribute('data-phone'));
+    const email = escapeBookingHtml(button.getAttribute('data-email'));
+    const unit = escapeBookingHtml(button.getAttribute('data-unit'));
+    const date = escapeBookingHtml(button.getAttribute('data-date'));
+    const checkin = escapeBookingHtml(button.getAttribute('data-checkin'));
+    const checkout = escapeBookingHtml(button.getAttribute('data-checkout'));
+    const nights = escapeBookingHtml(button.getAttribute('data-nights'));
+    const guests = escapeBookingHtml(button.getAttribute('data-guests'));
+    const amount = escapeBookingHtml(button.getAttribute('data-amount'));
+    const status = escapeBookingHtml(button.getAttribute('data-status'));
+    const requests = escapeBookingHtml(button.getAttribute('data-requests'));
+    const reason = escapeBookingHtml(button.getAttribute('data-reason'));
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
     const sourceBadge = source === 'manual'
         ? '<span class="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300"><i class="bi bi-pencil-square text-amber-600"></i> Staff / Front Desk (Manual)</span>'
-        : '<span class="inline-flex items-center gap-1 text-xs font-bold text-sky-800 bg-sky-100 px-2.5 py-0.5 rounded-full border border-sky-300"><i class="bi bi-globe2 text-sky-600"></i> Online Self-Service</span>';
+        : '';
 
     let specialApprovalHtml = '';
     if (type === 'special_resort') {

@@ -4,81 +4,64 @@
 
 @section('content')
 
-{{-- Welcome & Staff Profile Header --}}
-<div class="mb-8">
-    <div class="bg-gradient-to-r from-ocean-900 via-sky-900 to-teal-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        {{-- Decorative Circles --}}
-        <div class="absolute -right-12 -top-12 w-48 h-48 bg-white/5 rounded-full blur-xl pointer-events-none"></div>
-        <div class="absolute right-32 -bottom-16 w-64 h-64 bg-sky-400/10 rounded-full blur-2xl pointer-events-none"></div>
-
-        <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div class="flex items-start sm:items-center gap-4">
-                {{-- Avatar --}}
-                @if($staff->avatar)
-                    <img src="{{ Storage::url($staff->avatar) }}" alt="{{ $staff->name }}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg flex-shrink-0">
-                @else
-                    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-lg flex-shrink-0">
-                        {{ strtoupper(substr($staff->name, 0, 1)) }}
-                    </div>
-                @endif
-
-                <div>
-                    <div class="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-sky-400/20 text-sky-200 border border-sky-400/30">
-                            <i class="bi bi-person-badge-fill text-[11px]"></i>
-                            {{ $staff->staff_id ?? 'STAFF' }}
-                        </span>
-                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-white/90 border border-white/15">
-                            {{ $staff->department ?? 'Resort Operations' }}
-                        </span>
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $staff->accountStatusBadgeClass() }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $staff->account_status === 'active' ? 'bg-emerald-500' : 'bg-amber-500' }}"></span>
-                            {{ $staff->accountStatusLabel() }}
-                        </span>
-                    </div>
-
-                    <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white mb-1">
-                        Welcome back, {{ $staff->name }}!
-                    </h1>
-                    <p class="text-xs sm:text-sm text-sky-100/80 mb-0 font-medium flex items-center gap-2">
-                        <span>{{ $staff->position ?? 'Resort Staff Member' }}</span>
-                        <span>•</span>
-                        <span>Duty Status: <strong class="text-white">{{ ucfirst(str_replace('_', ' ', $staff->duty_status ?? 'available')) }}</strong></span>
-                    </p>
-                </div>
+<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="flex items-start gap-4">
+        @if($staff->avatar)
+            <img src="{{ Storage::url($staff->avatar) }}" alt="{{ $staff->name }}" class="w-14 h-14 rounded-lg object-cover border border-slate-200 flex-shrink-0">
+        @else
+            <div class="w-14 h-14 rounded-lg bg-ocean-800 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
+                {{ strtoupper(substr($staff->name, 0, 1)) }}
             </div>
-
-            {{-- Quick Header Action Buttons --}}
-            <div class="flex items-center gap-2.5 flex-wrap">
-                @if($staff->hasModuleAccess('bookings'))
-                <a href="{{ route('bookings.index') }}" class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold shadow-lg shadow-sky-500/30 transition flex items-center gap-2 no-underline">
-                    <i class="bi bi-calendar-check-fill"></i>
-                    <span>Bookings</span>
-                </a>
-                @endif
-                @if($staff->hasModuleAccess('payments'))
-                <a href="{{ route('payments.index') }}" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold shadow-lg shadow-emerald-500/30 transition flex items-center gap-2 no-underline">
-                    <i class="bi bi-credit-card-fill"></i>
-                    <span>Payments</span>
-                </a>
-                @endif
-            </div>
-        </div>
-
-        {{-- Assigned Modules Pills Strip --}}
-        <div class="mt-6 pt-5 border-t border-white/10 flex items-center gap-2 flex-wrap">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-sky-300/80 me-1">Authorized Responsibilities:</span>
-            @forelse($assignedModules as $modKey)
-                @php $modInfo = $moduleRegistry[$modKey] ?? ['name' => ucfirst($modKey), 'icon' => 'bi-check-circle']; @endphp
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-white/10 text-white border border-white/15 backdrop-blur-sm">
-                    <i class="bi {{ $modInfo['icon'] }} text-sky-300"></i>
-                    <span>{{ $modInfo['name'] }}</span>
+        @endif
+        <div>
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                    <i class="bi bi-person-badge text-[11px]"></i>
+                    {{ $staff->staff_id ?? 'STAFF' }}
                 </span>
-            @empty
-                <span class="text-xs text-white/60 italic">No specific administrative modules assigned. Access restricted to Staff Tasks and Profile.</span>
-            @endforelse
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white text-slate-600 border border-slate-200">
+                    {{ $staff->department ?? 'Resort Operations' }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $staff->accountStatusBadgeClass() }}">
+                    {{ $staff->accountStatusLabel() }}
+                </span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
+                Welcome back, {{ $staff->name }}
+            </h1>
+            <p class="text-sm text-slate-500 mb-0">
+                {{ $staff->position ?? 'Resort Staff Member' }}
+                · Duty: {{ ucfirst(str_replace('_', ' ', $staff->duty_status ?? 'available')) }}
+            </p>
         </div>
     </div>
+    <div class="flex items-center gap-2 flex-wrap">
+        @if($staff->hasModuleAccess('bookings'))
+        <a href="{{ route('bookings.index') }}" class="btn-ocean text-xs">
+            <i class="bi bi-calendar-check"></i>
+            <span>Bookings</span>
+        </a>
+        @endif
+        @if($staff->hasModuleAccess('payments'))
+        <a href="{{ route('payments.index') }}" class="px-4 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-2 no-underline">
+            <i class="bi bi-credit-card"></i>
+            <span>Payments</span>
+        </a>
+        @endif
+    </div>
+</div>
+
+<div class="mb-6 flex items-center gap-2 flex-wrap">
+    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Assigned modules</span>
+    @forelse($assignedModules as $modKey)
+        @php $modInfo = $moduleRegistry[$modKey] ?? ['name' => ucfirst($modKey), 'icon' => 'bi-check-circle']; @endphp
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-200">
+            <i class="bi {{ $modInfo['icon'] }} text-sky-700"></i>
+            <span>{{ $modInfo['name'] }}</span>
+        </span>
+    @empty
+        <span class="text-xs text-slate-500">No modules assigned. Access is limited to staff tasks and profile.</span>
+    @endforelse
 </div>
 
 {{-- Success / Error Notifications --}}
@@ -111,7 +94,7 @@
         </div>
         <div class="flex items-center gap-2">
             @if($staff->hasPermission('bookings', 'create'))
-            <a href="{{ route('bookings.index') }}" class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            <a href="{{ route('bookings.index') }}" class="btn-ocean text-xs">
                 <i class="bi bi-plus-circle-fill"></i>
                 <span>New Booking</span>
             </a>
@@ -124,7 +107,7 @@
 
     {{-- Booking Metrics --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-calendar2-event-fill"></i>
             </div>
@@ -134,7 +117,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-hourglass-split"></i>
             </div>
@@ -144,7 +127,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-box-arrow-in-right"></i>
             </div>
@@ -154,7 +137,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-people-fill"></i>
             </div>
@@ -233,7 +216,7 @@
 
     {{-- Payment Metrics --}}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-receipt"></i>
             </div>
@@ -243,7 +226,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-check2-circle"></i>
             </div>
@@ -253,7 +236,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-3.5">
+        <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
                 <i class="bi bi-cash-stack"></i>
             </div>
@@ -355,9 +338,9 @@
         <div>
             <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2 mb-0">
                 <i class="bi bi-star-fill text-amber-500"></i>
-                <span>Reviews Awaiting Moderation</span>
+                <span>Recent Guest Reviews</span>
             </h2>
-            <p class="text-xs text-slate-500 mb-0">Review guest feedback submissions before public display.</p>
+            <p class="text-xs text-slate-500 mb-0">Latest guest ratings. Open the feedback hub to hide inappropriate comments.</p>
         </div>
         <a href="{{ route('reviews.index') }}" class="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition">
             Open Feedback Hub

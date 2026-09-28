@@ -6,9 +6,8 @@
 <style>
 /* ── Modern Staff Management Design System ──────────────────────── */
 .sm-page-header {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
 }
 
 /* Glassmorphism Tab Bar */
@@ -16,10 +15,9 @@
     display: inline-flex;
     gap: 6px;
     background: #f1f5f9;
-    border-radius: 16px;
-    padding: 6px;
+    border-radius: 8px;
+    padding: 4px;
     border: 1px solid #e2e8f0;
-    box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.04);
     max-width: 100%;
     overflow-x: auto;
 }
@@ -27,8 +25,8 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 9px 20px;
-    border-radius: 12px;
+    padding: 8px 16px;
+    border-radius: 6px;
     border: none;
     background: transparent;
     font-size: 0.82rem;
@@ -44,11 +42,11 @@
 }
 .smtab-btn.active {
     background: #ffffff;
-    color: #0284c7;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
+    color: #0c4a6e;
+    border: 1px solid #e2e8f0;
 }
 .smtab-panel { display: none; }
-.smtab-panel.active { display: block; animation: tabFadeSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.smtab-panel.active { display: block; }
 @keyframes tabFadeSlide {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -57,45 +55,35 @@
 /* KPI Stat Cards */
 .kpi-stat-card {
     background: #ffffff;
-    border-radius: 20px;
+    border-radius: 10px;
     border: 1px solid #e2e8f0;
     padding: 20px;
     position: relative;
     overflow: hidden;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04);
 }
 .kpi-stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 30px -8px rgba(15, 23, 42, 0.09);
     border-color: #cbd5e1;
 }
 .kpi-accent-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3.5px;
+    display: none;
 }
 
 /* Staff Card */
 .staff-card {
     background: #ffffff;
-    border-radius: 22px;
+    border-radius: 12px;
     border: 1px solid #e2e8f0;
     padding: 22px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     position: relative;
-    overflow: hidden;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 4px 18px -2px rgba(15, 23, 42, 0.04);
+    overflow: visible;
+    transition: border-color 0.15s ease;
+    box-shadow: none;
 }
 .staff-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 36px -10px rgba(15, 23, 42, 0.10);
-    border-color: #bae6fd;
+    border-color: #cbd5e1;
 }
 .staff-card-top-bar {
     position: absolute;
@@ -110,15 +98,15 @@
     position: relative;
     width: 52px;
     height: 52px;
-    border-radius: 16px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
-    font-size: 1.15rem;
+    font-weight: 700;
+    font-size: 1.05rem;
     color: #ffffff;
     flex-shrink: 0;
-    box-shadow: 0 8px 16px -4px rgba(2, 132, 199, 0.35);
+    background: #0c4a6e;
 }
 .avatar-status-beacon {
     position: absolute;
@@ -132,7 +120,7 @@
 
 /* Pulsing beacon */
 .beacon-pulse {
-    animation: beaconPulse 2s infinite;
+    animation: none;
 }
 @keyframes beaconPulse {
     0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
@@ -210,9 +198,7 @@
 .sm-modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.55);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(15, 23, 42, 0.45);
     z-index: 3000;
     display: none;
     align-items: center;
@@ -222,8 +208,8 @@
 .sm-modal-backdrop.open { display: flex; }
 .sm-modal-box {
     background: #ffffff;
-    border-radius: 26px;
-    box-shadow: 0 32px 72px -12px rgba(15, 23, 42, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.2);
     width: 100%;
     max-width: 620px;
     max-height: 92vh;
@@ -301,7 +287,7 @@
 .duty-radio-tile:has(:checked) {
     border-color: #0284c7;
     background: #f0f9ff;
-    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+    box-shadow: none;
 }
 </style>
 @endpush
@@ -311,34 +297,24 @@
 {{-- ══════════════════════════════════════════════════════
      PAGE HEADER — Modern Resort Operations Banner
 ══════════════════════════════════════════════════════ --}}
-<div class="sm-page-header rounded-3xl p-6 sm:p-7 mb-6">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-        <div class="flex items-start gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white flex items-center justify-center text-2xl shadow-lg shadow-sky-500/20 flex-shrink-0">
-                <i class="bi bi-person-gear"></i>
-            </div>
-            <div>
-                <div class="flex items-center gap-2.5 mb-1.5 flex-wrap">
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-sky-100/80 text-sky-800 border border-sky-200">
-                        <i class="bi bi-shield-lock-fill text-sky-600"></i> Staff Directory &amp; RBAC
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 beacon-pulse"></span>
-                        Resort Operations Live
-                    </span>
-                </div>
-                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">Staff Management</h1>
-                <p class="text-sm text-slate-500 max-w-2xl leading-relaxed mb-0">
-                    Oversee staff duty availability, role assignments, module permissions, and complete audit trail for Talisay Beach Resort.
-                </p>
-            </div>
+<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-2 mb-1">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                <i class="bi bi-people-fill text-[10px] text-sky-600"></i>
+                Staff Directory
+            </span>
         </div>
-
-        <div class="flex items-center gap-3 flex-wrap">
-            <button type="button" onclick="openAddStaffModal()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white text-xs font-extrabold shadow-md shadow-sky-500/25 transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
-                <i class="bi bi-person-plus-fill text-sm"></i> Add New Staff
-            </button>
-        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">Staff Management</h1>
+        <p class="text-sm text-slate-500 mb-0">
+            Oversee staff duty, role assignments, module permissions, and the activity log.
+        </p>
+    </div>
+    <div class="flex items-center gap-3">
+        <button type="button" onclick="openAddStaffModal()" class="btn-ocean text-xs">
+            <i class="bi bi-person-plus"></i>
+            <span>Add Staff</span>
+        </button>
     </div>
 </div>
 
@@ -373,18 +349,17 @@
 ══════════════════════════════════════════════════════ --}}
 @php
     $totalStaff     = $staffMembers->count();
-    $activeStaff    = $staffMembers->where('account_status','active')->count();
     $availableStaff = $staffMembers->where('duty_status','available')->count();
     $busyStaff      = $staffMembers->where('duty_status','busy')->count();
     $onLeaveStaff   = $staffMembers->where('duty_status','on_leave')->count();
 @endphp
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-6">
     {{-- Card 1: Total Staff --}}
     <div class="kpi-stat-card">
         <div class="kpi-accent-bar bg-gradient-to-r from-sky-400 to-blue-600"></div>
         <div class="flex items-center justify-between gap-3 mb-3">
             <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Total Staff</span>
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-sky-500/20">
+            <div class="w-10 h-10 rounded-lg bg-ocean-800 text-white flex items-center justify-center">
                 <i class="bi bi-people-fill text-base"></i>
             </div>
         </div>
@@ -398,31 +373,12 @@
         </div>
     </div>
 
-    {{-- Card 2: Active Accounts --}}
-    <div class="kpi-stat-card">
-        <div class="kpi-accent-bar bg-gradient-to-r from-emerald-400 to-teal-600"></div>
-        <div class="flex items-center justify-between gap-3 mb-3">
-            <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Active Status</span>
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
-                <i class="bi bi-shield-check text-base"></i>
-            </div>
-        </div>
-        <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-black text-emerald-700 leading-none">{{ $activeStaff }}</span>
-            <span class="text-xs font-bold text-emerald-600">of {{ $totalStaff }}</span>
-        </div>
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Enabled accounts</span>
-            <span class="font-extrabold text-emerald-700">{{ $totalStaff > 0 ? round(($activeStaff / $totalStaff) * 100) : 0 }}% Operational</span>
-        </div>
-    </div>
-
-    {{-- Card 3: On Duty / Ready --}}
+    {{-- Card 2: On Duty / Ready --}}
     <div class="kpi-stat-card">
         <div class="kpi-accent-bar bg-gradient-to-r from-cyan-400 to-teal-500"></div>
         <div class="flex items-center justify-between gap-3 mb-3">
             <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">On Duty</span>
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-cyan-500/20">
+            <div class="w-10 h-10 rounded-lg bg-ocean-600 text-white flex items-center justify-center">
                 <i class="bi bi-person-check-fill text-base"></i>
             </div>
         </div>
@@ -443,7 +399,7 @@
         <div class="kpi-accent-bar bg-gradient-to-r from-amber-400 to-orange-500"></div>
         <div class="flex items-center justify-between gap-3 mb-3">
             <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Busy / In Task</span>
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+            <div class="w-10 h-10 rounded-lg bg-amber-600 text-white flex items-center justify-center">
                 <i class="bi bi-hourglass-split text-base"></i>
             </div>
         </div>
@@ -471,7 +427,7 @@
         <button type="button" class="smtab-btn" id="btn-tab-rbac" onclick="switchTab('rbac')">
             <i class="bi bi-shield-lock-fill text-sm"></i>
             <span>Job &amp; Role Assignments</span>
-            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-700">RBAC</span>
+            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">RBAC</span>
         </button>
         <button type="button" class="smtab-btn" id="btn-tab-activity" onclick="gotoActivity()">
             <i class="bi bi-clock-history text-sm"></i>
@@ -502,15 +458,7 @@
         @forelse($staffMembers as $staff)
         @php
             $ds = $staff->duty_status ?? 'available';
-            $as = $staff->account_status ?? 'active';
             $initial = strtoupper(substr($staff->name, 0, 1));
-            // Color palettes per initial or role
-            $gradientClass = match($loop->index % 4) {
-                0 => 'from-sky-500 via-blue-600 to-indigo-700',
-                1 => 'from-emerald-500 via-teal-600 to-cyan-700',
-                2 => 'from-indigo-500 via-purple-600 to-pink-600',
-                default => 'from-blue-600 via-cyan-600 to-teal-700',
-            };
             $dutyAccent = match($ds) {
                 'available' => 'bg-emerald-500',
                 'busy'      => 'bg-amber-500',
@@ -519,15 +467,12 @@
             };
         @endphp
         <div class="staff-card group" data-name="{{ strtolower($staff->name) }}" data-email="{{ strtolower($staff->email) }}" data-id="{{ strtolower($staff->staff_id ?? '') }}" data-pos="{{ strtolower($staff->position ?? '') }}" data-dept="{{ strtolower($staff->department ?? '') }}">
-            {{-- Top Accent Line --}}
-            <div class="staff-card-top-bar {{ $dutyAccent }}"></div>
-
             <div>
                 {{-- Staff Header Row --}}
                 <div class="flex items-start justify-between gap-3 mb-4">
                     <div class="flex items-center gap-3 min-w-0">
                         {{-- Avatar with duty beacon --}}
-                        <div class="staff-avatar-wrap bg-gradient-to-br {{ $gradientClass }}">
+                        <div class="staff-avatar-wrap">
                             @if($staff->avatar)
                                 <img src="{{ asset('storage/'.$staff->avatar) }}" alt="{{ $staff->name }}" class="w-full h-full object-cover rounded-2xl">
                             @else
@@ -554,10 +499,6 @@
                         <span class="pill-duty {{ $ds }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ $dutyAccent }} {{ $ds==='available' ? 'beacon-pulse' : '' }}"></span>
                             {{ ucfirst(str_replace('_', ' ', $ds)) }}
-                        </span>
-                        <span class="pill-account {{ $as }}">
-                            <i class="bi {{ $as==='active' ? 'bi-check-circle-fill' : 'bi-x-circle-fill' }} text-[9px]"></i>
-                            {{ ucfirst(str_replace('_', ' ', $as)) }}
                         </span>
                     </div>
                 </div>
@@ -624,7 +565,7 @@
             <div class="pt-3.5 border-t border-slate-100 flex items-center gap-2">
                 <button
                     type="button"
-                    onclick="openDutyModal({{ $staff->id }}, '{{ addslashes($staff->name) }}', '{{ $staff->duty_status ?? 'available' }}', '{{ addslashes($staff->duty_notes ?? '') }}')"
+                    onclick="openDutyModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->duty_status ?? 'available') }}, {{ Js::from($staff->duty_notes ?? '') }})"
                     class="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm hover:border-slate-300"
                 >
                     <i class="bi bi-arrow-repeat text-sky-600"></i>
@@ -633,8 +574,8 @@
 
                 <button
                     type="button"
-                    onclick="openPermissionsModal({{ $staff->id }}, '{{ addslashes($staff->name) }}', {{ $staff->permissions->toJson() }}, '{{ addslashes($staff->staff_id ?? '') }}', '{{ addslashes($staff->position ?? '') }}', '{{ addslashes($staff->department ?? '') }}', '{{ $staff->account_status ?? 'active' }}')"
-                    class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-sky-600/20"
+                    onclick="openPermissionsModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->permissions) }}, {{ Js::from($staff->staff_id ?? '') }}, {{ Js::from($staff->position ?? '') }}, {{ Js::from($staff->department ?? '') }}, {{ Js::from($staff->account_status ?? 'active') }})"
+                    class="flex-1 py-2.5 px-3 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5"
                 >
                     <i class="bi bi-shield-lock-fill"></i>
                     <span>Permissions</span>
@@ -653,7 +594,7 @@
                         x-show="open"
                         @click.outside="open = false"
                         x-transition
-                        class="absolute right-0 bottom-full mb-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl w-52 py-1.5"
+                        class="absolute right-0 top-full mt-2 z-[80] bg-white border border-slate-200 rounded-xl shadow-xl w-52 py-1.5"
                     >
                         <div class="px-3 py-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Account Actions</div>
                         <button @click="open=false; quickStatus({{ $staff->id }},'active')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
@@ -669,7 +610,7 @@
                         <button @click="open=false; quickStatus({{ $staff->id }},'suspended')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50">
                             <i class="bi bi-ban-fill text-red-500"></i> Suspend Account
                         </button>
-                        <button @click="open=false; openResetPasswordModal({{ $staff->id }}, '{{ addslashes($staff->name) }}')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
+                        <button @click="open=false; openResetPasswordModal({{ $staff->id }}, {{ Js::from($staff->name) }})" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
                             <i class="bi bi-key-fill text-indigo-500"></i> Reset Password
                         </button>
                     </div>
@@ -677,13 +618,13 @@
             </div>
         </div>
         @empty
-        <div class="col-span-full bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">
+        <div class="col-span-full bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">
             <div class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center text-3xl mx-auto mb-4">
                 <i class="bi bi-people"></i>
             </div>
             <h3 class="text-base font-extrabold text-slate-800 mb-1">No Staff Members Found</h3>
             <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">There are currently no staff registered matching the selected criteria.</p>
-            <button onclick="openAddStaffModal()" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md transition">
+            <button onclick="openAddStaffModal()" class="btn-ocean text-xs">
                 <i class="bi bi-person-plus-fill me-1"></i> Add First Staff Member
             </button>
         </div>
@@ -695,16 +636,16 @@
      TAB 2: JOB & ROLE ASSIGNMENTS (RBAC Table)
 ====================================================== --}}
 <div class="smtab-panel" id="panel-rbac">
-    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden mb-6">
-        <div class="px-6 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-50/70 to-white">
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm mb-6">
+        <div class="px-6 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-slate-50">
             <div>
                 <h2 class="text-base font-extrabold text-slate-900 mb-0.5 flex items-center gap-2">
                     <i class="bi bi-shield-check text-sky-600"></i> Role-Based Access Control (RBAC)
                 </h2>
                 <p class="text-xs text-slate-500 mb-0">Granular permission matrix mapping staff members to resort operation modules.</p>
             </div>
-            <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200/80 text-indigo-700 font-bold text-xs shadow-sm">
-                <i class="bi bi-shield-fill-check text-indigo-500"></i> Admin role maintains master oversight
+            <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 font-semibold text-xs">
+                <i class="bi bi-shield-check text-sky-700"></i> Admin role maintains master oversight
             </div>
         </div>
 
@@ -719,20 +660,10 @@
                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Department</label>
                 <input type="text" name="department" value="{{ request('department') }}" placeholder="e.g. Front Office" class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none w-48 shadow-sm">
             </div>
-            <div>
-                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-                <select name="status" class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
-                    <option value="">All Statuses</option>
-                    <option value="active" {{ request('status')==='active'?'selected':'' }}>Active</option>
-                    <option value="inactive" {{ request('status')==='inactive'?'selected':'' }}>Inactive</option>
-                    <option value="on_leave" {{ request('status')==='on_leave'?'selected':'' }}>On Leave</option>
-                    <option value="suspended" {{ request('status')==='suspended'?'selected':'' }}>Suspended</option>
-                </select>
-            </div>
             <button type="submit" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                 <i class="bi bi-funnel-fill"></i> Filter
             </button>
-            @if(request()->hasAny(['search','department','status']))
+            @if(request()->hasAny(['search','department']))
             <a href="{{ route('tasks.staff',['tab'=>'rbac']) }}" class="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold transition shadow-sm">
                 Clear
             </a>
@@ -740,15 +671,14 @@
         </form>
 
         {{-- Table Container --}}
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm" style="min-width:880px">
+        <div>
+            <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-slate-100 bg-slate-50/70">
                         <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-6 py-3.5">Staff Member</th>
                         <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Staff ID</th>
                         <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Position / Dept.</th>
                         <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Assigned Modules</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Account Status</th>
                         <th class="text-right text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-6 py-3.5">Actions</th>
                     </tr>
                 </thead>
@@ -757,7 +687,7 @@
                     <tr class="hover:bg-sky-50/30 transition-colors">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-sm flex-shrink-0">
+                                <div class="w-9 h-9 rounded-xl bg-ocean-800 text-white flex items-center justify-center font-black text-xs shadow-sm flex-shrink-0">
                                     {{ strtoupper(substr($staff->name,0,1)) }}
                                 </div>
                                 <div>
@@ -793,18 +723,11 @@
                             </div>
                             @endif
                         </td>
-                        <td class="px-4 py-4">
-                            @php $as = $staff->account_status ?? 'active'; @endphp
-                            <span class="pill-account {{ $as }}">
-                                <i class="bi {{ $as==='active' ? 'bi-check-circle-fill' : 'bi-x-circle-fill' }} text-[9px]"></i>
-                                {{ ucfirst(str_replace('_',' ',$as)) }}
-                            </span>
-                        </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-1.5">
                                 <button
                                     type="button"
-                                    onclick="openPermissionsModal({{ $staff->id }}, '{{ addslashes($staff->name) }}', {{ $staff->permissions->toJson() }}, '{{ addslashes($staff->staff_id ?? '') }}', '{{ addslashes($staff->position ?? '') }}', '{{ addslashes($staff->department ?? '') }}', '{{ $staff->account_status ?? 'active' }}')"
+                                    onclick="openPermissionsModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->permissions) }}, {{ Js::from($staff->staff_id ?? '') }}, {{ Js::from($staff->position ?? '') }}, {{ Js::from($staff->department ?? '') }}, {{ Js::from($staff->account_status ?? 'active') }})"
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs font-bold hover:bg-sky-100 transition shadow-sm"
                                 >
                                     <i class="bi bi-shield-lock-fill text-sky-600"></i> Edit Roles
@@ -827,7 +750,7 @@
                                         <button @click="open=false; quickStatus({{ $staff->id }},'suspended')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50">
                                             <i class="bi bi-ban-fill text-red-500"></i> Suspend Account
                                         </button>
-                                        <button @click="open=false; openResetPasswordModal({{ $staff->id }},'{{ addslashes($staff->name) }}')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
+                                        <button @click="open=false; openResetPasswordModal({{ $staff->id }}, {{ Js::from($staff->name) }})" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
                                             <i class="bi bi-key-fill text-indigo-500"></i> Reset Password
                                         </button>
                                     </div>
@@ -837,7 +760,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="text-center py-16 text-slate-400">
+                        <td colspan="5" class="text-center py-16 text-slate-400">
                             <i class="bi bi-person-x text-4xl mb-2 block"></i>
                             <p class="font-bold text-slate-600">No staff members found matching criteria</p>
                         </td>
@@ -849,7 +772,7 @@
     </div>
 
     {{-- Role Presets Reference Cards --}}
-    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2 mb-0">
                 <i class="bi bi-bookmark-star-fill text-sky-600"></i> Standard Staff Role Presets
@@ -886,7 +809,7 @@
      TAB 3: ACTIVITY AUDIT LOG
 ====================================================== --}}
 <div class="smtab-panel" id="panel-activity">
-    <form method="GET" action="{{ route('tasks.staff') }}" class="bg-white rounded-3xl border border-slate-200/80 shadow-sm px-6 py-5 mb-6 flex flex-wrap gap-3 items-end">
+    <form method="GET" action="{{ route('tasks.staff') }}" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6 py-5 mb-6 flex flex-wrap gap-3 items-end">
         <input type="hidden" name="tab" value="activity">
         <div>
             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search Events</label>
@@ -931,10 +854,10 @@
         @endif
     </form>
 
-    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
             <div>
-                <h2 class="text-base font-extrabold text-slate-900 mb-0.5">Staff Activity Audit Trail</h2>
+                <h2 class="text-base font-extrabold text-slate-900 mb-0.5">Staff Activity Log</h2>
                 <p class="text-xs text-slate-400 mb-0">Immutable system records of all staff permissions, duty changes, and logins</p>
             </div>
         </div>
@@ -970,7 +893,7 @@
                         <td class="px-4 py-4">
                             @if($log->user)
                             <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0 shadow-sm">
+                                <div class="w-8 h-8 rounded-xl bg-ocean-800 text-white flex items-center justify-center text-xs font-black flex-shrink-0 shadow-sm">
                                     {{ strtoupper(substr($log->user->name,0,1)) }}
                                 </div>
                                 <div>
@@ -1100,7 +1023,7 @@
                 <button type="button" onclick="closeDutyModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">
                     Cancel
                 </button>
-                <button type="submit" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white font-bold text-xs transition shadow-md shadow-sky-600/20">
+                <button type="submit" class="flex-1 py-2.5 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white font-semibold text-xs transition">
                     Update Status
                 </button>
             </div>
@@ -1118,7 +1041,7 @@
         </button>
 
         <div class="flex items-center gap-3 mb-1">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-ocean-800 text-white flex items-center justify-center text-lg shadow-sm">
                 <i class="bi bi-person-plus-fill"></i>
             </div>
             <div>
@@ -1131,7 +1054,7 @@
             @csrf
 
             {{-- Quick Presets Banner --}}
-            <div class="mb-5 p-4 bg-gradient-to-r from-sky-50 to-indigo-50/60 rounded-2xl border border-sky-200/80">
+            <div class="mb-5 p-4 bg-sky-50 rounded-2xl border border-sky-200/80">
                 <p class="text-xs font-extrabold text-sky-900 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                     <i class="bi bi-magic text-sky-600"></i> One-Click Role Presets
                 </p>
@@ -1236,7 +1159,7 @@
                 <button type="button" onclick="closeAddStaffModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">
                     Cancel
                 </button>
-                <button type="submit" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-xs transition shadow-md shadow-sky-600/25 flex items-center justify-center gap-1.5">
+                <button type="submit" class="flex-1 py-3 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5">
                     <i class="bi bi-person-plus-fill"></i> Create Staff Account
                 </button>
             </div>
@@ -1254,7 +1177,7 @@
         </button>
 
         <div class="flex items-center gap-3 mb-1">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-sky-600 text-white flex items-center justify-center text-lg shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-ocean-800 text-white flex items-center justify-center text-lg shadow-sm">
                 <i class="bi bi-shield-lock-fill"></i>
             </div>
             <div>
@@ -1266,7 +1189,7 @@
         <form id="perm-form" method="POST" class="mt-5">
             @csrf @method('PUT')
 
-            <div class="mb-5 p-4 bg-gradient-to-r from-sky-50 to-indigo-50/60 rounded-2xl border border-sky-200/80">
+            <div class="mb-5 p-4 bg-sky-50 rounded-2xl border border-sky-200/80">
                 <p class="text-xs font-extrabold text-sky-900 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                     <i class="bi bi-magic text-sky-600"></i> Role Preset Auto-Fill
                 </p>
@@ -1342,7 +1265,7 @@
                 <button type="button" onclick="closePermissionsModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">
                     Cancel
                 </button>
-                <button type="submit" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/25 flex items-center justify-center gap-1.5">
+                <button type="submit" class="flex-1 py-3 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
                     <i class="bi bi-shield-check-fill"></i> Save Role &amp; Permissions
                 </button>
             </div>

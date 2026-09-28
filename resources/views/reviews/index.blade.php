@@ -177,7 +177,7 @@
                             {{-- Block comment --}}
                             <button type="button" 
                                     class="btn btn-outline-danger btn-sm text-xs font-bold rounded-xl py-1 px-2.5"
-                                    onclick="openBlockModal({{ $review->id }}, '{{ addslashes($review->user->name ?? 'Guest') }}')">
+                                    onclick="openBlockModal({{ $review->id }}, {{ Js::from($review->user->name ?? 'Guest') }})">
                                 <i class="bi bi-slash-circle me-1"></i>
                                 <span>Block Comment</span>
                             </button>
@@ -220,7 +220,7 @@
         <p class="text-xs text-slate-600 mb-0 leading-relaxed">
             You are blocking the comment by <strong id="blockGuestName">Guest</strong>. 
             <span class="text-slate-800 font-semibold block mt-1">
-                ⭐ The guest's star rating cannot be removed and will remain preserved.
+                <i class="bi bi-star-fill text-amber-500"></i> The guest's star rating cannot be removed and will remain preserved.
             </span>
         </p>
 

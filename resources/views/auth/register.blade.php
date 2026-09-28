@@ -64,7 +64,7 @@ body {
 
 .fb-back-arrow:hover {
     background: #e4e6eb;
-    color: #0084B4;
+    color: #0284c7;
     transform: translateX(-2px);
 }
 
@@ -74,7 +74,7 @@ body {
     gap: 8px;
     font-size: 12.5px;
     font-weight: 700;
-    color: #0084B4;
+    color: #0284c7;
     background: #e0f2fe;
     padding: 6px 14px;
     border-radius: 9999px;
@@ -187,7 +187,7 @@ body {
 }
 
 .fb-help-icon:hover {
-    color: #0084B4;
+    color: #0284c7;
 }
 
 /* ── Inputs & Selects ─────────────────────────────────────────── */
@@ -214,7 +214,7 @@ body {
 }
 
 .fb-input:focus {
-    border-color: #0084B4;
+    border-color: #0284c7;
     box-shadow: 0 0 0 4px rgba(0, 132, 180, 0.12);
 }
 
@@ -245,7 +245,7 @@ body {
 }
 
 .fb-select:focus {
-    border-color: #0084B4;
+    border-color: #0284c7;
     box-shadow: 0 0 0 4px rgba(0, 132, 180, 0.12);
 }
 
@@ -300,7 +300,7 @@ body {
 }
 
 .fb-gender-card.active {
-    border-color: #0084B4;
+    border-color: #0284c7;
     background: #f0f9ff;
 }
 
@@ -317,7 +317,7 @@ body {
 }
 
 .fb-gender-card.active .fb-gender-text {
-    color: #0084B4;
+    color: #0284c7;
 }
 
 .fb-gender-circle {
@@ -330,14 +330,14 @@ body {
 }
 
 .fb-gender-card.active .fb-gender-circle {
-    border-color: #0084B4;
+    border-color: #0284c7;
 }
 
 .fb-gender-card.active .fb-gender-circle::after {
     content: '';
     position: absolute;
     inset: 3px;
-    background: #0084B4;
+    background: #0284c7;
     border-radius: 50%;
 }
 
@@ -368,7 +368,7 @@ body {
 }
 
 .fb-eye-btn:hover {
-    color: #0084B4;
+    color: #0284c7;
 }
 
 /* ── Password Strength Bar ────────────────────────────────────── */
@@ -433,7 +433,7 @@ body {
 }
 
 .fb-disclaimer a {
-    color: #0084B4;
+    color: #0284c7;
     text-decoration: none;
     font-weight: 600;
 }
@@ -447,7 +447,7 @@ body {
     width: 100%;
     height: 52px;
     border-radius: 9999px;
-    background: #0084B4;
+    background: #0284c7;
     border: none;
     color: #ffffff;
     font-size: 16px;
@@ -507,8 +507,8 @@ body {
 
 .fb-btn-login:hover {
     background: #f8fafc;
-    border-color: #0084B4;
-    color: #0084B4;
+    border-color: #0284c7;
+    color: #0284c7;
 }
 
 /* ── Responsive adjustments ───────────────────────────────────── */

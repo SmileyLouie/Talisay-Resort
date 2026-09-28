@@ -82,7 +82,6 @@ class GeminiProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(15)
-                ->withoutVerifying()
                 ->withHeaders(['Content-Type' => 'application/json'])
                 ->post($endpoint, $payload);
 
@@ -107,8 +106,8 @@ class GeminiProvider implements AIProviderInterface
             return trim($text);
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            Log::warning('Gemini connection failed: ' . $e->getMessage());
-            throw new \RuntimeException('Gemini connection failed: ' . $e->getMessage());
+            Log::warning('Gemini connection failed: ' . $this->redact($e->getMessage()));
+            throw new \RuntimeException('Gemini connection failed.');
         }
     }
 
@@ -128,7 +127,6 @@ class GeminiProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(10)
-                ->withoutVerifying()
                 ->withHeaders(['Content-Type' => 'application/json'])
                 ->post($url, [
                     'contents' => [
@@ -164,9 +162,14 @@ class GeminiProvider implements AIProviderInterface
             $latency = (int) round((microtime(true) - $start) * 1000);
             return [
                 'success'    => false,
-                'message'    => 'Connection failed: ' . $e->getMessage(),
+                'message'    => 'Connection failed: ' . $this->redact($e->getMessage()),
                 'latency_ms' => $latency,
             ];
         }
+    }
+
+    private function redact(string $message): string
+    {
+        return preg_replace('/key=[^&\s]+/', 'key=redacted', $message) ?? $message;
     }
 }

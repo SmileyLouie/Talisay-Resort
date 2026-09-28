@@ -9,6 +9,10 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
+/**
+ * Aggregate occupancy for a date. Contains no personal data, so it is
+ * intentionally public (used by the availability calendar).
+ */
 class CapacityUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -17,18 +21,21 @@ class CapacityUpdated implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        return [
-            new Channel('capacity'),
-        ];
+        return [new Channel('capacity')];
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'capacity.updated';
     }
 
     public function broadcastWith(): array
     {
         return [
-            'date' => $this->capacity->date->format('Y-m-d'),
+            'date'          => $this->capacity->date->format('Y-m-d'),
             'current_count' => $this->capacity->current_count,
-            'max_capacity' => $this->capacity->max_capacity,
-            'utilization' => $this->capacity->getUtilizationPercent(),
+            'max_capacity'  => $this->capacity->max_capacity,
+            'utilization'   => $this->capacity->getUtilizationPercent(),
         ];
     }
 }

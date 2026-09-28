@@ -152,7 +152,7 @@
                         <i class="bi bi-eye-fill text-ocean-600"></i>Details & 360°
                     </a>
                     <button type="button" 
-                       @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: '{{ addslashes($unit->unit_number) }}', unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" 
+                       @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: {{ Js::from($unit->unit_number) }}, unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" 
                        class="flex-1 bg-ocean-600 hover:bg-ocean-700 text-white font-bold text-xs py-2.5 rounded-xl text-center transition shadow-sm flex items-center justify-center gap-1">
                         <i class="bi bi-calendar-plus"></i>Book Now
                     </button>
@@ -247,7 +247,7 @@
             <button @click="open = false" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4">
+        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4" data-loading>
             @csrf
             <input type="hidden" name="accommodation_unit_id" :value="unitId">
 

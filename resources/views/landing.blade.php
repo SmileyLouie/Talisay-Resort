@@ -266,14 +266,14 @@
 
         /* Bottom button: Solid vibrant ocean blue pill matching example image */
         .login-btn-blue {
-            background: #0084B4;
+            background: #0284c7;
             border: 1.5px solid transparent;
             color: #ffffff;
             font-weight: 700;
         }
         .login-btn-blue:hover {
-            background: #00739e;
-            box-shadow: 0 6px 20px rgba(0, 132, 180, 0.35);
+            background: #0369a1;
+            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35);
             transform: translateY(-1px);
             color: #ffffff;
         }
@@ -307,6 +307,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            padding: 0;
             z-index: 850;
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -538,7 +539,7 @@
     {{-- Top Navigation --}}
     <nav class="topbar">
         <a href="{{ url('/') }}" class="topbar-brand">
-            <img src="{{ asset('logo.png') }}" alt="Talisay Resort Logo" class="topbar-logo">
+            <img src="{{ asset('images/logo.png') }}" alt="Talisay Resort Logo" class="topbar-logo">
             <div>
                 <div class="topbar-name">Talisay Beach Resort</div>
                 <div class="topbar-sub">Smart Tourism System</div>
@@ -574,12 +575,12 @@
         </p>
 
         <div class="btn-row">
-            <a href="{{ route('login') }}" class="btn-login" id="btn-landing-login" onclick="openLoginModal(event)">
-                <i class="bi bi-box-arrow-in-right" style="font-size:16px;"></i>
+            <a href="{{ route('login') }}" class="btn-login" id="btn-landing-login" onclick="openLoginModal(event)" aria-haspopup="dialog" aria-controls="loginModal">
+                <i class="bi bi-box-arrow-in-right" style="font-size:16px;" aria-hidden="true"></i>
                 Login
             </a>
             <a href="{{ route('register') }}" class="btn-register" id="btn-landing-register">
-                <i class="bi bi-person-plus" style="font-size:16px;"></i>
+                <i class="bi bi-person-plus" style="font-size:16px;" aria-hidden="true"></i>
                 Register
             </a>
         </div>
@@ -601,7 +602,7 @@
         <div class="login-dialog-options">
             {{-- Button 1: Tourist & Staff --}}
             <a href="{{ route('login', ['portal' => 'client']) }}" class="login-btn-pill login-btn-white" id="portal-client-btn">
-                <img src="{{ asset('logo.png') }}" class="login-btn-logo" alt="Logo">
+                <img src="{{ asset('images/logo.png') }}" class="login-btn-logo" alt="Talisay Beach Resort logo">
                 <span>Tourist &amp; Staff log in</span>
             </a>
 
@@ -643,6 +644,9 @@ function handleModalOverlayClick(e) {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeLoginModal();
+        if (typeof toggleLandingChatbot === 'function' && window.lcbOpen) {
+            toggleLandingChatbot(false);
+        }
     }
 });
 </script>
@@ -658,10 +662,10 @@ document.addEventListener('keydown', function(e) {
         default => 'Resort Assistant',
     };
     $landInitialWelcome = match($landRole) {
-        'admin' => "Hello **{$landFirstName}** (Admin)! 👋\nWelcome to Talisay Beach Resort. How can I assist you with resort management today?",
-        'staff' => "Hello **{$landFirstName}**! 👋 Staff Assistant ready.\nAsk about today's arrivals, room availability, or reservations.",
-        'tourist' => "Hello **{$landFirstName}**! 👋 Welcome back!\nAsk about your bookings, room rates, GCash payments, or 360° virtual tour.",
-        default => "Hello! 👋 Welcome to **Talisay Beach Resort**.\nI'm your virtual guide! How can I help you plan your visit today?",
+        'admin' => "Hello **{$landFirstName}** (Admin)!\nWelcome to Talisay Beach Resort. How can I assist you with resort management today?",
+        'staff' => "Hello **{$landFirstName}**! Staff Assistant ready.\nAsk about today's arrivals, room availability, or reservations.",
+        'tourist' => "Hello **{$landFirstName}**! Welcome back!\nAsk about your bookings, room rates, GCash payments, or 360° virtual tour.",
+        default => "Hello! Welcome to **Talisay Beach Resort**.\nI'm your virtual guide! How can I help you plan your visit today?",
     };
     $landDefaultChips = match($landRole) {
         'admin' => ["Today's Summary", "Pending Bookings", "Revenue Stats", "Occupancy"],
@@ -672,37 +676,38 @@ document.addEventListener('keydown', function(e) {
 @endphp
 
 {{-- Floating Chatbot FAB Button --}}
-<div class="landing-chatbot-fab" id="landingChatbotFab" onclick="toggleLandingChatbot()" title="Open Resort Assistant">
-    <i class="bi bi-chat-dots-fill" id="landingChatbotIcon"></i>
-</div>
+<button type="button" class="landing-chatbot-fab" id="landingChatbotFab" onclick="toggleLandingChatbot()" title="Open Resort Assistant" aria-label="Open Resort Assistant" aria-expanded="false" aria-controls="landingChatbotCard">
+    <i class="bi bi-chat-dots-fill" id="landingChatbotIcon" aria-hidden="true"></i>
+</button>
 
 {{-- Floating Chatbot Panel --}}
-<div class="landing-chatbot-card" id="landingChatbotCard">
+<div class="landing-chatbot-card" id="landingChatbotCard" role="dialog" aria-labelledby="lcbTitle" aria-hidden="true">
     <div class="lcb-header">
         <div class="lcb-header-info">
             <div class="lcb-avatar">
-                <i class="bi bi-robot"></i>
+                <i class="bi bi-robot" aria-hidden="true"></i>
             </div>
             <div>
-                <div class="lcb-title">Talisay Assistant</div>
+                <div class="lcb-title" id="lcbTitle">Talisay Assistant</div>
                 <div class="lcb-subtitle" id="lcbModeLabel">{{ $landModeLabel }}</div>
             </div>
         </div>
         <button type="button" class="lcb-close-btn" onclick="toggleLandingChatbot(false)" aria-label="Close Chatbot">
-            <i class="bi bi-x-lg"></i>
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
         </button>
     </div>
 
-    <div class="lcb-body" id="lcbMessages">
+    <div class="lcb-body" id="lcbMessages" aria-live="polite">
         {{-- Initial Bot Message --}}
         <div class="lcb-msg lcb-msg-bot" id="lcbInitialMsg"></div>
         <div class="lcb-chips-wrap" id="lcbChipsContainer"></div>
     </div>
 
     <form class="lcb-footer" id="lcbForm" onsubmit="handleLandingChatSubmit(event)">
+        <label for="lcbInput" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Type your message</label>
         <input type="text" class="lcb-input" id="lcbInput" placeholder="Ask about rates, hours, 360° tour..." autocomplete="off">
         <button type="submit" class="lcb-send-btn" id="lcbSendBtn" aria-label="Send message">
-            <i class="bi bi-send-fill"></i>
+            <i class="bi bi-send-fill" aria-hidden="true"></i>
         </button>
     </form>
 </div>
@@ -716,10 +721,11 @@ let lcbHistory = [];
 
 function formatLcbText(text) {
     if (!text) return '';
-    let escaped = text
+    let escaped = String(text)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 
     escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">•</span><span>$1</span></div>');
 
@@ -739,10 +745,19 @@ function initLandingChatbot() {
 function toggleLandingChatbot(forceState) {
     const card = document.getElementById('landingChatbotCard');
     const icon = document.getElementById('landingChatbotIcon');
+    const fab = document.getElementById('landingChatbotFab');
+    if (!card || !icon) return;
     if (typeof forceState === 'boolean') {
         lcbOpen = forceState;
     } else {
         lcbOpen = !lcbOpen;
+    }
+    window.lcbOpen = lcbOpen;
+
+    card.setAttribute('aria-hidden', lcbOpen ? 'false' : 'true');
+    if (fab) {
+        fab.setAttribute('aria-expanded', lcbOpen ? 'true' : 'false');
+        fab.setAttribute('aria-label', lcbOpen ? 'Close Resort Assistant' : 'Open Resort Assistant');
     }
 
     if (lcbOpen) {
@@ -766,11 +781,12 @@ function renderLcbChips(chips) {
     if (!chips || !chips.length) return;
 
     chips.forEach(chip => {
+        const label = String(chip);
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'lcb-chip-btn';
-        btn.textContent = chip;
-        btn.onclick = () => handleLcbChipClick(chip);
+        btn.textContent = label;
+        btn.onclick = () => handleLcbChipClick(label);
         container.appendChild(btn);
     });
 }
@@ -855,7 +871,7 @@ async function sendLandingMessage(text) {
         // Put chips container back at the end
         if (chipsContainer) {
             bodyEl.appendChild(chipsContainer);
-            renderLcbChips(data.chips || lcbDefaultChips);
+            renderLcbChips(Array.isArray(data.chips) && data.chips.length ? data.chips : lcbDefaultChips);
         }
     } catch (err) {
         typingEl.remove();

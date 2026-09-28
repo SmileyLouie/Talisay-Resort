@@ -46,6 +46,18 @@ class ChatbotIntent extends Model
     // Enable factory support for seeding and testing
     use HasFactory;
 
+    public const CATEGORIES = ['rates', 'hours', 'policies', 'directions', 'facilities', 'booking_help', 'general'];
+
+    /**
+     * Comma-separated keyword phrases as a clean array.
+     *
+     * @return array<int, string>
+     */
+    public function keywordList(): array
+    {
+        return array_values(array_filter(array_map('trim', explode(',', strtolower((string) $this->keyword)))));
+    }
+
     /**
      * Define type casts for model attributes.
      *

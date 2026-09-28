@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Booking;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -17,18 +17,26 @@ class BookingUpdated implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        return [
-            new Channel('staff-bookings'),
-            new Channel('guest-booking-' . $this->booking->user_id),
-        ];
+        $channels = [new PrivateChannel('staff-bookings')];
+
+        if ($this->booking->user_id) {
+            $channels[] = new PrivateChannel('guest-booking-' . $this->booking->user_id);
+        }
+
+        return $channels;
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'booking.updated';
     }
 
     public function broadcastWith(): array
     {
         return [
-            'id' => $this->booking->id,
+            'id'           => $this->booking->id,
             'reference_no' => $this->booking->reference_no,
-            'status' => $this->booking->status,
+            'status'       => $this->booking->status,
         ];
     }
 }

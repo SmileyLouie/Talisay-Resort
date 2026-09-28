@@ -90,6 +90,7 @@ class WebAccommodationController extends WebControllers
         ]);
 
         AuditLog::log('accommodation_unit_created', $unit, null, $unit->toArray());
+        app(\App\Services\SupabaseSyncService::class)->pushUnit($unit);
 
         return redirect()->route('accommodations.index')
             ->with('success', "Unit {$unit->unit_number} created successfully!");
@@ -152,6 +153,7 @@ class WebAccommodationController extends WebControllers
         ]);
 
         AuditLog::log('accommodation_unit_updated', $accommodation, $old, $accommodation->toArray());
+        app(\App\Services\SupabaseSyncService::class)->pushUnit($accommodation);
 
         return redirect()->route('accommodations.index')
             ->with('success', "Unit {$accommodation->unit_number} updated successfully!");
@@ -160,13 +162,21 @@ class WebAccommodationController extends WebControllers
     // ─── Admin: Delete unit ───────────────────────────────────────────
     public function destroy(AccommodationUnit $accommodation)
     {
+        $activeCount = $accommodation->bookings()->whereIn('status', \App\Models\Booking::ACTIVE_STATUSES)->count();
+        if ($activeCount > 0) {
+            return redirect()->route('accommodations.index')
+                ->with('error', "{$accommodation->unit_number} cannot be deleted while it has {$activeCount} active reservation(s). Cancel or complete them first, or mark the unit unavailable.");
+        }
+
         $name = $accommodation->unit_number;
         if ($accommodation->tour_video_path) {
             Storage::disk('public')->delete($accommodation->tour_video_path);
         }
+        $mysqlId = $accommodation->id;
         $accommodation->delete();
 
         AuditLog::log('accommodation_unit_deleted', $accommodation);
+        app(\App\Services\SupabaseSyncService::class)->deleteUnit($mysqlId);
 
         return redirect()->route('accommodations.index')
             ->with('success', "Unit {$name} deleted.");
@@ -176,6 +186,7 @@ class WebAccommodationController extends WebControllers
     public function toggleAvailability(AccommodationUnit $accommodation)
     {
         $accommodation->update(['is_available' => !$accommodation->is_available]);
+        app(\App\Services\SupabaseSyncService::class)->pushUnit($accommodation->fresh());
 
         $status = $accommodation->is_available ? 'available' : 'unavailable';
         return redirect()->route('accommodations.index')

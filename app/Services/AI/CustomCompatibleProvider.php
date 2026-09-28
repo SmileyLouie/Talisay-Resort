@@ -73,7 +73,6 @@ class CustomCompatibleProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(15)
-                ->withoutVerifying()
                 ->withHeaders($headers)
                 ->post($url, $payload);
 
@@ -117,7 +116,6 @@ class CustomCompatibleProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(10)
-                ->withoutVerifying()
                 ->withHeaders($headers)
                 ->post($url, [
                     'model'    => $model,

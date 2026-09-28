@@ -63,7 +63,6 @@ class AnthropicProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(15)
-                ->withoutVerifying()
                 ->withHeaders([
                     'x-api-key'         => $apiKey,
                     'anthropic-version' => '2023-06-01',
@@ -105,7 +104,6 @@ class AnthropicProvider implements AIProviderInterface
 
         try {
             $response = Http::timeout(10)
-                ->withoutVerifying()
                 ->withHeaders([
                     'x-api-key'         => $apiKey,
                     'anthropic-version' => '2023-06-01',

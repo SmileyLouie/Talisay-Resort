@@ -7,7 +7,7 @@
 @push('styles')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
 /* ── Reset ──────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -15,7 +15,7 @@
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -92,7 +92,7 @@ body {
     width: 64px;
     height: 64px;
     border-radius: 18px;
-    background: linear-gradient(135deg, #0084B4 0%, #00b4d8 100%);
+    background: linear-gradient(135deg, #0284c7 0%, #00b4d8 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -110,7 +110,7 @@ body {
 
 /* ── Heading & Sub ──────────────────────────────────────────────── */
 .fp-title {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 26px;
     font-weight: 800;
     color: #0f172a;
@@ -141,15 +141,15 @@ body {
 }
 
 .fp-alert-error {
-    background: rgba(239, 68, 68, 0.18);
-    border: 1px solid rgba(239, 68, 68, 0.35);
-    color: #fca5a5;
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    color: #9f1239;
 }
 
 .fp-alert-success {
-    background: rgba(16, 185, 129, 0.18);
-    border: 1px solid rgba(16, 185, 129, 0.35);
-    color: #6ee7b7;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
 }
 
 /* ── Label ──────────────────────────────────────────────────────── */
@@ -181,7 +181,7 @@ body {
     background: #f8fafc;
     color: #0f172a;
     font-size: 14px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     outline: none;
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     backdrop-filter: none;
@@ -198,7 +198,7 @@ body {
 }
 
 .fp-input:focus {
-    border-color: #0084B4;
+    border-color: #0284c7;
     background: #ffffff;
     box-shadow: 0 0 0 4px rgba(0, 132, 180, 0.12);
 }
@@ -210,7 +210,7 @@ body {
     width: 100%;
     height: 52px;
     border-radius: 9999px;
-    background: linear-gradient(135deg, #0084B4 0%, #00b4d8 100%);
+    background: linear-gradient(135deg, #0284c7 0%, #00b4d8 100%);
     border: none;
     color: #ffffff;
     font-size: 15px;
@@ -223,7 +223,7 @@ body {
     gap: 9px;
     box-shadow: 0 6px 20px rgba(0, 132, 180, 0.45);
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 .fp-btn-submit:hover {
@@ -281,8 +281,8 @@ body {
 
 .fp-btn-login:hover {
     background: #f8fafc;
-    border-color: #0084B4;
-    color: #0084B4;
+    border-color: #0284c7;
+    color: #0284c7;
     transform: translateY(-1px);
 }
 

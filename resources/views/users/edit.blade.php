@@ -12,7 +12,7 @@
     <div class="col-lg-8 col-xl-7">
         <div class="bg-white rounded-xl shadow-sm overflow-hidden">
             {{-- Card Header --}}
-            <div class="p-5 bg-gradient-to-r from-teal-500 to-sky-500 text-white">
+            <div class="p-5 bg-ocean-800 text-white">
                 <div class="flex items-center gap-4">
                     @if($user->avatar)
                         <img src="{{ Storage::url($user->avatar) }}" class="w-14 h-14 rounded-xl object-cover border-2 border-white/30" alt="{{ $user->name }}">
@@ -134,7 +134,7 @@
             <h6 class="text-sm font-bold text-red-600 mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Danger Zone</h6>
             <p class="text-sm text-gray-500 mb-3">Permanently delete this user account. This cannot be undone.</p>
             <form method="POST" action="{{ route('users.destroy', $user) }}"
-                  onsubmit="return confirm('Are you absolutely sure you want to delete {{ addslashes($user->name) }}?')">
+                  onsubmit="return confirm('Are you absolutely sure you want to delete ' + {{ Js::from($user->name) }} + '?')">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn btn-sm btn-outline-danger">

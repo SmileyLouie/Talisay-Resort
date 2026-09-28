@@ -79,11 +79,54 @@ class CapacitySchedule extends Model
             return $record;
         }
 
-        return static::create([
-            'date'          => $formattedDate,
-            'max_capacity'  => setting('daily_visitor_cap', 100),
-            'current_count' => 0,
-        ]);
+        try {
+            return static::create([
+                'date'          => $formattedDate,
+                'max_capacity'  => (int) setting('daily_visitor_cap', 100),
+                'current_count' => 0,
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            // A concurrent request created the row between our lookup and insert.
+            return static::whereDate('date', $formattedDate)->firstOrFail();
+        }
+    }
+
+    /**
+     * Rebuild the guest count for one date from the bookings that actually
+     * occupy it. An approved full-resort booking locks the whole day.
+     * Being derived from source data, this can never drift or go negative.
+     */
+    public static function recalculateForDate($date): self
+    {
+        $capacity = static::getCapacityForDate($date);
+        $day      = $capacity->date->format('Y-m-d');
+
+        $occupying = Booking::active()->occupyingDate($day);
+
+        $hasApprovedSpecial = (clone $occupying)
+            ->where('booking_type', 'special_resort')
+            ->where('admin_approval_status', 'approved')
+            ->exists();
+
+        $count = $hasApprovedSpecial
+            ? (int) $capacity->max_capacity
+            : (int) (clone $occupying)->where('booking_type', 'regular')->sum('guests_count');
+
+        if ((int) $capacity->current_count !== $count) {
+            $capacity->update(['current_count' => $count]);
+        }
+
+        return $capacity;
+    }
+
+    /**
+     * Recalculate every night a booking occupies ([check-in, check-out)).
+     */
+    public static function recalculateForBooking(Booking $booking): void
+    {
+        foreach ($booking->occupiedDates() as $date) {
+            static::recalculateForDate($date);
+        }
     }
 
     // ──────────────────────────────────────────────────────────
