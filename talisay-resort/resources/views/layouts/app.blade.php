@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,40 +9,28 @@
     {{-- Universal Fonts --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-    {{-- Tailwind CSS & Bootstrap --}}
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    <link href="{{ asset('vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+    @stack('head-scripts')
+    <script defer src="{{ asset('vendor/alpine/alpine.min.js') }}"></script>
+    <style>
+        a, a:hover { text-decoration: none; }
+        [x-cloak]{display:none!important}
+    </style>
+
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                    },
-                    colors: {
-                        ocean: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
-                        }
-                    }
-                }
+        try {
+            if (localStorage.getItem('talisaySidebar') === 'closed') {
+                document.documentElement.classList.add('sidebar-is-closed');
             }
-        }
+            var theme = localStorage.getItem('talisayTheme') || 'light';
+            var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) {}
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    {{-- Chart.js & Alpine.js --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-    <style>[x-cloak]{display:none!important}</style>
-
     @stack('styles')
 
     <style>
@@ -109,6 +97,11 @@
         }
         .sidebar-nav::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.3);
+        }
+        .sidebar-foot {
+            flex-shrink: 0;
+            border-top: 1px solid #e6e8ec;
+            padding: 8px 0 10px;
         }
         .sidebar.collapsed {
             width: var(--sidebar-collapsed-width);
@@ -186,6 +179,33 @@
         }
         .main-content.expanded {
             margin-left: var(--sidebar-collapsed-width);
+        }
+        @media (min-width: 769px) {
+            html.sidebar-is-closed .sidebar {
+                width: var(--sidebar-collapsed-width) !important;
+            }
+            html.sidebar-is-closed .sidebar .sidebar-text,
+            html.sidebar-is-closed .sidebar .sidebar-header-details,
+            html.sidebar-is-closed .sidebar .sidebar-section-title,
+            html.sidebar-is-closed .sidebar .sidebar-badge {
+                display: none !important;
+            }
+            html.sidebar-is-closed .sidebar .sidebar-link {
+                justify-content: center;
+                margin: 2px 8px !important;
+                padding: 9px !important;
+            }
+            html.sidebar-is-closed .sidebar .sidebar-link i {
+                margin: 0 !important;
+            }
+            html.sidebar-is-closed .sidebar > .px-4 {
+                justify-content: center;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+            html.sidebar-is-closed .main-content {
+                margin-left: var(--sidebar-collapsed-width) !important;
+            }
         }
 
         /* ── Modern Topbar ── */
@@ -440,6 +460,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/admin-portal.css') }}?v=76">
 </head>
 @php
     $cbUser = auth()->user();
@@ -471,7 +492,7 @@
     };
 @endphp
 <body class="antialiased" x-data="{
-    sidebarOpen: true,
+    sidebarOpen: localStorage.getItem('talisaySidebar') !== 'closed',
     mobileSidebar: false,
     chatOpen: false,
     chatRole: '{{ $cbRole }}',
@@ -482,26 +503,26 @@
     chatInput: '',
     chatTyping: false,
     chatSessionId: 'web-' + Date.now()
-}">
+}" x-init="$watch('sidebarOpen', value => { try { localStorage.setItem('talisaySidebar', value ? 'open' : 'closed'); } catch (e) {} document.documentElement.classList.toggle('sidebar-is-closed', !value); })">
 
 @if(auth()->check())
     {{-- Sidebar Navigation --}}
-    <aside class="sidebar" id="appSidebar" :class="{ 'collapsed': !sidebarOpen, 'mobile-open': mobileSidebar }" @keydown.escape.window="mobileSidebar = false">
+    <aside class="sidebar" id="appSidebar" :class="{ 'collapsed': !sidebarOpen && window.innerWidth >= 768, 'mobile-open': mobileSidebar }" @keydown.escape.window="mobileSidebar = false">
         
         {{-- Brand Header --}}
-        <div class="px-4 py-3 flex items-center gap-3 border-b border-white/10 flex-shrink-0">
+        <div class="px-4 py-4 flex items-center gap-3 border-b border-slate-200 flex-shrink-0">
             <div class="relative flex-shrink-0">
-                <img src="{{ asset('images/logo.png') }}" alt="Talisay Beach Resort Logo" class="w-11 h-11 rounded-xl object-cover border-2 border-sky-400 shadow-md">
+                <img src="{{ asset('images/logo.png') }}" alt="Talisay Beach Resort Logo" class="w-9 h-9 rounded-lg object-cover border border-slate-200">
             </div>
-            <div class="sidebar-header-details min-w-0">
-                <h2 class="text-white font-extrabold text-sm tracking-tight truncate mb-0 leading-tight">Talisay Beach Resort</h2>
+            <div class="sidebar-header-details">
+                <h2 class="text-slate-900 font-bold text-[13px] tracking-tight mb-0 leading-tight whitespace-nowrap">Talisay Beach Resort</h2>
                 <div class="flex items-center gap-1.5 mt-0.5">
                     @if(auth()->user()->isAdmin())
-                        <span class="text-[10px] font-semibold text-sky-300 tracking-wider uppercase block">
-                            Admin Portal
+                        <span class="text-[11px] font-medium text-slate-500 block">
+                            Admin
                         </span>
                     @else
-                        <span class="text-[10px] font-semibold text-sky-300 tracking-wider uppercase block truncate max-w-[170px]" title="{{ auth()->user()->position ?? 'Staff Portal' }}">
+                        <span class="text-[11px] font-medium text-slate-500 block truncate max-w-[170px]" title="{{ auth()->user()->position ?? 'Staff Portal' }}">
                             {{ auth()->user()->position ?? 'Staff Portal' }}
                         </span>
                     @endif
@@ -514,12 +535,12 @@
             @php $authUser = auth()->user(); @endphp
             
             {{-- MAIN SECTION --}}
-            <div class="sidebar-section-title">Main</div>
+            <div class="sidebar-section-title">{{ __('Main') }}</div>
             
             @if($authUser->isAdmin() || $authUser->isStaff())
             <a href="{{ route($authUser->isAdmin() ? 'admin.dashboard' : 'staff.dashboard') }}" class="sidebar-link {{ request()->routeIs('*.dashboard') ? 'active' : '' }}">
-                <i class="bi bi-grid-1x2-fill me-3"></i>
-                <span class="sidebar-text">Dashboard</span>
+                <i class="bi bi-grid-1x2 me-3"></i>
+                <span class="sidebar-text">{{ __('Dashboard') }}</span>
             </a>
             @endif
 
@@ -533,26 +554,30 @@
             @endphp
 
             @if($canSeeOperations)
-            <div class="sidebar-section-title">Operations</div>
+            <div class="sidebar-section-title">{{ __('Operations') }}</div>
 
             @if($authUser->isAdmin() || $authUser->hasModuleAccess('bookings'))
             <a href="{{ route('bookings.index') }}" class="sidebar-link {{ request()->routeIs('bookings.*') ? 'active' : '' }}">
-                <i class="bi bi-calendar-check-fill me-3"></i>
-                <span class="sidebar-text">Bookings</span>
+                <i class="bi bi-calendar-check me-3"></i>
+                <span class="sidebar-text">{{ __('Bookings') }}</span>
             </a>
             @endif
 
             @if($authUser->isAdmin() || $authUser->hasModuleAccess('accommodations') || $authUser->hasModuleAccess('housekeeping'))
-            <a href="{{ route('accommodations.index') }}" class="sidebar-link {{ request()->routeIs('accommodations.*') ? 'active' : '' }}">
-                <i class="bi bi-building me-3"></i>
-                <span class="sidebar-text">Room &amp; Cottage</span>
+            <a href="{{ route('accommodations.index') }}" class="sidebar-link {{ request()->routeIs('accommodations.index') ? 'active' : '' }}">
+                <i class="bi bi-door-closed me-3"></i>
+                <span class="sidebar-text">{{ __('Rooms') }}</span>
+            </a>
+            <a href="{{ route('accommodations.cottages') }}" class="sidebar-link {{ request()->routeIs('accommodations.cottages') ? 'active' : '' }}">
+                <i class="bi bi-house-door me-3"></i>
+                <span class="sidebar-text">{{ __('Cottages') }}</span>
             </a>
             @endif
 
             @if($authUser->isAdmin() || $authUser->hasModuleAccess('payments'))
             <a href="{{ route('payments.index') }}" class="sidebar-link {{ request()->routeIs('payments.*') ? 'active' : '' }}">
-                <i class="bi bi-credit-card-fill me-3"></i>
-                <span class="sidebar-text">Payments</span>
+                <i class="bi bi-credit-card me-3"></i>
+                <span class="sidebar-text">{{ __('Payments') }}</span>
             </a>
             @endif
             @endif
@@ -560,8 +585,8 @@
             {{-- ADMIN STAFF & ROLE MANAGEMENT --}}
             @if($authUser->isAdmin())
             <a href="{{ route('tasks.staff') }}" class="sidebar-link {{ request()->routeIs('tasks.staff*') ? 'active' : '' }}">
-                <i class="bi bi-person-lines-fill me-3"></i>
-                <span class="sidebar-text">Staff Management</span>
+                <i class="bi bi-people me-3"></i>
+                <span class="sidebar-text">{{ __('Staff Role Management') }}</span>
             </a>
             @endif
 
@@ -573,19 +598,26 @@
             @endphp
 
             @if($canSeeGuestExp)
-            <div class="sidebar-section-title">Guest Experience</div>
+            <div class="sidebar-section-title">{{ __('Guest Experience') }}</div>
 
-            @if($authUser->isAdmin() || $authUser->hasModuleAccess('reviews'))
-            <a href="{{ route('reviews.index') }}" class="sidebar-link {{ request()->routeIs('reviews.*') ? 'active' : '' }}">
-                <i class="bi bi-star-fill me-3"></i>
-                <span class="sidebar-text">Reviews & Feedback</span>
+            @if($authUser->isAdmin())
+            <a href="{{ route('activities.manage') }}" class="sidebar-link {{ request()->routeIs('activities.*') ? 'active' : '' }}">
+                <i class="bi bi-water me-3"></i>
+                <span class="sidebar-text">{{ __('Activities') }}</span>
             </a>
             @endif
 
-            @if($authUser->isAdmin() || $authUser->hasModuleAccess('tour'))
-            <a href="{{ route('tour.manage') }}" class="sidebar-link {{ request()->routeIs('tour.*') ? 'active' : '' }}">
-                <i class="bi bi-camera-video-fill me-3"></i>
-                <span class="sidebar-text">360° Virtual Tour</span>
+            @if($authUser->isAdmin() || $authUser->hasModuleAccess('reviews'))
+            <a href="{{ route('reviews.index') }}" class="sidebar-link {{ request()->routeIs('reviews.*') ? 'active' : '' }}">
+                <i class="bi bi-star me-3"></i>
+                <span class="sidebar-text">{{ __('Reviews & Feedback') }}</span>
+            </a>
+            @endif
+
+            @if($authUser->isAdmin())
+            <a href="{{ route('tour.manage') }}" class="sidebar-link {{ request()->routeIs('tour.manage') ? 'active' : '' }}">
+                <i class="bi bi-camera-video me-3"></i>
+                <span class="sidebar-text">{{ __('360° Virtual Tour') }}</span>
             </a>
             @endif
             @endif
@@ -598,61 +630,86 @@
             @endphp
 
             @if($canSeeManagement)
-            <div class="sidebar-section-title">Management</div>
+            <div class="sidebar-section-title">{{ __('Management') }}</div>
 
 
 
             @if($authUser->isAdmin() || $authUser->hasModuleAccess('reports'))
             <a href="{{ route('reports.index') }}" class="sidebar-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
-                <i class="bi bi-bar-chart-fill me-3"></i>
-                <span class="sidebar-text">Reports & Analytics</span>
+                <i class="bi bi-bar-chart me-3"></i>
+                <span class="sidebar-text">{{ __('Reports & Analytics') }}</span>
             </a>
             @endif
 
             @if($authUser->isAdmin() || $authUser->hasModuleAccess('chatbot'))
             <a href="{{ route('chatbot.index') }}" class="sidebar-link {{ request()->routeIs('chatbot.*') ? 'active' : '' }}">
-                <i class="bi bi-chat-dots-fill me-3"></i>
-                <span class="sidebar-text">AI Chatbot</span>
+                <i class="bi bi-chat-dots me-3"></i>
+                <span class="sidebar-text">{{ __('AI Chatbot') }}</span>
             </a>
             @endif
 
             @if($authUser->isAdmin())
-            <a href="{{ route('settings.index') }}" class="sidebar-link {{ request()->routeIs('settings.*') ? 'active' : '' }}">
-                <i class="bi bi-gear-fill me-3"></i>
-                <span class="sidebar-text">System Settings</span>
+            <a href="{{ route('maintenance.index') }}" class="sidebar-link {{ request()->routeIs('maintenance.*') ? 'active' : '' }}">
+                <i class="bi bi-folder2-open me-3"></i>
+                <span class="sidebar-text">{{ __('File Maintenance') }}</span>
             </a>
             @endif
             @endif
 
         </nav>
+        @if($authUser->isAdmin())
+        <div class="sidebar-foot">
+            <a href="{{ route('settings.index') }}" class="sidebar-link {{ request()->routeIs('settings.*') ? 'active' : '' }}">
+                <i class="bi bi-gear me-3"></i>
+                <span class="sidebar-text">{{ __('Settings') }}</span>
+            </a>
+        </div>
+        @endif
     </aside>
 
     {{-- Mobile Sidebar Backdrop --}}
     <div x-show="mobileSidebar" x-cloak @click="mobileSidebar = false" class="fixed inset-0 bg-slate-900/50 md:hidden" style="z-index: 1035;" aria-hidden="true"></div>
 
     {{-- Main Content Area --}}
-    <div class="main-content" :class="{ 'expanded': !sidebarOpen }">
+    <div class="main-content" :class="{ 'expanded': !sidebarOpen && window.innerWidth >= 768 }">
         
         {{-- Topbar Header --}}
         <header class="topbar-nav sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <button type="button" @click="window.innerWidth < 768 ? mobileSidebar = !mobileSidebar : sidebarOpen = !sidebarOpen" :aria-expanded="(window.innerWidth < 768 ? mobileSidebar : sidebarOpen) ? 'true' : 'false'" aria-controls="appSidebar" aria-label="Toggle navigation menu" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">
-                    <i class="bi bi-list text-2xl" aria-hidden="true"></i>
+                <button type="button" @click="window.innerWidth < 768 ? mobileSidebar = !mobileSidebar : sidebarOpen = !sidebarOpen" :aria-expanded="(window.innerWidth < 768 ? mobileSidebar : sidebarOpen) ? 'true' : 'false'" aria-controls="appSidebar" aria-label="Toggle navigation menu" class="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200 transition">
+                    <i class="bi bi-list text-xl" aria-hidden="true"></i>
                 </button>
-                <div class="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-400">
+                @if(auth()->user()->isAdmin() || auth()->user()->hasPermission('bookings', 'view'))
+                <form method="GET" action="{{ route('bookings.index') }}" class="admin-top-search hidden lg:flex">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" name="search" value="{{ request()->routeIs('bookings.*') ? request('search') : '' }}" placeholder="{{ __('Search reservations, guests, rooms...') }}" aria-label="{{ __('Search reservations, guests, rooms...') }}">
+                </form>
+                @endif
+                <div class="admin-crumb hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-400">
                     <span class="text-slate-800 font-bold">Talisay Smart Tourism</span>
                     <i class="bi bi-chevron-right text-[10px]"></i>
-                    <span class="text-sky-600 font-medium capitalize">{{ ucwords(str_replace('-', ' ', request()->segment(1) ?? 'Dashboard')) }}</span>
+                    @php
+                        $crumbLabels = [
+                            'staff-management' => __('Staff Role Management'),
+                            'accommodations' => request()->routeIs('accommodations.cottages') ? __('Cottages') : __('Rooms'),
+                            'file-maintenance' => __('File Maintenance'),
+                            'bookings' => __('Bookings'),
+                            'payments' => __('Payments'),
+                            'reviews' => __('Reviews & Feedback'),
+                            'tour-manage' => __('360° Virtual Tour'),
+                            'activities-manage' => __('Activities'),
+                            'reports' => __('Reports & Analytics'),
+                            'chatbot' => __('AI Chatbot'),
+                            'settings' => __('Settings'),
+                        ];
+                        $crumbSegment = request()->segment(1) ?? 'Dashboard';
+                        $crumbLabel = $crumbLabels[$crumbSegment] ?? ucwords(str_replace('-', ' ', $crumbSegment));
+                    @endphp
+                    <span class="text-sky-600 font-medium capitalize">{{ $crumbLabel }}</span>
                 </div>
             </div>
 
             <div class="flex items-center gap-3">
-                
-                {{-- Quick Link to Tourist Portal --}}
-                <a href="{{ route('tourist.dashboard') }}" target="_blank" class="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-sky-600 bg-slate-100 hover:bg-sky-50 px-3 py-1.5 rounded-xl transition border border-slate-200/60 no-underline">
-                    <i class="bi bi-globe2 text-sky-500"></i>
-                    <span>Guest View</span>
-                </a>
 
                 {{-- Notification Dropdown --}}
                 <div class="relative" x-data="{
@@ -690,15 +747,15 @@
                     }
                 }">
                     <button type="button" @click="notifOpen = !notifOpen" :aria-expanded="notifOpen ? 'true' : 'false'" aria-controls="notificationsPanel" aria-label="Notifications" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-sky-600 hover:bg-slate-100 transition relative">
-                        <i class="bi bi-bell-fill text-lg" aria-hidden="true"></i>
+                        <i class="bi bi-bell text-lg" aria-hidden="true"></i>
                         <span x-show="unread > 0" class="absolute top-1.5 right-1.5 bg-rose-500 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-sm" x-text="unread"></span>
                     </button>
 
                     <div x-show="notifOpen" @click.away="notifOpen = false" x-transition id="notificationsPanel" class="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden" x-cloak>
                         <div class="p-3.5 bg-ocean-900 text-white flex items-center justify-between">
                             <div class="flex items-center gap-2">
-                                <i class="bi bi-bell-fill text-sky-400"></i>
-                                <span class="font-extrabold text-xs tracking-wider uppercase">Notifications</span>
+                                <i class="bi bi-bell text-sky-400"></i>
+                                <span class="font-extrabold text-xs tracking-wider uppercase">{{ __('Notifications') }}</span>
                                 <span x-show="unread > 0" class="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full" x-text="unread + ' new'"></span>
                             </div>
                             <button type="button" @click="markAllRead()" class="text-[11px] text-sky-300 hover:text-white font-semibold transition">
@@ -713,12 +770,13 @@
                                 $typeIcons = [
                                     'booking'   => ['icon' => 'bi-calendar-check', 'bg' => 'bg-sky-50 text-sky-600 border-sky-200'],
                                     'payment'   => ['icon' => 'bi-credit-card-2-front', 'bg' => 'bg-emerald-50 text-emerald-600 border-emerald-200'],
-                                    'review'    => ['icon' => 'bi-star-fill', 'bg' => 'bg-amber-50 text-amber-600 border-amber-200'],
-                                    'system'    => ['icon' => 'bi-info-circle-fill', 'bg' => 'bg-purple-50 text-purple-600 border-purple-200'],
+                                    'review'    => ['icon' => 'bi-star', 'bg' => 'bg-amber-50 text-amber-600 border-amber-200'],
+                                    'system'    => ['icon' => 'bi-info-circle', 'bg' => 'bg-purple-50 text-purple-600 border-purple-200'],
                                 ];
-                                $meta = $typeIcons[$notif->type] ?? ['icon' => 'bi-bell-fill', 'bg' => 'bg-slate-50 text-slate-600 border-slate-200'];
+                                $meta = $typeIcons[$notif->type] ?? ['icon' => 'bi-bell', 'bg' => 'bg-slate-50 text-slate-600 border-slate-200'];
                             @endphp
-                            <div @click="markSingleRead({{ $notif->id }}, $el)" class="p-3.5 flex gap-3 hover:bg-slate-50 transition cursor-pointer {{ $notif->read_at ? 'bg-white' : 'bg-sky-50/70 notif-item-unread' }}">
+                            @php $paymentLinkId = data_get($notif->data, 'payment_id'); @endphp
+                            <div @click="markSingleRead({{ $notif->id }}, $el); @if($paymentLinkId && (auth()->user()->isAdmin() || auth()->user()->hasPermission('payments', 'view'))) window.location='{{ route('payments.show', $paymentLinkId) }}'; @endif" class="p-3.5 flex gap-3 hover:bg-slate-50 transition cursor-pointer {{ $notif->read_at ? 'bg-white' : 'bg-sky-50/70 notif-item-unread' }}">
                                 <div class="w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 text-sm {{ $meta['bg'] }}">
                                     <i class="bi {{ $meta['icon'] }}"></i>
                                 </div>
@@ -736,7 +794,7 @@
                             @empty
                             <div class="p-8 text-center text-slate-400">
                                 <i class="bi bi-bell-slash text-3xl block mb-2 text-slate-300"></i>
-                                <p class="text-xs font-semibold mb-0">No notifications yet</p>
+                                <p class="text-xs font-semibold mb-0">{{ __('No notifications yet') }}</p>
                             </div>
                             @endforelse
                         </div>
@@ -749,7 +807,7 @@
                         @if(auth()->user()->avatar)
                             <img src="{{ Storage::url(auth()->user()->avatar) }}" class="w-8 h-8 rounded-lg object-cover border border-slate-200" alt="Avatar">
                         @else
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-ocean-800 to-sky-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                            <div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-white font-bold text-xs">
                                 {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                             </div>
                         @endif
@@ -757,9 +815,9 @@
                             <div class="text-xs font-bold text-slate-800 leading-tight">{{ auth()->user()->name }}</div>
                             <div class="text-[10px] font-semibold text-slate-400">
                                 @if(auth()->user()->isAdmin())
-                                    <span class="text-sky-600 font-bold uppercase">Administrator</span>
+                                    <span class="text-sky-600 font-bold uppercase">{{ __('Administrator') }}</span>
                                 @elseif(auth()->user()->isStaff())
-                                    <span class="text-sky-600 font-bold">{{ auth()->user()->staff_id ?? 'Staff' }}</span> • {{ auth()->user()->position ?? 'Resort Staff' }}
+                                    <span class="text-sky-600 font-bold">{{ auth()->user()->staff_id ?? __('Staff') }}</span> • {{ auth()->user()->position ?? __('Resort Staff') }}
                                 @else
                                     <span class="capitalize">{{ auth()->user()->role }}</span>
                                 @endif
@@ -774,18 +832,18 @@
                             <p class="text-[11px] text-slate-500 truncate mb-0">{{ auth()->user()->email }}</p>
                         </div>
                         <a href="{{ route('profile.show') }}" class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition no-underline">
-                            <i class="bi bi-person-circle text-slate-400"></i>My Profile
+                            <i class="bi bi-person-circle text-slate-400"></i>{{ __('My Profile') }}
                         </a>
                         @if(auth()->user()->isAdmin())
                         <a href="{{ route('settings.index') }}" class="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition no-underline">
-                            <i class="bi bi-gear text-slate-400"></i>Settings
+                            <i class="bi bi-gear text-slate-400"></i>{{ __('Settings') }}
                         </a>
                         @endif
                         <div class="border-t border-slate-100 my-1"></div>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition border-0 bg-transparent text-left">
-                                <i class="bi bi-box-arrow-right text-rose-500"></i>Sign Out
+                                <i class="bi bi-box-arrow-right text-rose-500"></i>{{ __('Sign Out') }}
                             </button>
                         </form>
                     </div>
@@ -795,13 +853,13 @@
         </header>
 
         {{-- Main Content Page Injection --}}
-        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main class="admin-page flex-1 w-full">
             
             {{-- Toast Flash Alerts --}}
             @if(session('success'))
             <div data-flash="success" role="status" class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-3">
-                    <i class="bi bi-check-circle-fill text-emerald-500 text-lg" aria-hidden="true"></i>
+                    <i class="bi bi-check-circle text-emerald-500 text-lg" aria-hidden="true"></i>
                     <span class="text-sm font-semibold">{{ session('success') }}</span>
                 </div>
                 <button type="button" class="btn-close text-xs" aria-label="Dismiss" onclick="this.closest('[data-flash]').remove()"></button>
@@ -811,7 +869,7 @@
             @if(session('error'))
             <div data-flash="error" role="alert" class="mb-6 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-3">
-                    <i class="bi bi-exclamation-triangle-fill text-rose-500 text-lg" aria-hidden="true"></i>
+                    <i class="bi bi-exclamation-triangle text-rose-500 text-lg" aria-hidden="true"></i>
                     <span class="text-sm font-semibold">{{ session('error') }}</span>
                 </div>
                 <button type="button" class="btn-close text-xs" aria-label="Dismiss" onclick="this.closest('[data-flash]').remove()"></button>
@@ -824,7 +882,7 @@
         {{-- Footer --}}
         <footer class="mt-auto py-4 px-6 border-t border-slate-200/80 bg-white text-center sm:flex sm:items-center sm:justify-between text-xs text-slate-400">
             <div>
-                © {{ date('Y') }} <span class="font-bold text-slate-700">Talisay Beach Resort</span>. Smart Tourism System.
+                © <span class="font-bold text-slate-700">Talisay Beach Resort</span>. {{ __('Smart Tourism System') }}.
             </div>
             <div class="mt-1 sm:mt-0 font-medium text-slate-400">
                 Baybay City, Leyte, Philippines
@@ -837,22 +895,22 @@
 
     {{-- Floating Chatbot Widget (Role-Based) --}}
     <button type="button" class="chatbot-bubble" @click="chatOpen = !chatOpen" :aria-expanded="chatOpen ? 'true' : 'false'" aria-controls="chatbot-panel" aria-label="Open resort assistant" title="Open Resort Assistant" id="chatbot-bubble">
-        <i class="bi" :class="chatOpen ? 'bi-x-lg text-xl' : 'bi-chat-dots-fill text-2xl'" aria-hidden="true"></i>
+        <i class="bi" :class="chatOpen ? 'bi-x-lg text-xl' : 'bi-chat-dots text-2xl'" aria-hidden="true"></i>
     </button>
 
     <div class="chatbot-panel" :class="{ 'open': chatOpen }" id="chatbot-panel" x-cloak role="dialog" aria-label="Talisay Assistant">
         {{-- Header (dynamic bg per role) --}}
         <div class="chatbot-header" :class="'role-' + chatRole">
             <div class="flex items-center gap-2.5">
-                <div class="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0 text-white shadow-sm">
+                <div class="w-9 h-9 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center flex-shrink-0 text-sky-700">
                     <i class="bi bi-robot text-lg"></i>
                 </div>
                 <div>
-                    <h4 class="font-bold text-sm mb-0 text-white tracking-tight">Talisay Assistant</h4>
-                    <span class="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-full inline-block mt-0.5" x-text="chatModeLabel"></span>
+                    <h4 class="font-bold text-sm mb-0 text-slate-900 tracking-tight">{{ __('Talisay Assistant') }}</h4>
+                    <span class="text-[10px] font-semibold text-slate-500 inline-block mt-0.5" x-text="chatModeLabel"></span>
                 </div>
             </div>
-            <button @click="chatOpen = false" type="button" class="text-white/75 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/15 transition flex-shrink-0" aria-label="Close Chatbot">
+            <button @click="chatOpen = false" type="button" class="text-slate-400 hover:text-slate-700 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition flex-shrink-0" aria-label="Close Chatbot">
                 <i class="bi bi-x-lg text-sm"></i>
             </button>
         </div>
@@ -879,7 +937,7 @@
             <div class="flex gap-2 items-center">
                 <input type="text" x-model="chatInput" @keydown.enter.prevent="sendChat()" placeholder="Type a message..." class="flex-1 form-control-clean text-xs rounded-full py-2 px-3.5 border border-slate-300 focus:border-sky-500" id="chat-input" autocomplete="off">
                 <button @click="sendChat()" type="button" class="w-9 h-9 rounded-full bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition flex-shrink-0 shadow-sm" id="chat-send-btn" aria-label="Send Message">
-                    <i class="bi bi-send-fill text-xs"></i>
+                    <i class="bi bi-send text-xs"></i>
                 </button>
             </div>
         </div>
@@ -899,9 +957,9 @@
         var stack = document.getElementById('appToastStack');
         if (!stack) return;
         var palette = {
-            success: { wrap: 'bg-emerald-50 border-emerald-200 text-emerald-800', icon: 'bi-check-circle-fill text-emerald-500' },
-            info:    { wrap: 'bg-sky-50 border-sky-200 text-sky-800', icon: 'bi-calendar-check-fill text-sky-500' },
-            error:   { wrap: 'bg-rose-50 border-rose-200 text-rose-800', icon: 'bi-exclamation-triangle-fill text-rose-500' }
+            success: { wrap: 'bg-emerald-50 border-emerald-200 text-emerald-800', icon: 'bi-check-circle text-emerald-500' },
+            info:    { wrap: 'bg-sky-50 border-sky-200 text-sky-800', icon: 'bi-calendar-check text-sky-500' },
+            error:   { wrap: 'bg-rose-50 border-rose-200 text-rose-800', icon: 'bi-exclamation-triangle text-rose-500' }
         };
         var p = palette[type] || palette.info;
 
@@ -1085,7 +1143,39 @@
     }
 </script>
 {{-- Bootstrap 5 JS Bundle (needed for modal triggers and popovers) --}}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ asset('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+@include('partials.required-stars')
+<script>
+// Keeps stat cards and lists marked with data-live-region in step with the database.
+// Waits while the admin is typing, has a modal or dropdown open, or the tab is hidden.
+(function () {
+    if (!document.querySelector('[data-live-region]')) return;
+    const busy = () => document.hidden
+        || document.querySelector('.modal.show, .dropdown-menu.show, .sm-modal-backdrop.open')
+        || (document.activeElement && document.activeElement.matches('input, textarea, select'))
+        || Array.from(document.querySelectorAll('[data-live-pause-if-filled]')).some((el) => el.value.trim() !== '');
+    let running = false;
+    async function refresh() {
+        if (running || busy()) return;
+        running = true;
+        try {
+            const res = await fetch(window.location.href, { credentials: 'same-origin', cache: 'no-store', headers: { 'X-Live-Refresh': '1' } });
+            if (!res.ok || res.redirected) return;
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            if (busy()) return;
+            document.querySelectorAll('[data-live-region]').forEach((el) => {
+                const fresh = doc.querySelector('[data-live-region="' + el.dataset.liveRegion + '"]');
+                if (fresh && fresh.outerHTML !== el.outerHTML) el.replaceWith(document.importNode(fresh, true));
+            });
+        } catch (e) {
+        } finally {
+            running = false;
+        }
+    }
+    setInterval(refresh, 15000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+})();
+</script>
 @stack('scripts')
 </body>
 </html>

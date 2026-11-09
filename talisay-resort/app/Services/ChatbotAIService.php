@@ -171,6 +171,10 @@ class ChatbotAIService
         // 4. Role-specific context (guest, tourist, staff, admin)
         $directives[] = "ROLE-SPECIFIC CONTEXT & CONSTRAINTS:\n" . trim($roleContextPrompt);
 
+        if (\App\Models\SystemSetting::get('ai_hide_contacts', '1') === '1') {
+            $directives[] = 'PRIVACY: Never repeat a guest phone number, email address, or ID number. If one appears, shorten it to the last four characters before it leaves this reply.';
+        }
+
         return implode("\n\n", $directives);
     }
 }

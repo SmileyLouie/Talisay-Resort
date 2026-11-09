@@ -9,7 +9,7 @@
     <div>
         <div class="flex items-center gap-2 mb-1">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
-                <i class="bi bi-people-fill text-[10px] text-sky-600"></i>
+                <i class="bi bi-people text-[10px] text-sky-600"></i>
                 Accounts
             </span>
         </div>
@@ -22,7 +22,7 @@
     </div>
 
     <a href="{{ route('users.create') }}" class="btn-ocean">
-        <i class="bi bi-person-plus-fill"></i>
+        <i class="bi bi-person-plus"></i>
         <span>Add New Account</span>
     </a>
 </div>
@@ -39,7 +39,7 @@
     {{-- Total Users --}}
     <div class="stat-card-clean flex items-center gap-4">
         <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-people-fill"></i>
+            <i class="bi bi-people"></i>
         </div>
         <div>
             <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Total Accounts</p>
@@ -50,7 +50,7 @@
     {{-- Admins --}}
     <div class="stat-card-clean flex items-center gap-4">
         <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-shield-fill"></i>
+            <i class="bi bi-shield"></i>
         </div>
         <div>
             <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Admins</p>
@@ -61,7 +61,7 @@
     {{-- Staff --}}
     <div class="stat-card-clean flex items-center gap-4">
         <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-person-badge-fill"></i>
+            <i class="bi bi-person-badge"></i>
         </div>
         <div>
             <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Resort Staff</p>
@@ -72,7 +72,7 @@
     {{-- Tourists --}}
     <div class="stat-card-clean flex items-center gap-4">
         <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-person-check-fill"></i>
+            <i class="bi bi-person-check"></i>
         </div>
         <div>
             <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Guests / Tourists</p>
@@ -172,12 +172,12 @@
                         <div class="flex items-center justify-end gap-1.5">
                             @if($user->isStaff())
                             <a href="{{ route('tasks.staff', ['tab' => 'rbac', 'search' => $user->email]) }}" class="btn-secondary-clean text-xs py-1 px-2.5 text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100" title="Manage Staff Roles & Permissions">
-                                <i class="bi bi-shield-lock-fill"></i>
+                                <i class="bi bi-shield-lock"></i>
                                 <span>RBAC</span>
                             </a>
                             @endif
                             <a href="{{ route('users.edit', $user) }}" class="btn-secondary-clean text-xs py-1 px-2.5" title="Edit User">
-                                <i class="bi bi-pencil-fill text-slate-500"></i>
+                                <i class="bi bi-pencil text-slate-500"></i>
                                 <span>Edit</span>
                             </a>
                             @if($user->id !== auth()->id())
@@ -213,7 +213,7 @@
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden p-6 text-center">
             <div class="w-14 h-14 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">
-                <i class="bi bi-exclamation-triangle-fill"></i>
+                <i class="bi bi-exclamation-triangle"></i>
             </div>
             <h5 class="font-extrabold text-slate-900 text-base mb-1">Delete User Account?</h5>
             <p class="text-xs text-slate-500 mb-6">Are you sure you want to remove <strong id="deleteUserName" class="text-slate-800"></strong>? This action cannot be reversed.</p>

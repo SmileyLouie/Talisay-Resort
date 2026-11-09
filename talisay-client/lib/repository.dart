@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:talisay_client/config.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ApiException implements Exception {
   ApiException(this.message);
@@ -18,6 +19,22 @@ class ResortRepository {
   Map<String, dynamic>? user;
 
   static const _tokenKey = 'guest_token';
+  static const rememberedEmailKey = 'talisay.rememberedEmail';
+
+  static Future<String?> rememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(rememberedEmailKey);
+  }
+
+  static Future<void> rememberEmail(String? email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = email?.trim() ?? '';
+    if (value.isEmpty) {
+      await prefs.remove(rememberedEmailKey);
+    } else {
+      await prefs.setString(rememberedEmailKey, value);
+    }
+  }
 
   static Future<ResortRepository> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -54,6 +71,35 @@ class ResortRepository {
       'password': password,
     }, auth: false);
     await _storeSession(body);
+  }
+
+  Future<void> signInWithProvider(String provider) async {
+    final start = await _post('/api/mobile/auth/$provider/start', {}, auth: false);
+    final attempt = start['attempt']?.toString();
+    final url = start['url']?.toString();
+    if (attempt == null || url == null) {
+      throw ApiException('Could not start sign-in.');
+    }
+    final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!opened) {
+      throw ApiException('Could not open the sign-in page.');
+    }
+    for (var i = 0; i < 45; i++) {
+      await Future.delayed(const Duration(seconds: 2));
+      final status = await _get('/api/mobile/auth/social/$attempt', auth: false);
+      final state = status['status']?.toString();
+      if (state == 'ok') {
+        await _storeSession(status);
+        return;
+      }
+      if (state == 'error') {
+        throw ApiException(status['message']?.toString() ?? 'Sign-in failed.');
+      }
+      if (state == 'expired') {
+        throw ApiException('Sign-in expired. Try again.');
+      }
+    }
+    throw ApiException('Sign-in timed out. Finish it in the browser, then try again.');
   }
 
   Future<void> signOut() async {
@@ -119,6 +165,14 @@ class ResortRepository {
     });
   }
 
+  Future<Map<String, dynamic>> paymentInfo() async {
+    return await _get('/api/mobile/payment-info', auth: false);
+  }
+
+  Future<Map<String, dynamic>> site() async {
+    return await _get('/api/mobile/site', auth: false);
+  }
+
   Future<List<Map<String, dynamic>>> units() async {
     final body = await _get('/api/mobile/units', auth: false);
     return _list(body['units']);
@@ -127,27 +181,86 @@ class ResortRepository {
   Future<Map<String, dynamic>> checkStay({
     required int unitId,
     required DateTime checkIn,
-    required DateTime checkOut,
+    DateTime? checkOut,
+    String stayType = 'night',
+    int? hours,
+    String? hourStart,
   }) async {
-    final query = 'check_in=${_date(checkIn)}&check_out=${_date(checkOut)}';
+    final params = <String, String>{
+      'check_in': _date(checkIn),
+      'stay_type': stayType,
+      if (checkOut != null) 'check_out': _date(checkOut),
+      if (hours != null) 'hours_count': '$hours',
+      if (hourStart != null) 'hour_start': hourStart,
+    };
+    final query = params.entries.map((entry) => '${entry.key}=${Uri.encodeQueryComponent(entry.value)}').join('&');
     return await _get('/api/mobile/units/$unitId/availability?$query', auth: false);
   }
 
   Future<Map<String, dynamic>> requestBooking({
     required int unitId,
     required DateTime checkIn,
-    required DateTime checkOut,
+    DateTime? checkOut,
     required int guests,
     required String paymentMethod,
+    String stayType = 'night',
+    int? hours,
+    String? hourStart,
+    String paymentPlan = 'full',
+    String gcashMethod = 'qr',
     String? notes,
+    String? cardLastFour,
+    List<int> activityIds = const [],
   }) async {
     return await _post('/api/bookings', {
       'accommodation_unit_id': unitId,
       'booking_date': _date(checkIn),
+      if (checkOut != null) 'check_out_date': _date(checkOut),
+      'stay_type': stayType,
+      if (stayType == 'hour') 'hours_count': hours,
+      if (stayType == 'hour') 'hour_start': hourStart,
+      'guests_count': guests,
+      'payment_method': paymentMethod,
+      'payment_plan': paymentPlan,
+      'gcash_method': gcashMethod,
+      'special_requests': notes,
+      if (cardLastFour != null) 'card_last_four': cardLastFour,
+      if (activityIds.isNotEmpty) 'activity_ids': activityIds,
+    });
+  }
+
+  Future<Map<String, dynamic>> requestSpecialResort({
+    required DateTime checkIn,
+    required DateTime checkOut,
+    required int guests,
+    required String paymentMethod,
+    required String notes,
+    String? cardLastFour,
+    String paymentPlan = 'full',
+    String gcashMethod = 'qr',
+    List<int> activityIds = const [],
+  }) async {
+    return await _post('/api/bookings/special-resort', {
+      'check_in_date': _date(checkIn),
       'check_out_date': _date(checkOut),
       'guests_count': guests,
       'payment_method': paymentMethod,
+      'payment_plan': paymentPlan,
+      'gcash_method': gcashMethod,
       'special_requests': notes,
+      if (cardLastFour != null) 'card_last_four': cardLastFour,
+      if (activityIds.isNotEmpty) 'activity_ids': activityIds,
+    });
+  }
+
+  Future<Map<String, dynamic>> modifyBooking({
+    required int bookingId,
+    required int unitId,
+    String? notes,
+  }) async {
+    return await _post('/api/bookings/$bookingId/modify', {
+      'new_accommodation_unit_id': unitId,
+      'modification_notes': notes,
     });
   }
 
@@ -156,11 +269,25 @@ class ResortRepository {
     return _list(body['data']);
   }
 
-  Future<void> cancelBooking(int id, String reason) async {
-    await _post('/api/bookings/$id/cancel', {'cancellation_reason': reason});
+  Future<String> cancellationPreview(int id) async {
+    final body = await _get('/api/bookings/$id/cancellation-preview');
+    return body['message']?.toString() ?? '';
   }
 
-  Future<void> uploadProof({required int paymentId, required String filePath}) async {
+  Future<String> cancelBooking(int id, String reason) async {
+    final body = await _post('/api/bookings/$id/cancel', {'cancellation_reason': reason});
+    return body['message']?.toString() ?? 'Booking cancelled.';
+  }
+
+  Future<void> uploadProof({
+    required int paymentId,
+    String? filePath,
+    String? referenceNumber,
+  }) async {
+    final reference = (referenceNumber ?? '').replaceAll(RegExp(r'\D'), '');
+    if (!RegExp(r'^\d{13}$').hasMatch(reference) || filePath == null || filePath.isEmpty) {
+      throw ApiException('Enter the 13-digit GCash transaction reference and upload the receipt screenshot.');
+    }
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('${AppConfig.apiBase}/api/payments/$paymentId/upload-proof'),
@@ -169,6 +296,7 @@ class ResortRepository {
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     });
+    if (reference.isNotEmpty) request.fields['reference_number'] = reference;
     request.files.add(await http.MultipartFile.fromPath('proof', filePath));
     final streamed = await request.send();
     _decode(await http.Response.fromStream(streamed));

@@ -7,7 +7,7 @@
 <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
     <div class="flex items-start gap-4">
         @if($staff->avatar)
-            <img src="{{ Storage::url($staff->avatar) }}" alt="{{ $staff->name }}" class="w-14 h-14 rounded-lg object-cover border border-slate-200 flex-shrink-0">
+            <img src="{{ '/storage/' . ltrim($staff->avatar, '/') }}" alt="{{ $staff->name }}" class="w-14 h-14 rounded-lg object-cover border border-slate-200 flex-shrink-0">
         @else
             <div class="w-14 h-14 rounded-lg bg-ocean-800 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
                 {{ strtoupper(substr($staff->name, 0, 1)) }}
@@ -67,7 +67,7 @@
 {{-- Success / Error Notifications --}}
 @if(session('success'))
 <div class="mb-6 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl px-4 py-3.5 text-sm font-semibold shadow-sm">
-    <i class="bi bi-check-circle-fill text-emerald-500 text-lg flex-shrink-0"></i>
+    <i class="bi bi-check-circle text-emerald-500 text-lg flex-shrink-0"></i>
     <div class="flex-1">{{ session('success') }}</div>
     <button class="text-emerald-400 hover:text-emerald-700" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
 </div>
@@ -87,7 +87,7 @@
     <div class="flex items-center justify-between gap-4 mb-4">
         <div>
             <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2 mb-0">
-                <i class="bi bi-calendar-check-fill text-sky-600"></i>
+                <i class="bi bi-calendar-check text-sky-600"></i>
                 <span>Booking Operations Overview</span>
             </h2>
             <p class="text-xs text-slate-500 mb-0">Real-time reservations, expected arrivals, and today's schedule.</p>
@@ -95,7 +95,7 @@
         <div class="flex items-center gap-2">
             @if($staff->hasPermission('bookings', 'create'))
             <a href="{{ route('bookings.index') }}" class="btn-ocean text-xs">
-                <i class="bi bi-plus-circle-fill"></i>
+                <i class="bi bi-plus-circle"></i>
                 <span>New Booking</span>
             </a>
             @endif
@@ -109,7 +109,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
-                <i class="bi bi-calendar2-event-fill"></i>
+                <i class="bi bi-calendar2-event"></i>
             </div>
             <div>
                 <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Today's Bookings</p>
@@ -139,7 +139,7 @@
 
         <div class="stat-card-clean flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold flex-shrink-0">
-                <i class="bi bi-people-fill"></i>
+                <i class="bi bi-people"></i>
             </div>
             <div>
                 <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Guests Today</p>
@@ -176,7 +176,17 @@
                         <td class="py-3 px-4 text-slate-500">{{ \Carbon\Carbon::parse($b->booking_date)->format('M d, Y') }}</td>
                         <td class="py-3 px-4 font-semibold">{{ $b->guests_count }}</td>
                         <td class="py-3 px-4">
-                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border {{ $b->getStatusBadgeClass() }}">
+                            @php
+                                $statusBadge = [
+                                    'pending' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                    'paid' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                    'checked_in' => 'bg-sky-50 text-sky-700 border-sky-200',
+                                    'checked_out' => 'bg-slate-100 text-slate-700 border-slate-200',
+                                    'completed' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                                    'cancelled' => 'bg-rose-50 text-rose-700 border-rose-200',
+                                ][$b->status] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+                            @endphp
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border {{ $statusBadge }}">
                                 {{ str_replace('_', ' ', $b->status) }}
                             </span>
                         </td>
@@ -204,7 +214,7 @@
     <div class="flex items-center justify-between gap-4 mb-4">
         <div>
             <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2 mb-0">
-                <i class="bi bi-credit-card-fill text-emerald-600"></i>
+                <i class="bi bi-credit-card text-emerald-600"></i>
                 <span>Payment Verification Queue</span>
             </h2>
             <p class="text-xs text-slate-500 mb-0">Verify GCash receipts, update payment status, and process guest accounts.</p>
@@ -271,14 +281,18 @@
                         <td class="py-3 px-4 font-mono font-bold text-sky-700">{{ $p->booking?->reference_no }}</td>
                         <td class="py-3 px-4 font-semibold text-slate-900">{{ $p->booking?->user?->name ?? 'Guest' }}</td>
                         <td class="py-3 px-4 font-black text-slate-900">₱{{ number_format($p->amount, 2) }}</td>
-                        <td class="py-3 px-4 font-bold text-slate-600 uppercase">{{ $p->payment_method ?? 'GCash' }}</td>
+                        <td class="py-3 px-4 font-bold text-slate-600 uppercase">{{ $p->gateway ?? $p->payment_channel ?? 'GCash' }}</td>
                         <td class="py-3 px-4">
-                            @if($p->proof_file)
-                                <a href="{{ Storage::url($p->proof_file) }}" target="_blank" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 font-bold">
+                            @if($p->proofUrl())
+                                <a href="{{ $p->proofUrl() }}" target="_blank" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 font-bold">
                                     <i class="bi bi-image"></i> View Receipt
                                 </a>
-                            @else
-                                <span class="text-slate-400 italic">No receipt attached</span>
+                            @endif
+                            @if($p->guestReference())
+                                <div class="font-mono text-[11px] text-slate-700 mt-1">Ref: {{ $p->guestReference() }}</div>
+                            @endif
+                            @if(!$p->proofUrl() && !$p->guestReference())
+                                <span class="text-slate-400 italic">Waiting for guest proof</span>
                             @endif
                         </td>
                         <td class="py-3 px-4 text-right">
@@ -312,9 +326,14 @@
             </h2>
             <p class="text-xs text-slate-500 mb-0">Occupancy status, cleaning readiness, and guest check-ins.</p>
         </div>
-        <a href="{{ route('accommodations.index') }}" class="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition">
-            View All Units
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('accommodations.index') }}" class="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition">
+                Rooms
+            </a>
+            <a href="{{ route('accommodations.cottages') }}" class="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition">
+                Cottages
+            </a>
+        </div>
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -337,7 +356,7 @@
     <div class="flex items-center justify-between gap-4 mb-4">
         <div>
             <h2 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2 mb-0">
-                <i class="bi bi-star-fill text-amber-500"></i>
+                <i class="bi bi-star text-amber-500"></i>
                 <span>Recent Guest Reviews</span>
             </h2>
             <p class="text-xs text-slate-500 mb-0">Latest guest ratings. Open the feedback hub to hide inappropriate comments.</p>

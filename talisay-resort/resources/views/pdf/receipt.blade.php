@@ -59,10 +59,23 @@
                     <br><small style="color:#64748b;">{{ $booking->accommodationUnit->variant_label }} {{ $booking->accommodationUnit->type_label }}</small>
                     @endif
                 </td>
+                @if($booking->isHourly())
+                <td>{{ $booking->hours_count }} Hour(s)<br><small>{{ $booking->time_slot }}</small></td>
+                <td style="text-align:right;">PHP {{ number_format($booking->accommodationUnit?->hourlyRate() ?? $booking->total_amount, 2) }}/hour</td>
+                @else
                 <td>{{ $booking->nights_count ?? 1 }} Night(s)</td>
                 <td style="text-align:right;">PHP {{ number_format($booking->accommodationUnit->price_per_night ?? $booking->total_amount, 2) }}/night</td>
-                <td style="text-align:right;">PHP {{ number_format($booking->total_amount, 2) }}</td>
+                @endif
+                <td style="text-align:right;">PHP {{ number_format(max(0, (float) $booking->total_amount - $booking->activities->sum(fn ($row) => (float) $row->price * max(1, (int) $row->quantity))), 2) }}</td>
             </tr>
+            @foreach($booking->activities as $addon)
+            <tr>
+                <td>{{ $addon->title }}<br><small style="color:#64748b;">Activity</small></td>
+                <td>{{ $addon->quantity }}</td>
+                <td style="text-align:right;">PHP {{ number_format($addon->price, 2) }}</td>
+                <td style="text-align:right;">PHP {{ number_format($addon->lineTotal(), 2) }}</td>
+            </tr>
+            @endforeach
         </tbody>
         <tfoot>
             <tr class="total-row">
@@ -82,7 +95,7 @@
     <div class="footer">
         <p>Thank you for choosing Talisay Beach Resort!</p>
         <p>This receipt was generated on {{ now()->format('F d, Y \a\t h:i A') }}</p>
-        <p>&copy; 2026 Talisay Beach Resort. All rights reserved.</p>
+        <p>&copy; Talisay Beach Resort. All rights reserved.</p>
     </div>
 </body>
 </html>

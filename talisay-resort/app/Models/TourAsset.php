@@ -91,4 +91,42 @@ class TourAsset extends Model
         // This ensures scenes appear in the intended tour sequence order
         return $query->where('is_active', true)->orderBy('sort_order');
     }
+
+    /**
+     * Same-origin URL for the uploaded panorama or video.
+     * A root-relative path keeps the 360 viewer on the site the guest is browsing.
+     */
+    public function mediaUrl(): string
+    {
+        if (! $this->panorama_path) {
+            return '';
+        }
+
+        if (str_starts_with($this->panorama_path, 'http://') || str_starts_with($this->panorama_path, 'https://')) {
+            return $this->panorama_path;
+        }
+
+        return '/storage/'.ltrim($this->panorama_path, '/');
+    }
+
+    /**
+     * True when the image is a 2:1 equirectangular panorama the 360 viewer can wrap.
+     * Any other image is shown to guests as a flat photo.
+     */
+    public function isPanorama(): bool
+    {
+        if ($this->type === 'video' || ! $this->panorama_path) {
+            return false;
+        }
+
+        $file = storage_path('app/public/'.ltrim($this->panorama_path, '/'));
+        $info = is_file($file) ? @getimagesize($file) : null;
+        if (! $info || ($info[1] ?? 0) <= 0) {
+            return false;
+        }
+
+        $ratio = $info[0] / $info[1];
+
+        return $ratio >= 1.7 && $ratio <= 2.3 && $info[0] >= 800;
+    }
 }

@@ -1,28 +1,44 @@
-@extends('layouts.tourist')
+@extends('layouts.public')
 
-@section('title', 'My Bookings - Talisay Beach Resort')
+@section('title', 'My bookings – '.$resortInfo['name'])
+
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/app.css') }}">
+<link rel="stylesheet" href="{{ asset('vendor/bootstrap/bootstrap.min.css') }}">
+<style>
+    .lp-stay-banner .lp-banner-box p { margin-bottom: 8px; }
+    .lp-stay-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 22px; }
+    .lp-stay-page .rounded-3xl { border-radius: 26px; }
+    #newBookingModal, #specialBookingModal, #modifyBookingModal, #uploadProofModal, #cancelBookingModal { z-index: 1100; }
+</style>
+@endpush
 
 @section('content')
 
-{{-- Header Banner --}}
-<div class="bg-ocean-gradient text-white py-10 px-4 shadow-lg mb-8">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-white mb-1">My Reservations</h1>
-            <p class="text-xs sm:text-sm text-sky-100 mb-0">Track bookings, manage check-in dates, and upload payment proofs</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <button onclick="document.getElementById('newBookingModal').classList.remove('hidden')" class="bg-white text-ocean-900 hover:bg-sky-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow transition flex items-center gap-1.5">
-                <i class="bi bi-plus-circle-fill text-ocean-600"></i>New Reservation
-            </button>
-            <button onclick="openSpecialBookingModal()" class="bg-amber-500 hover:bg-amber-400 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow transition flex items-center gap-1.5 border border-amber-300/40">
-                <i class="bi bi-stars"></i>Special Full-Resort Booking
-            </button>
-        </div>
+<section class="lp-banner lp-banner-short lp-stay-banner" style="background-image:url('/images/hero-landing.jpg')">
+    <div class="lp-banner-box">
+        <div class="lp-eyebrow">Your stays</div>
+        <h1>My bookings</h1>
+        <p>Track a reservation, send a GCash receipt, or change the room. These are the same bookings the resort desk sees.</p>
     </div>
+</section>
+
+<section class="lp-account-wrap lp-stay-page">
+<div class="lp-section">
+
+    @if(session('success'))
+        <div class="lp-note lp-note-ok"><i class="bi bi-check-circle-fill"></i> {{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="lp-note lp-note-bad"><i class="bi bi-exclamation-triangle-fill"></i> {{ session('error') }}</div>
+    @endif
+
+<div class="lp-stay-actions">
+    <a class="lp-btn lp-btn-sand" href="{{ route('public.booking') }}"><i class="bi bi-plus-circle-fill"></i> New reservation</a>
+    <a class="lp-btn lp-btn-outline" href="{{ route('public.booking', ['exclusive' => 1]) }}"><i class="bi bi-stars"></i> Full-resort booking</a>
 </div>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+<div class="space-y-6">
 
     {{-- Bookings List --}}
     @if($bookings->isEmpty())
@@ -32,9 +48,7 @@
         </div>
         <h3 class="text-lg font-bold text-slate-800 mb-1">No Reservations Found</h3>
         <p class="text-xs text-slate-500 max-w-sm mx-auto mb-6">You haven't made any resort reservations yet. Reserve your favorite room or cottage today!</p>
-        <button onclick="document.getElementById('newBookingModal').classList.remove('hidden')" class="bg-ocean-600 hover:bg-ocean-700 text-white font-bold text-xs px-5 py-3 rounded-xl shadow transition">
-            <i class="bi bi-plus-circle me-1"></i>Book a Room or Cottage Now
-        </button>
+        <a class="lp-btn lp-btn-sand" href="{{ route('public.booking') }}"><i class="bi bi-plus-circle-fill"></i> Book a room or cottage</a>
     </div>
     @else
 
@@ -92,6 +106,9 @@
                 <div>
                     <h3 class="text-lg font-extrabold text-slate-900 mb-0">
                         {{ $booking->booking_type === 'special_resort' ? 'Exclusive Full-Resort Private Reservation' : ($booking->accommodationUnit->unit_number ?? 'Room / Cottage Reservation') }}
+                        @if($booking->activities->isNotEmpty())
+                            <span class="block text-xs font-semibold text-slate-500 mt-1">Activities: {{ $booking->activities->pluck('title')->join(', ') }}</span>
+                        @endif
                         @if($booking->accommodationUnit && $booking->booking_type !== 'special_resort')
                         <span class="text-xs font-semibold text-slate-500 font-normal">({{ $booking->accommodationUnit->variant_label }} {{ $booking->accommodationUnit->type_label }})</span>
                         @endif
@@ -108,13 +125,17 @@
                 </div>
 
                 <div class="flex flex-wrap gap-4 text-xs text-slate-500 pt-1">
-                    @if($booking->check_in_date && $booking->check_out_date)
+                    @if($booking->isHourly())
+                    <span><i class="bi bi-clock me-1 text-ocean-600"></i>{{ $booking->check_in_date?->format('M d, Y') }} · {{ $booking->time_slot }}</span>
+                    @elseif($booking->check_in_date && $booking->check_out_date)
                     <span><i class="bi bi-calendar-range me-1 text-ocean-600"></i>{{ $booking->check_in_date->format('M d, Y') }} to {{ $booking->check_out_date->format('M d, Y') }} ({{ $booking->nights_count }} Nights)</span>
                     @else
                     <span><i class="bi bi-calendar-event me-1 text-ocean-600"></i>{{ \Carbon\Carbon::parse($booking->booking_date)->format('M d, Y') }}</span>
                     @endif
                     <span><i class="bi bi-people me-1 text-ocean-600"></i>{{ $booking->guests_count }} Guests</span>
+                    @unless($booking->isHourly())
                     <span><i class="bi bi-clock me-1 text-ocean-600"></i>{{ $booking->time_slot }}</span>
+                    @endunless
                 </div>
 
                 @if($booking->special_requests)
@@ -128,6 +149,14 @@
                 <div>
                     <span class="text-xs text-slate-400 block font-semibold">Total Cost</span>
                     <span class="text-2xl font-extrabold text-ocean-900 block">₱{{ number_format($booking->total_amount, 2) }}</span>
+                    @php $payMethod = $booking->payment ? \App\Models\PaymentMethod::lookup($booking->payment->gateway) : null; @endphp
+                    @if($booking->status === 'pending' && $payMethod && \App\Models\PaymentMethod::needsProof($booking->payment->gateway) && $payMethod->receivingNumber() !== '')
+                    <div class="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-left md:text-right">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700 block">Send {{ $payMethod->name }} to</span>
+                        <span class="text-xs font-bold text-slate-800 block">{{ $payMethod->receivingName() !== '' ? $payMethod->receivingName() : 'Talisay Beach Resort' }}</span>
+                        <span class="text-sm font-black text-ocean-800 block">{{ $payMethod->receivingNumber() }}</span>
+                    </div>
+                    @endif
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
@@ -140,16 +169,21 @@
                     </button>
                     @endif
 
-                    {{-- GCash Upload Button --}}
-                    @if($booking->status === 'pending' && $booking->payment)
-                        @if(!$booking->payment->proof_path)
+                    {{-- Online payment proof --}}
+                    @if($booking->status === 'pending' && $booking->payment && \App\Models\PaymentMethod::needsProof($booking->payment->gateway))
+                        @php
+                            $guestReference = $booking->payment->transaction_id;
+                            $hasGuestReference = $guestReference && !preg_match('/^(TXN|CASH|MNL)-/', $guestReference);
+                            $hasProof = $booking->payment->proof_path || $hasGuestReference;
+                        @endphp
+                        @if(!$hasProof)
                         <button type="button" onclick="openUploadModal({{ $booking->payment->id }})" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-sm transition flex items-center gap-1">
-                            <i class="bi bi-upload"></i>Upload GCash Proof
+                            <i class="bi bi-upload"></i>Send payment proof
                         </button>
                         @else
-                        <button type="button" onclick="openUploadModal({{ $booking->payment->id }})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-emerald-200 transition flex items-center gap-1">
-                            <i class="bi bi-check2-circle text-emerald-600"></i>Proof Uploaded (Replace)
-                        </button>
+                        <span class="inline-flex items-center text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            <i class="bi bi-hourglass-split me-1"></i>Waiting for admin approval
+                        </span>
                         @endif
                     @elseif($booking->payment && $booking->payment->is_cash_on_arrival)
                         <span class="inline-flex items-center text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
@@ -159,7 +193,8 @@
 
                     {{-- Cancel Stay Option --}}
                     @if(in_array($booking->status, ['pending', 'paid']))
-                    <button type="button" onclick="openCancelModal({{ $booking->id }}, {{ Js::from($booking->reference_no) }})" class="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 transition flex items-center gap-1">
+                    @php $cancelPreview = app(\App\Services\BookingService::class)->previewCancellation($booking); @endphp
+                    <button type="button" onclick="openCancelModal({{ $booking->id }}, {{ Js::from($booking->reference_no) }}, {{ Js::from($cancelPreview['message']) }})" class="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 transition flex items-center gap-1">
                         <i class="bi bi-x-circle" aria-hidden="true"></i>Cancel
                     </button>
                     @endif
@@ -176,45 +211,117 @@
 
     @endif
 </div>
+</div>
+</section>
 
 {{-- ── 1. New Booking Modal (with Multi-Channel Payment) ────────────────── --}}
-<div id="newBookingModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 space-y-4 my-8">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+<style>
+    #newBookingModal,
+    #specialBookingModal,
+    #modifyBookingModal,
+    #uploadProofModal,
+    #cancelBookingModal { z-index: 1100; }
+    #newBookingModal .reservation-sheet,
+    #specialBookingModal .reservation-sheet {
+        max-height: calc(100vh - 1.5rem);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    #newBookingModal .reservation-form,
+    #specialBookingModal .reservation-form {
+        min-height: 0;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+    }
+    #newBookingModal .reservation-scroll,
+    #specialBookingModal .reservation-scroll {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+    }
+    #newBookingModal .reservation-actions,
+    #specialBookingModal .reservation-actions { flex-shrink: 0; }
+    #newBookingModal .pay-choices {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    @media (min-width: 640px) {
+        #newBookingModal .pay-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+</style>
+<div id="newBookingModal" class="hidden fixed inset-0 flex items-center justify-center bg-slate-900/80 p-3 sm:p-6">
+    <div class="reservation-sheet bg-white rounded-3xl shadow-2xl w-full max-w-xl">
+        <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 sm:px-6 py-4 shrink-0">
             <div>
                 <h3 class="text-xl font-extrabold text-slate-900 mb-0">Create New Reservation</h3>
-                <p class="text-xs text-slate-400 mb-0">Choose room or cottage, dates, and preferred payment method</p>
+                <p class="text-xs text-slate-400 mb-0">Choose a room or cottage, the stay, and how to pay</p>
             </div>
-            <button onclick="document.getElementById('newBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
+            <button type="button" onclick="document.getElementById('newBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4" data-loading>
+        <form action="{{ route('tourist.bookings.store') }}" method="POST" enctype="multipart/form-data" class="reservation-form" data-loading onsubmit="return bookingGuestsAllowed() && prepareResortPayment(this)">
             @csrf
+            <div class="reservation-scroll px-5 sm:px-6 py-4 space-y-4">
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Select Accommodation (Room / Cottage)</label>
                 <select name="accommodation_unit_id" id="bookingUnitSelect" class="w-full form-select text-sm rounded-xl" onchange="calculateBookingTotal()" required>
                     @foreach($accommodationUnits as $unit)
-                    <option value="{{ $unit->id }}" data-price="{{ $unit->price_per_night }}" data-cap="{{ $unit->max_occupancy }}">
+                    <option value="{{ $unit->id }}" data-price="{{ $unit->price_per_night }}" data-hour="{{ $unit->hourlyRate() }}" data-cap="{{ $unit->max_occupancy }}">
                         {{ $unit->unit_number }} — {{ $unit->variant_label }} {{ $unit->type_label }} (₱{{ number_format($unit->price_per_night, 2) }}/night · max {{ $unit->max_occupancy }} pax)
                     </option>
                     @endforeach
                 </select>
             </div>
 
+            <input type="hidden" name="stay_type" id="bookingStayType" value="night">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-2">Book this room</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="border border-ocean-600 bg-ocean-50/40 rounded-xl p-3 flex items-center gap-2 cursor-pointer text-xs font-bold" onclick="setBookingStay('night', this)">
+                        <input type="radio" name="stay_type_choice" value="night" checked class="form-check-input text-ocean-600">
+                        <span>Per night</span>
+                    </label>
+                    <label class="border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer text-xs font-bold" onclick="setBookingStay('hour', this)">
+                        <input type="radio" name="stay_type_choice" value="hour" class="form-check-input text-ocean-600">
+                        <span>Per hour</span>
+                    </label>
+                </div>
+                <p id="bookingHourHint" class="hidden text-[11px] text-slate-500 mt-2 mb-0">The hourly rate is the amount saved for this room. A stay can be 1 to 12 hours.</p>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Check-in Date</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1" id="bookingDateLabel">Check-in Date</label>
                     <input type="date" name="booking_date" id="bookingDateInput" min="{{ date('Y-m-d') }}" value="{{ date('Y-m-d') }}" class="w-full form-control rounded-xl text-sm" onchange="calculateBookingTotal()" required>
                 </div>
-                <div>
+                <div id="bookingCheckOutWrap">
                     <label class="block text-xs font-bold text-slate-700 mb-1">Check-out Date</label>
                     <input type="date" name="check_out_date" id="bookingCheckOutInput" min="{{ date('Y-m-d', strtotime('+1 day')) }}" value="{{ date('Y-m-d', strtotime('+1 day')) }}" class="w-full form-control rounded-xl text-sm" onchange="calculateBookingTotal()" required>
+                </div>
+            </div>
+            <div id="bookingHourFields" class="hidden grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Start time</label>
+                    <select name="hour_start" id="bookingHourStart" class="w-full form-select rounded-xl text-sm" onchange="calculateBookingTotal()" disabled>
+                        @foreach (range(8, 20) as $hour)
+                        <option value="{{ sprintf('%02d:00', $hour) }}" @selected($hour === 14)>{{ \Carbon\Carbon::createFromTime($hour)->format('g:i A') }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Hours</label>
+                    <input type="number" name="hours_count" id="bookingHours" min="1" max="12" value="1" class="w-full form-control rounded-xl text-sm" oninput="calculateBookingTotal()" disabled>
                 </div>
             </div>
 
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Number of Guests (Pax)</label>
-                <input type="number" name="guests_count" id="bookingGuestsCount" min="1" value="2" class="w-full form-control rounded-xl text-sm" required>
+                <input type="number" name="guests_count" id="bookingGuestsCount" min="1" value="1" class="w-full form-control rounded-xl text-sm" required oninput="clampBookingGuests()">
+                <p class="text-xs text-slate-400 mt-1" id="bookingGuestsHint">This room or cottage allows a limited number of guests.</p>
+                <p class="hidden text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mt-2 mb-0" id="bookingGuestsNotice"></p>
             </div>
 
             <div>
@@ -222,26 +329,12 @@
                 <textarea name="special_requests" rows="2" class="w-full form-control rounded-xl text-sm" placeholder="e.g. Extra pillows, late arrival, cottage preferences..."></textarea>
             </div>
 
+            @include('partials.activity-addon-picks')
+
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-2">Select Payment Channel</label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="payment-option border border-ocean-600 bg-ocean-50/40 rounded-xl p-3 flex items-center gap-2 cursor-pointer transition text-xs font-bold" onclick="selectPaymentMethod(this)">
-                        <input type="radio" name="payment_method" value="gcash" checked class="form-check-input text-ocean-600">
-                        <span>GCash QR</span>
-                    </label>
-                    <label class="payment-option border border-slate-200 hover:border-ocean-300 rounded-xl p-3 flex items-center gap-2 cursor-pointer transition text-xs font-bold" onclick="selectPaymentMethod(this)">
-                        <input type="radio" name="payment_method" value="cash" class="form-check-input text-ocean-600">
-                        <span>Cash on Arrival</span>
-                    </label>
-                    <label class="payment-option border border-slate-200 hover:border-ocean-300 rounded-xl p-3 flex items-center gap-2 cursor-pointer transition text-xs font-bold" onclick="selectPaymentMethod(this)">
-                        <input type="radio" name="payment_method" value="paypal" class="form-check-input text-ocean-600">
-                        <span>PayPal Express</span>
-                    </label>
-                    <label class="payment-option border border-slate-200 hover:border-ocean-300 rounded-xl p-3 flex items-center gap-2 cursor-pointer transition text-xs font-bold" onclick="selectPaymentMethod(this)">
-                        <input type="radio" name="payment_method" value="card" class="form-check-input text-ocean-600">
-                        <span>Credit / Debit Card</span>
-                    </label>
-                </div>
+                @include('partials.payment-method-radios')
+                @include('partials.guest-payment-fields')
             </div>
 
             {{-- Real-time Availability Feedback Box --}}
@@ -255,10 +348,11 @@
                     <span class="text-xs font-bold text-slate-600 block">Total Reservation Cost</span>
                     <span class="text-[11px] text-slate-400" id="bookingNightsText">1 Night</span>
                 </div>
-                <span class="text-xl font-extrabold text-ocean-900" id="bookingEstimatedTotal">₱0.00</span>
+                <span class="text-xl font-extrabold text-ocean-900 js-stay-total" id="bookingEstimatedTotal">₱0.00</span>
             </div>
 
-            <div class="flex gap-2 pt-2">
+            </div>
+            <div class="reservation-actions flex gap-2 border-t border-slate-100 px-5 sm:px-6 py-4">
                 <button type="button" onclick="document.getElementById('newBookingModal').classList.add('hidden')" class="flex-1 btn btn-light rounded-xl font-bold text-sm">Cancel</button>
                 <button type="submit" id="bookingSubmitBtn" class="flex-1 bg-ocean-600 hover:bg-ocean-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm py-2.5 rounded-xl shadow">Confirm &amp; Proceed</button>
             </div>
@@ -323,21 +417,22 @@
 </div>
 
 {{-- ── 3. Special Full-Resort Exclusive Booking Modal ──────────────────── --}}
-<div id="specialBookingModal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-6 sm:p-8 space-y-4 my-8">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+<div id="specialBookingModal" class="hidden fixed inset-0 flex items-center justify-center bg-slate-900/80 p-3 sm:p-6">
+    <div class="reservation-sheet bg-white rounded-3xl shadow-2xl w-full max-w-xl">
+        <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 sm:px-6 py-4 shrink-0">
             <div>
                 <div class="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-md mb-1">
                     <i class="bi bi-stars"></i> Exclusive Reservation
                 </div>
                 <h3 class="text-xl font-extrabold text-slate-900 mb-0">Special Full-Resort Booking</h3>
-                <p class="text-xs text-slate-400 mb-0">Book the entire Talisay Beach Resort (all 20 units) for private events</p>
+                <p class="text-xs text-slate-400 mb-0">Book the entire Talisay Beach Resort for a private event</p>
             </div>
-            <button onclick="document.getElementById('specialBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
+            <button type="button" onclick="document.getElementById('specialBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.special-resort') }}" method="POST" class="space-y-4" data-loading>
+        <form action="{{ route('tourist.bookings.special-resort') }}" method="POST" enctype="multipart/form-data" class="reservation-form" data-loading onsubmit="return prepareResortPayment(this)">
             @csrf
+            <div class="reservation-scroll px-5 sm:px-6 py-4 space-y-4">
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -351,46 +446,43 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Estimated Guest Count (Up to 100 Pax)</label>
-                <input type="number" name="guests_count" min="1" max="200" value="30" class="w-full form-control rounded-xl text-sm" required>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Estimated Guest Count (Up to {{ \App\Models\CapacitySchedule::visitorCap() }} guests)</label>
+                <input type="number" name="guests_count" min="1" max="{{ \App\Models\CapacitySchedule::visitorCap() }}" value="{{ min(30, \App\Models\CapacitySchedule::visitorCap()) }}" class="w-full form-control rounded-xl text-sm" required>
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Event Type &amp; Special Requirements</label>
-                <textarea name="special_requests" rows="3" class="w-full form-control rounded-xl text-sm" placeholder="Tell us about your event (e.g. Wedding reception, corporate team building, catering requests, sound setup)..." required></textarea>
+                <label class="block text-xs font-bold text-slate-700 mb-1">What is this booking for?</label>
+                <select name="occasion" class="w-full form-select rounded-xl text-sm" required>
+                    <option value="">Choose the occasion</option>
+                    @foreach(\App\Models\Booking::occasions() as $choice)
+                        <option value="{{ $choice }}">{{ $choice }}</option>
+                    @endforeach
+                </select>
             </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Event details</label>
+                <textarea name="special_requests" rows="3" class="w-full form-control rounded-xl text-sm" placeholder="Tell us about the schedule, setup, or anything the group needs." required></textarea>
+            </div>
+
+            @include('partials.activity-addon-picks')
 
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-2">Preferred Payment Method</label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="payment-option border border-ocean-600 bg-ocean-50/40 rounded-xl p-3 flex items-center gap-2 cursor-pointer text-xs font-bold">
-                        <input type="radio" name="payment_method" value="gcash" checked class="form-check-input text-ocean-600">
-                        <span>GCash</span>
-                    </label>
-                    <label class="payment-option border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer text-xs font-bold">
-                        <input type="radio" name="payment_method" value="cash" class="form-check-input text-ocean-600">
-                        <span>Cash / Bank Deposit</span>
-                    </label>
-                    <label class="payment-option border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer text-xs font-bold">
-                        <input type="radio" name="payment_method" value="paypal" class="form-check-input text-ocean-600">
-                        <span>PayPal</span>
-                    </label>
-                    <label class="payment-option border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer text-xs font-bold">
-                        <input type="radio" name="payment_method" value="card" class="form-check-input text-ocean-600">
-                        <span>Credit Card</span>
-                    </label>
-                </div>
+                @include('partials.payment-method-radios')
+                @include('partials.guest-payment-fields')
             </div>
 
             <div class="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-center justify-between">
                 <div>
                     <span class="text-xs font-bold text-amber-900 block">Exclusive Rate (<span id="specialDurationText">1 Night</span>)</span>
-                    <span class="text-[10px] text-amber-700">Includes all 20 rooms &amp; beachfront cottages</span>
+                    <span class="text-[10px] text-amber-700">Includes all {{ $openUnitCount }} open {{ $openUnitCount === 1 ? 'room or cottage' : 'rooms and cottages' }}</span>
                 </div>
-                <span class="text-xl font-extrabold text-amber-900" id="specialCalculatedTotal">₱0.00</span>
+                <span class="text-xl font-extrabold text-amber-900 js-stay-total" id="specialCalculatedTotal">₱0.00</span>
             </div>
 
-            <div class="flex gap-2 pt-2">
+            </div>
+            <div class="reservation-actions flex gap-2 border-t border-slate-100 px-5 sm:px-6 py-4">
                 <button type="button" onclick="document.getElementById('specialBookingModal').classList.add('hidden')" class="flex-1 btn btn-light rounded-xl font-bold text-sm">Cancel</button>
                 <button type="submit" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2.5 rounded-xl shadow">Request Reservation</button>
             </div>
@@ -406,15 +498,27 @@
             <button onclick="document.getElementById('uploadProofModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form id="uploadProofForm" action="" method="POST" enctype="multipart/form-data" class="space-y-4">
+        <form id="uploadProofForm" action="" method="POST" enctype="multipart/form-data" class="space-y-4" data-proof-required="1">
             @csrf
+            @if(trim((string) setting('gcash_number', '')) !== '')
+            <div class="rounded-2xl border border-sky-200 bg-sky-50 p-3">
+                <p class="text-[11px] font-bold text-sky-900 mb-1">Send GCash to</p>
+                <p class="text-sm font-black text-slate-900 mb-0">{{ setting('gcash_name', 'Talisay Beach Resort') }}</p>
+                <p class="text-base font-black text-ocean-800 mb-0">{{ setting('gcash_number') }}</p>
+            </div>
+            @endif
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">GCash reference number <span class="req-star" aria-hidden="true">*</span></label>
+                <input type="text" name="reference_number" inputmode="numeric" maxlength="16" class="w-full form-control rounded-xl text-sm" placeholder="1234 567 890123">
+            </div>
             <div class="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-ocean-400 transition">
                 <i class="bi bi-cloud-arrow-up text-3xl text-ocean-600 block mb-2"></i>
                 <label class="block text-xs font-bold text-slate-700 mb-1 cursor-pointer">
-                    Click to select payment screenshot
-                    <input type="file" name="proof_image" accept="image/*" class="hidden" onchange="previewUpload(event)" required>
+                    Receipt screenshot <span class="req-star" aria-hidden="true">*</span>
+                    <input type="file" name="proof_image" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" class="hidden" onchange="previewUpload(event)">
                 </label>
-                <p class="text-[10px] text-slate-400 mb-0">PNG, JPG, or JPEG up to 5MB</p>
+                <p class="text-[10px] text-slate-400 mb-0">Both the 13-digit reference and a JPG, PNG, or WEBP screenshot (up to 5 MB) are required.</p>
+                <p class="js-proof-status pay-lock-note" hidden></p>
                 <div id="uploadPreviewWrap" class="hidden mt-3">
                     <img id="uploadPreview" src="" alt="Proof Preview" class="max-h-40 mx-auto rounded-lg shadow-sm">
                 </div>
@@ -434,7 +538,8 @@
             <h3 id="cancelBookingTitle" class="text-lg font-extrabold text-slate-900 mb-0">Cancel Reservation</h3>
             <button type="button" onclick="document.getElementById('cancelBookingModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
         </div>
-        <p class="text-sm text-slate-600 mb-0">Cancel reservation <strong id="cancelBookingRef"></strong>? This will release the room or cottage for other guests.</p>
+        <p class="text-sm text-slate-600 mb-0">Cancel reservation <strong id="cancelBookingRef"></strong>? This releases the room or cottage for other guests.</p>
+        <p id="cancelRefundNote" class="text-sm font-semibold text-slate-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-0"></p>
         <form id="cancelBookingForm" method="POST" class="space-y-4" data-loading onsubmit="return confirm('Confirm cancellation of this reservation?');">
             @csrf
             <div>
@@ -454,20 +559,92 @@
 @push('scripts')
 <script>
 const unitTotalSum = {{ $accommodationUnits->sum('price_per_night') }};
+const exclusiveNightly = {{ (float) app(\App\Services\BookingService::class)->exclusiveNightlyRate() }};
+function activityAddonTotal(root) {
+    let extra = 0;
+    (root || document).querySelectorAll('.js-activity-addon:checked').forEach((box) => {
+        extra += Number(box.dataset.price || 0);
+    });
+    return extra;
+}
+document.addEventListener('change', (event) => {
+    if (!event.target.classList.contains('js-activity-addon')) return;
+    if (event.target.closest('#specialBookingModal')) calculateSpecialTotal();
+    else calculateBookingTotal();
+});
 let modifyCurrentCost = 0;
 let modifyNightsCount = 1;
 
 function selectPaymentMethod(el) {
-    document.querySelectorAll('.payment-option').forEach(opt => {
+    (el.closest('form') || document).querySelectorAll('.payment-option').forEach(opt => {
         opt.classList.remove('border-ocean-600', 'bg-ocean-50/40');
         opt.classList.add('border-slate-200');
     });
     el.classList.add('border-ocean-600', 'bg-ocean-50/40');
     el.classList.remove('border-slate-200');
     el.querySelector('input[type="radio"]').checked = true;
+    if (typeof showPayPanels === 'function') showPayPanels(el.closest('form'));
+}
+
+function bookingGuestCap() {
+    const select = document.getElementById('bookingUnitSelect');
+    return Math.max(1, parseInt(select?.options[select.selectedIndex]?.dataset?.cap || '1', 10) || 1);
+}
+function showBookingGuestNotice(cap) {
+    const notice = document.getElementById('bookingGuestsNotice');
+    if (!notice) return;
+    notice.textContent = 'This room only allows ' + cap + ' guests.';
+    notice.classList.remove('hidden');
+}
+function clampBookingGuests() {
+    const input = document.getElementById('bookingGuestsCount');
+    const hint = document.getElementById('bookingGuestsHint');
+    const notice = document.getElementById('bookingGuestsNotice');
+    if (!input) return;
+    const cap = bookingGuestCap();
+    const typed = parseInt(input.value, 10);
+    if (Number.isFinite(typed) && typed > cap) {
+        showBookingGuestNotice(cap);
+    } else if (notice) {
+        notice.classList.add('hidden');
+    }
+    if (hint) hint.textContent = 'This room or cottage allows up to ' + cap + ' guests.';
+}
+function bookingGuestsAllowed() {
+    clampBookingGuests();
+    const input = document.getElementById('bookingGuestsCount');
+    const typed = parseInt(input?.value, 10);
+    if (Number.isFinite(typed) && typed > bookingGuestCap()) {
+        showBookingGuestNotice(bookingGuestCap());
+        return false;
+    }
+    return true;
+}
+
+function setBookingStay(type, label) {
+    document.getElementById('bookingStayType').value = type;
+    const hourly = type === 'hour';
+    document.getElementById('bookingHourFields').classList.toggle('hidden', !hourly);
+    document.getElementById('bookingHourHint').classList.toggle('hidden', !hourly);
+    document.getElementById('bookingCheckOutWrap').classList.toggle('hidden', hourly);
+    const checkout = document.getElementById('bookingCheckOutInput');
+    checkout.required = !hourly;
+    checkout.disabled = hourly;
+    document.getElementById('bookingHourStart').disabled = !hourly;
+    document.getElementById('bookingHours').disabled = !hourly;
+    document.getElementById('bookingDateLabel').textContent = hourly ? 'Date' : 'Check-in Date';
+    const group = label.closest('.grid');
+    group.querySelectorAll('label').forEach((item) => {
+        item.classList.remove('border-ocean-600', 'bg-ocean-50/40');
+        item.classList.add('border-slate-200');
+    });
+    label.classList.add('border-ocean-600', 'bg-ocean-50/40');
+    label.classList.remove('border-slate-200');
+    calculateBookingTotal();
 }
 
 async function calculateBookingTotal() {
+    clampBookingGuests();
     const select = document.getElementById('bookingUnitSelect');
     const unitId = select.value;
     const price = parseFloat(select.options[select.selectedIndex]?.dataset?.price || 0);
@@ -489,8 +666,14 @@ async function calculateBookingTotal() {
     let nights = Math.round((checkOut - checkIn) / (1000 * 60 * 60 * 24));
     if (isNaN(nights) || nights < 1) nights = 1;
 
-    document.getElementById('bookingNightsText').textContent = nights + (nights === 1 ? ' Night' : ' Nights');
-    const total = price * nights;
+    const hourly = document.getElementById('bookingStayType')?.value === 'hour';
+    const bookedHours = Math.max(1, Math.min(12, parseInt(document.getElementById('bookingHours')?.value || '1', 10) || 1));
+    const hourRate = parseFloat(select.options[select.selectedIndex]?.dataset?.hour || 0) || Math.round(price / 12 * 100) / 100;
+    document.getElementById('bookingNightsText').textContent = hourly
+        ? (bookedHours + (bookedHours === 1 ? ' Hour' : ' Hours'))
+        : (nights + (nights === 1 ? ' Night' : ' Nights'));
+    const stayTotal = hourly ? hourRate * bookedHours : price * nights;
+    const total = stayTotal + activityAddonTotal(document.getElementById('newBookingModal'));
     document.getElementById('bookingEstimatedTotal').textContent = '₱' + total.toLocaleString('en-US', { minimumFractionDigits: 2 });
 
     // Live conflict verification
@@ -501,7 +684,13 @@ async function calculateBookingTotal() {
 
     if (unitId && checkInInput.value && checkOutInput.value) {
         try {
-            const res = await fetch(`/tourist/accommodations/${unitId}/check-availability?check_in=${checkInInput.value}&check_out=${checkOutInput.value}`);
+            const hourlyStay = document.getElementById('bookingStayType')?.value === 'hour';
+            const hourStart = document.getElementById('bookingHourStart')?.value || '14:00';
+            const hourCount = document.getElementById('bookingHours')?.value || '1';
+            const stayQuery = hourlyStay
+                ? `check_in=${checkInInput.value}&stay_type=hour&hour_start=${hourStart}&hours=${hourCount}`
+                : `check_in=${checkInInput.value}&check_out=${checkOutInput.value}`;
+            const res = await fetch(`/tourist/accommodations/${unitId}/check-availability?${stayQuery}`);
             const data = await res.json();
             feedback.classList.remove('hidden');
             if (data.available) {
@@ -580,14 +769,16 @@ function calculateSpecialTotal() {
     if (isNaN(days) || days < 1) days = 1;
 
     document.getElementById('specialDurationText').textContent = days + (days === 1 ? ' Night' : ' Nights');
-    const total = unitTotalSum * days;
+    const nightly = exclusiveNightly > 0 ? exclusiveNightly : unitTotalSum;
+    const total = nightly * days + activityAddonTotal(document.getElementById('specialBookingModal'));
     document.getElementById('specialCalculatedTotal').textContent = '₱' + total.toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
-function openCancelModal(bookingId, refNo) {
+function openCancelModal(bookingId, refNo, refundNote) {
     const form = document.getElementById('cancelBookingForm');
     form.action = '/tourist/bookings/' + bookingId + '/cancel';
     document.getElementById('cancelBookingRef').textContent = refNo || '';
+    document.getElementById('cancelRefundNote').textContent = refundNote || 'The room or cottage is released for other guests.';
     document.getElementById('cancellation_reason').value = '';
     document.getElementById('cancelBookingModal').classList.remove('hidden');
 }

@@ -47,7 +47,7 @@ class DatabaseSeeder extends Seeder
             'is_active'         => true,
         ]);
 
-        foreach (['bookings', 'payments', 'accommodations', 'reviews', 'guests'] as $module) {
+        foreach (['bookings', 'payments', 'accommodations', 'reviews', 'guests', 'reports', 'chatbot'] as $module) {
             \App\Models\StaffPermission::create([
                 'user_id' => $staff1->id,
                 'module'  => $module,
@@ -70,7 +70,7 @@ class DatabaseSeeder extends Seeder
             'is_active'         => true,
         ]);
 
-        foreach (['bookings', 'accommodations', 'housekeeping', 'maintenance', 'reviews'] as $module) {
+        foreach (['bookings', 'payments', 'accommodations', 'housekeeping', 'maintenance', 'reviews', 'reports', 'chatbot'] as $module) {
             \App\Models\StaffPermission::create([
                 'user_id' => $staff2->id,
                 'module'  => $module,
@@ -230,7 +230,7 @@ class DatabaseSeeder extends Seeder
         }
 
         // ─── Payments ────────────────────────────────────────────
-        $channels = ['gcash', 'paypal', 'card', 'cash'];
+        $channels = ['gcash', 'card', 'cash'];
         foreach ($bookings as $idx => $booking) {
             $channel = $channels[$idx % count($channels)];
             $isCash = $channel === 'cash';

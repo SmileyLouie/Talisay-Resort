@@ -94,7 +94,7 @@ class StaffPermission extends Model
             'description' => 'AI concierge settings, FAQs, knowledge intents, and visitor chat logs.',
             'icon'        => 'bi-chat-dots-fill',
             'actions'     => ['view', 'manage'],
-            'default'     => ['view'],
+            'default'     => ['view', 'manage'],
         ],
         'emergency' => [
             'name'        => 'Emergency & Safety Management',
@@ -116,9 +116,12 @@ class StaffPermission extends Model
             'description' => 'Full booking workflow, reservations, guest check-in/out, and room availability.',
             'modules'     => [
                 'bookings'       => ['view', 'create', 'edit', 'confirm', 'check_in_out'],
+                'payments'       => ['view', 'verify'],
                 'accommodations' => ['view', 'toggle_availability'],
                 'guests'         => ['view'],
                 'reviews'        => ['view'],
+                'reports'        => ['view', 'export'],
+                'chatbot'        => ['view', 'manage'],
             ],
         ],
         'cashier' => [
@@ -171,8 +174,10 @@ class StaffPermission extends Model
                 'accommodations' => ['view', 'edit', 'toggle_availability'],
                 'housekeeping'   => ['view', 'update_status', 'cleaning_request'],
                 'maintenance'    => ['view', 'create_request', 'update_status'],
-                'payments'       => ['view'],
+                'payments'       => ['view', 'verify'],
                 'reviews'        => ['view', 'approve'],
+                'reports'        => ['view', 'export'],
+                'chatbot'        => ['view', 'manage'],
             ],
         ],
     ];

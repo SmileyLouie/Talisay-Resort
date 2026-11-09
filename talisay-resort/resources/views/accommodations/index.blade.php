@@ -1,208 +1,174 @@
 @extends('layouts.app')
 
-@section('title', 'Rooms & Cottages Management - Talisay Beach Resort')
+@section('title', ($kind === 'cottage' ? 'Cottage' : 'Room').' Management - Talisay Beach Resort')
+
+@push('styles')
+<style>
+    .modal-dialog.unit-modal-dialog { max-width: 760px; max-height: calc(100vh - 2.5rem); margin: 1.25rem auto; }
+    .unit-modal-content {
+        max-height: calc(100vh - 2rem);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .unit-modal-form {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+    }
+    .unit-modal-form .modal-body { overflow-y: auto; min-height: 0; }
+    .amenity-chip { border: 1px solid #dbe3ec; background: #fff; color: #334155; border-radius: 999px; font-size: 12px; font-weight: 500; padding: 3px 10px; }
+    .amenity-chip:hover { border-color: #1d6fbf; background: #e8f2fb; color: #155a9c; }
+</style>
+@endpush
 
 @section('content')
 
-{{-- ── Page Header ─────────────────────────────────────────────────────────── --}}
-<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+@php
+    $variant = $variant ?? 'all';
+    $listRoute = $kind === 'cottage' ? 'accommodations.cottages' : 'accommodations.index';
+    $noun = $kind === 'cottage' ? 'cottages' : 'rooms';
+    $Noun = $kind === 'cottage' ? 'Cottage' : 'Room';
+    $unitVariants = $unitVariants ?? collect();
+    $amenityItems = $amenityItems ?? collect();
+    $variantCards = $variantCards ?? collect();
+    $variantTabs = collect([
+        ['slug' => 'all', 'label' => 'All', 'count' => $stats['total']],
+    ])->concat($variantCards);
+@endphp
+
+<div class="res-head">
     <div>
-        <div class="flex items-center gap-2 mb-1">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
-                <i class="bi bi-building text-[10px] text-sky-600"></i>
-                Resort Units
-            </span>
-        </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
-            Room &amp; Cottage Management
-        </h1>
-        <p class="text-sm text-slate-500 mb-0">
-            Manage the 20 resort rooms and cottages, 360° virtual video tours, amenities, and real-time availability.
-        </p>
+        <h1>{{ $kind === 'cottage' ? __('Cottages') : __('Rooms') }}</h1>
+        <p>{{ $kind === 'cottage' ? __('Rates, guest limits, photos, 360° tours, and whether each cottage can be booked.') : __('Rates, guest limits, photos, 360° tours, and whether each room can be booked.') }}</p>
     </div>
-
-    <button class="btn-ocean" data-bs-toggle="modal" data-bs-target="#createUnitModal">
-        <i class="bi bi-plus-circle-fill"></i>
-        <span>Add New Unit</span>
-    </button>
-</div>
-
-{{-- ── Stats KPI Cards ─────────────────────────────────────────────────────── --}}
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-    
-    {{-- Total Units --}}
-    <div class="stat-card-clean flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-building"></i>
-        </div>
-        <div>
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Total Units</p>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-0">{{ $stats['total'] }}</h3>
-        </div>
-    </div>
-
-    {{-- Available Units --}}
-    <div class="stat-card-clean flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-check-circle-fill"></i>
-        </div>
-        <div>
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Available Now</p>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mb-0">{{ $stats['available'] }}</h3>
-        </div>
-    </div>
-
-    {{-- Rooms --}}
-    <div class="stat-card-clean flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-door-closed-fill"></i>
-        </div>
-        <div>
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Rooms (10)</p>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-indigo-900 mb-0">{{ $stats['rooms'] }}</h3>
-        </div>
-    </div>
-
-    {{-- Cottages --}}
-    <div class="stat-card-clean flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-xl font-bold flex-shrink-0">
-            <i class="bi bi-house-door-fill"></i>
-        </div>
-        <div>
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">Cottages (10)</p>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-amber-600 mb-0">{{ $stats['cottages'] }}</h3>
-        </div>
+    <div class="res-head-actions">
+        <button type="button" class="btn-ocean" data-bs-toggle="modal" data-bs-target="#createUnitModal">
+            <i class="bi bi-plus-lg"></i>
+            <span>{{ $kind === 'cottage' ? __('Add cottage') : __('Add room') }}</span>
+        </button>
     </div>
 </div>
 
-{{-- ── Filter Tabs ────────────────────────────────────────────────────────── --}}
-<div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3 sm:p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
-    <div class="flex flex-wrap gap-1.5">
-        <a href="{{ route('accommodations.index', ['filter' => 'all']) }}" 
-           class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition no-underline {{ ($filter ?? 'all') === 'all' ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-            All Units ({{ $stats['total'] }})
-        </a>
-        <a href="{{ route('accommodations.index', ['filter' => 'rooms']) }}" 
-           class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition no-underline {{ ($filter ?? '') === 'rooms' ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-            <i class="bi bi-door-closed me-1"></i>Rooms ({{ $stats['rooms'] }})
-        </a>
-        <a href="{{ route('accommodations.index', ['filter' => 'cottages']) }}" 
-           class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition no-underline {{ ($filter ?? '') === 'cottages' ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-            <i class="bi bi-house-door me-1"></i>Cottages ({{ $stats['cottages'] }})
-        </a>
-        <a href="{{ route('accommodations.index', ['filter' => 'normal']) }}" 
-           class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition no-underline {{ ($filter ?? '') === 'normal' ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-            Normal
-        </a>
-        <a href="{{ route('accommodations.index', ['filter' => 'premium']) }}" 
-           class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition no-underline {{ ($filter ?? '') === 'premium' ? 'bg-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-            <i class="bi bi-star-fill text-[10px] me-1"></i>Premium
-        </a>
-    </div>
+@if($errors->any())
+<div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800" role="alert">
+    {{ $errors->first() }}
+</div>
+@endif
 
-    <span class="text-xs text-slate-400 font-semibold px-2">
-        Showing {{ $units->count() }} of {{ $stats['total'] }} units
-    </span>
+<div class="unit-stats unit-stats-variants" data-live-region="unit-stats">
+    <div><span>{{ $kind === 'cottage' ? __('Cottages') : __('Rooms') }}</span><strong>{{ $stats['total'] }}</strong></div>
+    <div><span>{{ __('Available') }}</span><strong class="is-good">{{ $stats['available'] }}</strong></div>
+    <div><span>{{ __('Unavailable') }}</span><strong class="{{ $stats['total'] - $stats['available'] > 0 ? 'is-bad' : '' }}">{{ $stats['total'] - $stats['available'] }}</strong></div>
+    @foreach($variantCards as $card)
+        <div><span>{{ __($card['label']) }}</span><strong>{{ $card['count'] }}</strong></div>
+    @endforeach
 </div>
 
-{{-- ── Accommodations Table Card ───────────────────────────────────────────── --}}
 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-    <div class="table-responsive">
-        <table class="table-clean">
+    <div class="res-toolbar">
+        @php $currentTab = $variantTabs->firstWhere('slug', $variant) ?? $variantTabs->first(); @endphp
+        <div class="dropdown" data-live-region="unit-variant-filter">
+            <button type="button" class="manual-kind-btn {{ $variant !== 'all' ? 'is-active' : '' }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ __('Filter by variant') }}">
+                <span>{{ $currentTab['slug'] === 'all' ? ($kind === 'cottage' ? __('All cottages') : __('All rooms')) : __($currentTab['label']) }}</span>
+                @if($currentTab['count'] !== null)<span class="unit-filter-count">{{ $currentTab['count'] }}</span>@endif
+            </button>
+            <ul class="dropdown-menu manual-kind-menu unit-filter-menu">
+                @foreach($variantTabs as $tab)
+                <li>
+                    <a class="dropdown-item {{ $variant === $tab['slug'] ? 'active' : '' }}"
+                       href="{{ $tab['slug'] === 'all' ? route($listRoute) : route($listRoute, ['variant' => $tab['slug']]) }}">
+                        <span>{{ $tab['slug'] === 'all' ? ($kind === 'cottage' ? __('All cottages') : __('All rooms')) : __($tab['label']) }}</span>
+                        @if($tab['count'] !== null)<span class="unit-filter-count">{{ $tab['count'] }}</span>@endif
+                    </a>
+                </li>
+                @endforeach
+            </ul>
+        </div>
+        <div class="res-search unit-search">
+            <i class="bi bi-search"></i>
+            <input type="search" id="unitSearch" class="form-control-clean" placeholder="{{ $kind === 'cottage' ? __('Find a cottage...') : __('Find a room...') }}" aria-label="{{ $kind === 'cottage' ? __('Find a cottage') : __('Find a room') }}" data-live-pause-if-filled>
+        </div>
+        <span class="unit-count" id="unitCount" data-total="{{ $units->count() }}" data-label="{{ __($kind === 'cottage' ? ':shown of :total cottages' : ':shown of :total rooms', ['shown' => $units->count(), 'total' => $stats['total']]) }}" data-live-region="unit-count">{{ __($kind === 'cottage' ? ':shown of :total cottages' : ':shown of :total rooms', ['shown' => $units->count(), 'total' => $stats['total']]) }}</span>
+    </div>
+    <div class="table-responsive" data-live-region="unit-list">
+        <table class="table-clean unit-table">
             <thead>
                 <tr>
-                    <th>Unit Details</th>
-                    <th>Category &amp; Variant</th>
-                    <th>Max Guests</th>
-                    <th>Nightly Rate</th>
-                    <th>360° Video Tour</th>
-                    <th>Availability Status</th>
-                    <th class="text-end">Actions</th>
+                    <th>{{ $kind === 'cottage' ? __('Cottage') : __('Room') }}</th>
+                    <th>{{ __('Variant') }}</th>
+                    <th>{{ __('Guests') }}</th>
+                    <th>{{ __('Per night') }}</th>
+                    <th>{{ __('Per hour') }}</th>
+                    <th>{{ __('360° tour') }}</th>
+                    <th>{{ __('Status') }}</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($units as $unit)
-                <tr>
-                    {{-- Unit Details --}}
+                @php
+                    $photo = $unit->first_image;
+                    if ($photo && !str_starts_with($photo, 'http')) {
+                        $photo = '/storage/'.ltrim($photo, '/');
+                    }
+                    $photoCount = is_array($unit->images) ? count($unit->images) : 0;
+                @endphp
+                <tr class="unit-row" data-search="{{ strtolower($unit->unit_number.' '.$unit->variant_label) }}">
                     <td>
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 {{ $unit->unit_type === 'room' ? 'bg-sky-100 text-sky-700 border border-sky-200' : 'bg-amber-100 text-amber-700 border border-amber-200' }}">
-                                <i class="bi {{ $unit->unit_type === 'room' ? 'bi-door-closed-fill' : 'bi-house-door-fill' }}"></i>
+                        <div class="unit-cell">
+                            <div class="unit-thumb">
+                                @if($photo)
+                                    <img src="{{ $photo }}" alt="" loading="lazy">
+                                @else
+                                    <i class="bi {{ $kind === 'cottage' ? 'bi-house-door' : 'bi-door-closed' }}"></i>
+                                @endif
                             </div>
                             <div>
-                                <div class="font-extrabold text-slate-900 text-sm">{{ $unit->unit_number }}</div>
-                                <div class="text-[11px] text-slate-400">{{ $unit->bed_configuration ?? ($unit->floor_area_sqm ? $unit->floor_area_sqm . ' sqm' : 'Resort accommodation') }}</div>
+                                <div class="unit-name">{{ $unit->unit_number }}</div>
+                                <div class="res-note">
+                                    {{ $unit->floor_area_sqm ? rtrim(rtrim(number_format($unit->floor_area_sqm, 1), '0'), '.').' sqm' : __('No floor area') }}
+                                    · {{ $photoCount }} {{ $photoCount === 1 ? __('photo') : __('photos') }}
+                                </div>
                             </div>
                         </div>
                     </td>
-
-                    {{-- Category & Variant --}}
                     <td>
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            @if($unit->variant === 'premium')
-                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1">
-                                <i class="bi bi-stars text-amber-600"></i> Premium
-                            </span>
-                            @else
-                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                Normal
-                            </span>
-                            @endif
-                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/60 uppercase">
-                                {{ $unit->type_label }}
-                            </span>
-                        </div>
+                        <span class="unit-variant">{{ $unit->variant_label }}</span>
                     </td>
-
-                    {{-- Max Guests --}}
-                    <td>
-                        <span class="text-xs font-bold text-slate-700 flex items-center gap-1">
-                            <i class="bi bi-people-fill text-sky-500"></i>
-                            {{ $unit->max_occupancy }} Pax
-                        </span>
-                    </td>
-
-                    {{-- Nightly Rate --}}
-                    <td>
-                        <span class="text-xs font-extrabold text-slate-900">₱{{ number_format($unit->price_per_night, 2) }}</span>
-                    </td>
-
-                    {{-- 360 Tour --}}
+                    <td>{{ $unit->max_occupancy }} {{ $unit->max_occupancy == 1 ? __('guest') : __('guests') }}</td>
+                    <td class="res-money"><strong class="unit-price">₱{{ number_format($unit->price_per_night, 2) }}</strong></td>
+                    <td class="res-money">₱{{ number_format($unit->hourlyRate(), 2) }}</td>
                     <td>
                         @if($unit->tour_video_path)
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <i class="bi bi-camera-video-fill text-emerald-500"></i> Video Active
-                        </span>
+                            <span class="unit-tour is-on">{{ __('Video') }}</span>
                         @else
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                            <i class="bi bi-badge-vr"></i> 360° Simulation
-                        </span>
+                            <span class="unit-tour">{{ __('Not uploaded') }}</span>
                         @endif
                     </td>
-
-                    {{-- Availability Toggle --}}
                     <td>
-                        <form action="{{ route('accommodations.toggle-availability', $unit->id) }}" method="POST" class="inline-block">
+                        <form action="{{ route('accommodations.toggle-availability', $unit->id) }}" method="POST" class="m-0">
                             @csrf
-                            <button type="submit" class="px-2.5 py-1 rounded-full text-xs font-bold border transition flex items-center gap-1.5 {{ $unit->is_available ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $unit->is_available ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                                <span>{{ $unit->is_available ? 'Available' : 'Booked / Off' }}</span>
+                            <button type="submit" class="unit-switch {{ $unit->is_available ? 'is-on' : '' }}"
+                                    role="switch" aria-checked="{{ $unit->is_available ? 'true' : 'false' }}"
+                                    title="{{ $unit->is_available ? 'Click to mark unavailable' : 'Click to make bookable' }}">
+                                <span class="unit-switch-track"><span></span></span>
+                                <span>{{ $unit->is_available ? __('Available') : __('Unavailable') }}</span>
                             </button>
                         </form>
                     </td>
-
-                    {{-- Actions --}}
                     <td class="text-end">
-                        <div class="flex items-center justify-end gap-1.5">
-                            <button class="btn-secondary-clean text-xs py-1 px-2.5" 
+                        <div class="unit-actions">
+                            <button type="button" class="res-icon-btn" title="Edit {{ $unit->unit_number }}" aria-label="Edit {{ $unit->unit_number }}"
                                     onclick="openEditModal({{ json_encode($unit) }})">
-                                <i class="bi bi-pencil-square text-slate-500"></i>
-                                <span>Edit</span>
+                                <i class="bi bi-pencil"></i>
                             </button>
-                            <form action="{{ route('accommodations.destroy', $unit->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to delete {{ $unit->unit_number }}?');">
+                            <form action="{{ route('accommodations.destroy', $unit->id) }}" method="POST" class="m-0" onsubmit="return confirm('Delete {{ $unit->unit_number }}? This cannot be undone.');">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="p-1.5 rounded-xl text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition" title="Delete unit">
+                                <button type="submit" class="res-icon-btn unit-delete" title="Delete {{ $unit->unit_number }}" aria-label="Delete {{ $unit->unit_number }}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
@@ -211,12 +177,18 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="text-center py-12 text-slate-400">
-                        <i class="bi bi-inbox text-3xl block mb-2 text-slate-300"></i>
-                        <p class="text-xs font-semibold mb-0">No accommodation units found.</p>
+                    <td colspan="8" class="text-center py-12 text-slate-400">
+                        <p class="text-sm mb-0">{{ $kind === 'cottage' ? __('No cottages yet.') : __('No rooms yet.') }}</p>
                     </td>
                 </tr>
                 @endforelse
+                @if($units->isNotEmpty())
+                <tr id="unitNoMatch" hidden>
+                    <td colspan="8" class="text-center py-10 text-slate-400">
+                        <p class="text-sm mb-0">{{ $kind === 'cottage' ? __('No cottages match that search.') : __('No rooms match that search.') }}</p>
+                    </td>
+                </tr>
+                @endif
             </tbody>
         </table>
     </div>
@@ -224,87 +196,31 @@
 
 {{-- ── Create Unit Modal ────────────────────────────────────────────────── --}}
 <div class="modal fade" id="createUnitModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
-                        <i class="bi bi-building-add"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-extrabold text-base mb-0 tracking-tight">Add New Room / Cottage</h5>
-                        <p class="text-xs text-sky-200/70 mb-0 font-medium">Create a new room or cottage with pricing and 360° tour support</p>
-                    </div>
+    <div class="modal-dialog modal-lg modal-dialog-centered unit-modal-dialog">
+        <div class="modal-content manual-modal unit-modal-content">
+            <form action="{{ route('accommodations.store') }}" method="POST" enctype="multipart/form-data" class="unit-modal-form">
+                @csrf
+            <div class="manual-head">
+                <div>
+                    <h5>Add {{ strtolower($Noun) }}</h5>
+                    <p>Set the name, rates, guest limit, photos, and an optional 360° tour.</p>
                 </div>
-                <button type="button" class="text-white/70 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition" data-bs-dismiss="modal">
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
 
-            <form action="{{ route('accommodations.store') }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                <div class="modal-body p-6 bg-slate-50/50 space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                        <div class="md:col-span-6">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Unit Name / Identifier</label>
-                            <input type="text" name="unit_number" class="w-full form-control-clean text-xs" placeholder="Unit name or number" required>
-                        </div>
-                        <div class="md:col-span-3">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Category</label>
-                            <select name="unit_type" class="w-full form-select-clean text-xs font-medium" required>
-                                <option value="room">Room</option>
-                                <option value="cottage">Cottage</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-3">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Variant</label>
-                            <select name="variant" class="w-full form-select-clean text-xs font-medium" required>
-                                <option value="normal">Normal</option>
-                                <option value="premium">Premium</option>
-                            </select>
-                        </div>
-
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Nightly Rate (PHP)</label>
-                            <input type="number" step="0.01" name="price_per_night" class="w-full form-control-clean text-xs" value="1500.00" required>
-                        </div>
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Max Occupancy (Pax)</label>
-                            <input type="number" name="max_occupancy" class="w-full form-control-clean text-xs" value="2" min="1" required>
-                        </div>
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Floor Area (sqm)</label>
-                            <input type="number" step="0.1" name="floor_area_sqm" class="w-full form-control-clean text-xs" placeholder="Floor area (sqm)">
-                        </div>
-
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Bed Configuration</label>
-                            <input type="text" name="bed_configuration" class="w-full form-control-clean text-xs" placeholder="Bed arrangement">
-                        </div>
-
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Description</label>
-                            <textarea name="description" rows="3" class="w-full form-control-clean text-xs" placeholder="Detailed overview of the room/cottage..."></textarea>
-                        </div>
-
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Amenities (1 per line)</label>
-                            <textarea name="amenities" rows="3" class="w-full form-control-clean text-xs" placeholder="Air-conditioning&#10;Private bathroom with hot shower&#10;Free Wi-Fi&#10;Smart TV"></textarea>
-                        </div>
-
-                        <div class="md:col-span-6">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">360° Virtual Tour Video (MP4 / WebM)</label>
-                            <input type="file" name="tour_video" accept="video/mp4,video/webm" class="w-full form-control-clean text-xs">
-                        </div>
-                        <div class="md:col-span-6">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Photo Gallery Images</label>
-                            <input type="file" name="images[]" multiple accept="image/*" class="w-full form-control-clean text-xs">
-                        </div>
+                <div class="modal-body unit-modal-body">
+                    @if($errors->any() && !old('_method'))
+                    <div class="unit-modal-error" role="alert">
+                        {{ $errors->first() }}
                     </div>
+                    @endif
+                    @include('accommodations.partials.unit-fields', ['prefix' => 'create', 'mode' => 'create'])
                 </div>
-                <div class="p-4 bg-white border-t border-slate-100 flex items-center justify-end gap-2">
-                    <button type="button" class="btn-secondary-clean text-xs px-4 py-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn-ocean text-xs px-5 py-2">Save New Unit</button>
+                <div class="manual-foot">
+                    <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-ocean">Add {{ strtolower($Noun) }}</button>
                 </div>
             </form>
         </div>
@@ -313,88 +229,27 @@
 
 {{-- ── Edit Unit Modal ──────────────────────────────────────────────────── --}}
 <div class="modal fade" id="editUnitModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
-                        <i class="bi bi-pencil-square"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-extrabold text-base mb-0 tracking-tight" id="editModalTitle">Edit Room / Cottage</h5>
-                        <p class="text-xs text-sky-200/70 mb-0 font-medium">Update pricing, amenities, occupancy, or media</p>
-                    </div>
+    <div class="modal-dialog modal-lg modal-dialog-centered unit-modal-dialog">
+        <div class="modal-content manual-modal unit-modal-content">
+            <div class="manual-head">
+                <div>
+                    <h5 id="editModalTitle">Edit {{ strtolower($Noun) }}</h5>
+                    <p>Update the rates, guest limit, amenities, or media.</p>
                 </div>
-                <button type="button" class="text-white/70 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition" data-bs-dismiss="modal">
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
 
-            <form id="editUnitForm" action="" method="POST" enctype="multipart/form-data">
+            <form id="editUnitForm" action="" method="POST" enctype="multipart/form-data" class="unit-modal-form">
                 @csrf
                 @method('PUT')
-                <div class="modal-body p-6 bg-slate-50/50 space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                        <div class="md:col-span-6">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Unit Name / Identifier</label>
-                            <input type="text" name="unit_number" id="editUnitNumber" class="w-full form-control-clean text-xs" required>
-                        </div>
-                        <div class="md:col-span-3">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Category</label>
-                            <select name="unit_type" id="editUnitType" class="w-full form-select-clean text-xs font-medium" required>
-                                <option value="room">Room</option>
-                                <option value="cottage">Cottage</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-3">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Variant</label>
-                            <select name="variant" id="editVariant" class="w-full form-select-clean text-xs font-medium" required>
-                                <option value="normal">Normal</option>
-                                <option value="premium">Premium</option>
-                            </select>
-                        </div>
-
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Nightly Rate (PHP)</label>
-                            <input type="number" step="0.01" name="price_per_night" id="editPrice" class="w-full form-control-clean text-xs" required>
-                        </div>
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Max Occupancy (Pax)</label>
-                            <input type="number" name="max_occupancy" id="editOccupancy" class="w-full form-control-clean text-xs" min="1" required>
-                        </div>
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Floor Area (sqm)</label>
-                            <input type="number" step="0.1" name="floor_area_sqm" id="editFloorArea" class="w-full form-control-clean text-xs">
-                        </div>
-
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Bed Configuration</label>
-                            <input type="text" name="bed_configuration" id="editBedConfig" class="w-full form-control-clean text-xs">
-                        </div>
-
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Description</label>
-                            <textarea name="description" id="editDescription" rows="3" class="w-full form-control-clean text-xs"></textarea>
-                        </div>
-
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Amenities (1 per line)</label>
-                            <textarea name="amenities" id="editAmenities" rows="3" class="w-full form-control-clean text-xs"></textarea>
-                        </div>
-
-                        <div class="md:col-span-6">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Upload New 360° Tour Video (optional)</label>
-                            <input type="file" name="tour_video" accept="video/mp4,video/webm" class="w-full form-control-clean text-xs">
-                        </div>
-                        <div class="md:col-span-6">
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Add More Photos</label>
-                            <input type="file" name="images[]" multiple accept="image/*" class="w-full form-control-clean text-xs">
-                        </div>
-                    </div>
+                <div class="modal-body unit-modal-body">
+                    @include('accommodations.partials.unit-fields', ['prefix' => 'edit', 'mode' => 'edit'])
                 </div>
-                <div class="p-4 bg-white border-t border-slate-100 flex items-center justify-end gap-2">
-                    <button type="button" class="btn-secondary-clean text-xs px-4 py-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn-ocean text-xs px-5 py-2">Update Unit</button>
+                <div class="manual-foot">
+                    <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-ocean">Save changes</button>
                 </div>
             </form>
         </div>
@@ -402,26 +257,134 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    @if($errors->any() && !old('_method'))
+    const createModal = document.getElementById('createUnitModal');
+    if (createModal && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(createModal).show();
+    }
+    @endif
+});
+function applyVariantRate(radio, priceId) {
+    const price = radio.dataset.night;
+    if (price === undefined || price === '') return;
+    const field = document.getElementById(priceId);
+    if (field) field.value = Number(price).toFixed(2);
+}
 function openEditModal(unit) {
     document.getElementById('editModalTitle').textContent = 'Edit ' + unit.unit_number;
     document.getElementById('editUnitForm').action = '/accommodations/' + unit.id;
-    document.getElementById('editUnitNumber').value = unit.unit_number;
-    document.getElementById('editUnitType').value = unit.unit_type;
-    document.getElementById('editVariant').value = unit.variant;
+    const numberInput = document.getElementById('editUnitNo');
+    const ownNumber = String(unit.unit_number || '').match(/(\d+)\s*$/);
+    numberInput.dataset.ignore = unit.id;
+    numberInput.value = ownNumber ? Number(ownNumber[1]) : '';
+    checkUnitNumber(numberInput);
+    const form = document.getElementById('editUnitForm');
+    const variantRadios = Array.from(form.querySelectorAll('input[name="variant"]'));
+    (variantRadios.find(r => r.value === unit.variant) || variantRadios[0]).checked = true;
     document.getElementById('editPrice').value = unit.price_per_night;
+    const storedHourly = unit.price_per_hour;
+    document.getElementById('editHourly').value = storedHourly === null || storedHourly === ''
+        ? (Math.round(Number(unit.price_per_night) / 12 * 100) / 100).toFixed(2)
+        : storedHourly;
     document.getElementById('editOccupancy').value = unit.max_occupancy;
     document.getElementById('editFloorArea').value = unit.floor_area_sqm || '';
-    document.getElementById('editBedConfig').value = unit.bed_configuration || '';
     document.getElementById('editDescription').value = unit.description || '';
     
-    if (Array.isArray(unit.amenities)) {
-        document.getElementById('editAmenities').value = unit.amenities.join('\n');
-    } else {
-        document.getElementById('editAmenities').value = '';
-    }
+    const amenities = document.getElementById('editAmenities');
+    amenities.value = Array.isArray(unit.amenities) ? unit.amenities.join('\n') : '';
+    syncAmenityChips(amenities);
 
-    new bootstrap.Modal(document.getElementById('editUnitModal')).show();
+    const photoCount = Array.isArray(unit.images) ? unit.images.length : 0;
+    document.getElementById('editTourHint').textContent = unit.tour_video_path
+        ? 'A video is already uploaded. Choose a new file only to replace it.'
+        : 'No video yet. MP4, WebM, or MOV, up to 200 MB.';
+    document.getElementById('editPhotoHint').textContent = photoCount
+        ? `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'} uploaded. New photos are added to them.`
+        : 'No photos yet. JPG, PNG, or WebP under 5 MB each.';
+    form.querySelectorAll('input[type="file"]').forEach(input => { input.value = ''; });
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editUnitModal')).show();
 }
+function amenityLines(box) {
+    return box.value.split('\n').map((line) => line.trim()).filter(Boolean);
+}
+function syncAmenityChips(box) {
+    const lines = amenityLines(box).map(line => line.toLowerCase());
+    box.closest('.unit-amenities')?.querySelectorAll('.amenity-chip').forEach(chip => {
+        chip.classList.toggle('is-on', lines.includes(chip.dataset.amenity.toLowerCase()));
+    });
+}
+document.querySelectorAll('.unit-amenities').forEach((wrap) => {
+    const box = wrap.querySelector('.js-amenities');
+    wrap.querySelectorAll('.amenity-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+            const name = chip.dataset.amenity;
+            const lines = amenityLines(box);
+            const at = lines.findIndex(line => line.toLowerCase() === name.toLowerCase());
+            if (at >= 0) lines.splice(at, 1); else lines.push(name);
+            box.value = lines.join('\n');
+            syncAmenityChips(box);
+        });
+    });
+    box.addEventListener('input', () => syncAmenityChips(box));
+    syncAmenityChips(box);
+});
+function checkUnitNumber(input) {
+    const p = input.id.replace(/UnitNo$/, '');
+    const wrap = document.getElementById(p + 'UnitNoWrap');
+    const hint = document.getElementById(p + 'UnitNoHint');
+    const hidden = document.getElementById(p + 'UnitNumber');
+    const prefix = input.dataset.prefix;
+    const ignore = Number(input.dataset.ignore || 0);
+    const taken = JSON.parse(input.dataset.units || '[]')
+        .filter(unit => unit.id !== ignore)
+        .map(unit => unit.number);
+    let next = 1;
+    while (taken.includes(next)) next++;
+
+    const n = Number(input.value);
+    const valid = input.value !== '' && Number.isInteger(n) && n > 0;
+    const isTaken = valid && taken.includes(n);
+    hidden.value = valid ? `${prefix} ${n}` : '';
+    wrap.classList.toggle('is-taken', isTaken);
+    hint.classList.toggle('is-taken', isTaken);
+    input.setCustomValidity(isTaken ? `${prefix} ${n} is already taken. Use ${prefix} ${next}.` : '');
+    input.dataset.next = next;
+    if (isTaken) {
+        hint.innerHTML = `${prefix} ${n} is already taken. <button type="button">Use ${prefix} ${next}</button>`;
+    } else {
+        hint.textContent = valid ? `Saved as ${prefix} ${n}.` : `Type a number, e.g. ${next}.`;
+    }
+}
+document.querySelectorAll('.js-unit-no').forEach((input) => {
+    const hint = document.getElementById(input.id.replace(/UnitNo$/, '') + 'UnitNoHint');
+    hint.addEventListener('click', (event) => {
+        if (!event.target.closest('button')) return;
+        input.value = input.dataset.next;
+        checkUnitNumber(input);
+        input.focus();
+    });
+    input.addEventListener('input', () => checkUnitNumber(input));
+    checkUnitNumber(input);
+});
+(function () {
+    const search = document.getElementById('unitSearch');
+    if (!search) return;
+    search.addEventListener('input', () => {
+        const count = document.getElementById('unitCount');
+        const noMatch = document.getElementById('unitNoMatch');
+        const term = search.value.trim().toLowerCase();
+        let shown = 0;
+        document.querySelectorAll('.unit-row').forEach(row => {
+            const match = !term || row.dataset.search.includes(term);
+            row.hidden = !match;
+            if (match) shown++;
+        });
+        if (noMatch) noMatch.hidden = !term || shown > 0;
+        if (count) count.textContent = term ? `${shown} of ${count.dataset.total} shown` : count.dataset.label;
+    });
+})();
 </script>
 
 @endsection

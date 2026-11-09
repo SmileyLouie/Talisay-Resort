@@ -4,217 +4,243 @@
 
 @section('content')
 
-{{-- Header --}}
-<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+@php
+    $statusLabels = ['pending' => 'Pending', 'success' => 'Paid', 'failed' => 'Failed', 'refunded' => 'Refunded'];
+    $status = (string) request('status');
+    $gateway = (string) request('gateway');
+    $methodNames = $paymentMethods->pluck('name', 'code')->all();
+    $methodIcons = $paymentMethods->pluck('icon', 'code')->all();
+    $allCount = $statusCounts->sum();
+    $canVerify = auth()->user()->isAdmin() || auth()->user()->hasPermission('payments', 'verify');
+    $methodLabel = fn ($code) => $methodNames[$code] ?? \Illuminate\Support\Str::headline((string) $code);
+@endphp
+
+<div class="res-head">
     <div>
-        <div class="flex items-center gap-2 mb-1">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
-                <i class="bi bi-wallet2 text-[10px] text-sky-600"></i>
-                Financials
-            </span>
-        </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
-            Payments &amp; Transactions
-        </h1>
-        <p class="text-sm text-slate-500 mb-0">
-            Monitor transaction records, verify guest payments, and review proof of payment uploads.
-        </p>
+        <h1>{{ __('Payments') }}</h1>
+        <p>Check guest receipts, approve payments, and track what has been collected.</p>
     </div>
-
-    <div class="flex items-center gap-3">
-        <span class="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 shadow-sm">
-            Total Transactions: <strong class="text-slate-900">{{ $payments->total() }}</strong>
-        </span>
+    @if(auth()->user()->isAdmin())
+    <div class="res-head-actions">
+        <a href="{{ route('maintenance.section', 'payments') }}" class="btn-secondary-clean">
+            <i class="bi bi-wallet2"></i>
+            <span>{{ __('Payment methods') }}</span>
+        </a>
     </div>
+    @endif
 </div>
 
-{{-- Financial Summary KPI Cards --}}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
-    
-    {{-- Total Revenue --}}
-    <div class="stat-card-clean flex flex-col justify-between">
-        <div class="flex items-start justify-between">
-            <div>
-                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Total Revenue Collected</p>
-                <h2 class="text-2xl sm:text-3xl font-extrabold text-emerald-600 tracking-tight">
-                    ₱{{ number_format($totalSuccess, 2) }}
-                </h2>
-            </div>
-            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xl font-bold shadow-sm">
-                <i class="bi bi-cash-stack"></i>
-            </div>
-        </div>
-        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center text-xs text-emerald-600 font-semibold">
-            <i class="bi bi-check-circle-fill me-1.5 text-xs"></i> Verified successful payments
-        </div>
-    </div>
-
-    {{-- Pending Approval Value --}}
-    <div class="stat-card-clean flex flex-col justify-between">
-        <div class="flex items-start justify-between">
-            <div>
-                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Pending Approval Value</p>
-                <h2 class="text-2xl sm:text-3xl font-extrabold text-amber-600 tracking-tight">
-                    ₱{{ number_format($totalPending, 2) }}
-                </h2>
-            </div>
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-xl font-bold shadow-sm">
-                <i class="bi bi-hourglass-split"></i>
-            </div>
-        </div>
-        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center text-xs text-amber-600 font-semibold">
-            <i class="bi bi-clock-history me-1.5 text-xs"></i> {{ $pendingCount }} transactions awaiting verification
-        </div>
-    </div>
-
-    {{-- Total Logged --}}
-    <div class="stat-card-clean flex flex-col justify-between">
-        <div class="flex items-start justify-between">
-            <div>
-                <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Logged Payment Attempts</p>
-                <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    {{ $payments->total() }}
-                </h2>
-            </div>
-            <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center text-xl font-bold shadow-sm">
-                <i class="bi bi-receipt"></i>
-            </div>
-        </div>
-        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center text-xs text-sky-600 font-semibold">
-            <i class="bi bi-shield-check me-1.5 text-xs"></i> Full audit trail available
-        </div>
-    </div>
-</div>
-
-{{-- Search & Filter Form --}}
-<div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 mb-6">
-    <form method="GET" action="{{ route('payments.index') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-        <div class="sm:col-span-5">
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Search</label>
-            <div class="relative">
-                <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                <input type="text" name="search" class="w-full pl-9 form-control-clean text-xs" placeholder="Transaction ID or Booking Reference..." value="{{ request('search') }}">
-            </div>
-        </div>
-
-        <div class="sm:col-span-3">
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
-            <select name="status" class="w-full form-select-clean text-xs font-medium" onchange="this.form.submit()">
-                <option value="">All Statuses</option>
-                <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
-                <option value="success" {{ request('status') === 'success' ? 'selected' : '' }}>Success / Verified</option>
-                <option value="failed" {{ request('status') === 'failed' ? 'selected' : '' }}>Failed</option>
-                <option value="refunded" {{ request('status') === 'refunded' ? 'selected' : '' }}>Refunded</option>
-            </select>
-        </div>
-
-        <div class="sm:col-span-2">
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Gateway</label>
-            <select name="gateway" class="w-full form-select-clean text-xs font-medium" onchange="this.form.submit()">
-                <option value="">All Gateways</option>
-                <option value="stripe" {{ request('gateway') === 'stripe' ? 'selected' : '' }}>Stripe</option>
-                <option value="gcash" {{ request('gateway') === 'gcash' ? 'selected' : '' }}>GCash</option>
-                <option value="cash" {{ request('gateway') === 'cash' ? 'selected' : '' }}>Cash</option>
-                <option value="bank_transfer" {{ request('gateway') === 'bank_transfer' ? 'selected' : '' }}>Bank Transfer</option>
-            </select>
-        </div>
-
-        <div class="sm:col-span-2 flex gap-2">
-            <button type="submit" class="btn-ocean text-xs flex-1 justify-center">
-                <i class="bi bi-funnel-fill"></i> Filter
-            </button>
-            @if(request()->hasAny(['search','status','gateway']))
-            <a href="{{ route('payments.index') }}" class="btn-secondary-clean text-xs">
-                Clear
-            </a>
+<div class="unit-stats pay-stats" data-live-region="payment-stats">
+    <div>
+        <span>{{ __('Collected') }}</span>
+        <strong class="is-good">₱{{ number_format($totalSuccess, 2) }}</strong>
+        <em>
+            @if($statusCounts['success'] ?? 0)
+                {{ $statusCounts['success'] }} paid{{ $refundSentCount ? ' · net of refunds' : '' }}
+            @else
+                No approved payments yet
             @endif
-        </div>
-    </form>
+        </em>
+    </div>
+    <div>
+        <span>{{ __('Awaiting approval') }}</span>
+        <strong class="{{ $pendingCount ? 'is-warn' : '' }}">₱{{ number_format($totalPending, 2) }}</strong>
+        <em>
+            @if($pendingCount)
+                <a href="{{ route('payments.index', ['status' => 'pending']) }}" class="pay-link">{{ $pendingCount }} to review</a>
+            @else
+                0 to review
+            @endif
+            @if($awaitingReceiptCount)
+                · {{ $awaitingReceiptCount }} waiting for a receipt
+            @endif
+        </em>
+    </div>
+    <div>
+        <span>{{ __('Refunds to send') }}</span>
+        <strong class="{{ $refundDueCount ? 'is-warn' : '' }}">₱{{ number_format($refundDueTotal, 2) }}</strong>
+        <em>
+            @if($refundDueCount)
+                <a href="{{ route('payments.index', ['status' => 'refund_due']) }}" class="pay-link">{{ $refundDueCount }} cancelled {{ $refundDueCount === 1 ? 'booking' : 'bookings' }}</a>
+            @elseif($refundSentCount)
+                ₱{{ number_format($refundSentTotal, 2) }} already refunded
+            @else
+                Nothing owed to guests
+            @endif
+        </em>
+    </div>
+    <div>
+        <span>{{ __('Failed') }}</span>
+        <strong class="{{ ($statusCounts['failed'] ?? 0) ? 'is-bad' : '' }}">{{ $statusCounts['failed'] ?? 0 }}</strong>
+        <em>
+            @if($statusCounts['failed'] ?? 0)
+                <a href="{{ route('payments.index', ['status' => 'failed']) }}" class="pay-link">Declined or not completed</a>
+            @else
+                Declined or not completed
+            @endif
+        </em>
+    </div>
+    <div>
+        <span>{{ __('All payments') }}</span>
+        <strong>{{ $allCount }}</strong>
+        <em>{{ $refundSentCount ? $refundSentCount.' refunded' : 'Every attempt is kept' }}</em>
+    </div>
 </div>
 
-{{-- Payments Table Card --}}
 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-    <div class="table-responsive">
-        <table class="table-clean">
+    <form method="GET" action="{{ route('payments.index') }}" class="res-toolbar">
+        <input type="hidden" name="status" value="{{ $status }}">
+        <input type="hidden" name="gateway" value="{{ $gateway }}">
+
+        <div class="dropdown" data-live-region="payment-status-filter">
+            <button type="button" class="manual-kind-btn {{ $status !== '' ? 'is-active' : '' }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Filter by status">
+                <span>{{ $status === 'refund_due' ? 'Refund due' : ($status !== '' ? ($statusLabels[$status] ?? ucfirst($status)) : 'All statuses') }}</span>
+                <span class="unit-filter-count">{{ $status === 'refund_due' ? $refundDueCount : ($status !== '' ? ($statusCounts[$status] ?? 0) : $allCount) }}</span>
+            </button>
+            <ul class="dropdown-menu manual-kind-menu unit-filter-menu">
+                <li>
+                    <a class="dropdown-item {{ $status === '' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['status' => null, 'page' => null]) }}">
+                        <span>All statuses</span><span class="unit-filter-count">{{ $allCount }}</span>
+                    </a>
+                </li>
+                @foreach($statusLabels as $code => $label)
+                <li>
+                    <a class="dropdown-item {{ $status === $code ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['status' => $code, 'page' => null]) }}">
+                        <span>{{ $label }}</span><span class="unit-filter-count">{{ $statusCounts[$code] ?? 0 }}</span>
+                    </a>
+                </li>
+                @endforeach
+            </ul>
+        </div>
+
+        <div class="dropdown" data-live-region="payment-method-filter">
+            <button type="button" class="manual-kind-btn {{ $gateway !== '' ? 'is-active' : '' }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Filter by payment method">
+                <span>{{ $gateway !== '' ? $methodLabel($gateway) : 'All methods' }}</span>
+            </button>
+            <ul class="dropdown-menu manual-kind-menu unit-filter-menu">
+                <li>
+                    <a class="dropdown-item {{ $gateway === '' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['gateway' => null, 'page' => null]) }}">
+                        <span>All methods</span><span class="unit-filter-count">{{ $allCount }}</span>
+                    </a>
+                </li>
+                @foreach($paymentMethods as $method)
+                <li>
+                    <a class="dropdown-item {{ $gateway === $method->code ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['gateway' => $method->code, 'page' => null]) }}">
+                        <span>{{ $method->name }}</span><span class="unit-filter-count">{{ $gatewayCounts[$method->code] ?? 0 }}</span>
+                    </a>
+                </li>
+                @endforeach
+            </ul>
+        </div>
+
+        @if(request()->anyFilled(['search', 'status', 'gateway']))
+        <a href="{{ route('payments.index') }}" class="res-clear">Clear</a>
+        @endif
+
+        <div class="res-search unit-search">
+            <i class="bi bi-search"></i>
+            <input type="search" name="search" class="form-control-clean" placeholder="Booking ref or receipt no." value="{{ request('search') }}" aria-label="Search payments">
+        </div>
+        <span class="unit-count" data-live-region="payment-count">{{ $payments->total() }} {{ $payments->total() === 1 ? 'payment' : 'payments' }}</span>
+    </form>
+
+    <div class="table-responsive" data-live-region="payment-list">
+        <table class="table-clean pay-table">
             <thead>
                 <tr>
-                    <th>Transaction ID</th>
-                    <th>Booking Ref</th>
-                    <th>Guest Details</th>
-                    <th>Amount</th>
-                    <th>Payment Method</th>
-                    <th>Status</th>
-                    <th>Date Logged</th>
-                    <th class="text-end">Actions</th>
+                    <th>{{ __('Booking') }}</th>
+                    <th>{{ __('Guest') }}</th>
+                    <th>{{ __('Amount') }}</th>
+                    <th>{{ __('Method') }}</th>
+                    <th>{{ __('Receipt') }}</th>
+                    <th>{{ __('Status') }}</th>
+                    <th>{{ __('Logged') }}</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($payments as $payment)
-                <tr class="{{ $payment->status === 'pending' ? 'bg-amber-50/30' : '' }}">
+                @php
+                    $booking = $payment->booking;
+                    $receiptNo = $payment->guestReference();
+                    $proof = $payment->proofUrl();
+                @endphp
+                <tr class="{{ $payment->status === 'pending' ? 'pay-row-pending' : '' }}">
                     <td>
-                        <span class="font-mono text-xs font-extrabold text-slate-800">{{ $payment->transaction_id ?? 'N/A' }}</span>
+                        <span class="res-ref">{{ $booking->reference_no ?? '—' }}</span>
+                        @if($booking)
+                        <div class="res-note">{{ $booking->booking_type === 'special_resort' ? 'Full resort' : ($booking->accommodationUnit->unit_number ?? '—') }}</div>
+                        @endif
                     </td>
                     <td>
-                        <span class="font-mono text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200/60">
-                            {{ $payment->booking->reference_no ?? '—' }}
+                        <span class="res-guest">{{ $booking->guest_name ?? $booking?->user?->name ?? 'Guest' }}</span>
+                        @if($booking?->user?->email)
+                        <div class="res-note pay-guest-email" title="{{ $booking->user->email }}">{{ $booking->user->email }}</div>
+                        @endif
+                    </td>
+                    <td class="res-money">
+                        <strong class="pay-amount">₱{{ number_format($payment->amount, 2) }}</strong>
+                        @if(($payment->metadata['payment_plan'] ?? null) === 'down')
+                        <div class="res-note">50% down payment</div>
+                        @endif
+                    </td>
+                    <td>
+                        <span class="pay-method">
+                            <i class="bi {{ $methodIcons[$payment->gateway] ?? 'bi-credit-card' }}"></i>
+                            {{ $methodLabel($payment->gateway) }}
                         </span>
                     </td>
                     <td>
-                        <div class="font-bold text-slate-900 text-xs">{{ $payment->booking->user->name ?? 'Guest User' }}</div>
-                        <div class="text-[11px] text-slate-400">{{ $payment->booking->user->email ?? '' }}</div>
+                        @if($receiptNo || $proof)
+                            @if($receiptNo)<div class="pay-receipt-no">{{ $receiptNo }}</div>@endif
+                            @if($proof)
+                            <a href="{{ $proof }}" target="_blank" rel="noopener" class="pay-proof"><i class="bi bi-image"></i> View receipt</a>
+                            @endif
+                        @else
+                            <span class="res-note m-0">No receipt yet</span>
+                        @endif
                     </td>
                     <td>
-                        <span class="text-xs font-black text-slate-900">₱{{ number_format($payment->amount, 2) }}</span>
+                        @if($payment->refundState() === 'due')
+                        <span class="res-status pay-status-pending">Refund due</span>
+                        @else
+                        <span class="res-status pay-status-{{ $payment->status }}">{{ $statusLabels[$payment->status] ?? ucfirst($payment->status) }}</span>
+                        @endif
+                        @switch($payment->refundState())
+                            @case('due')
+                                <div class="res-note pay-refund-due">Refund due ₱{{ number_format($payment->suggestedRefund(), 2) }}</div>
+                                @break
+                            @case('sent')
+                                <div class="res-note">Refunded ₱{{ number_format($payment->refundSent()['amount'], 2) }}</div>
+                                @break
+                        @endswitch
                     </td>
                     <td>
-                        @php
-                            $gwIcons = ['stripe' => 'bi-credit-card-fill', 'gcash' => 'bi-phone-fill', 'cash' => 'bi-cash-stack', 'bank_transfer' => 'bi-bank'];
-                        @endphp
-                        <span class="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
-                            <i class="bi {{ $gwIcons[$payment->gateway] ?? 'bi-credit-card' }} text-sky-600"></i>
-                            {{ ucfirst(str_replace('_', ' ', $payment->gateway)) }}
-                        </span>
-                    </td>
-                    <td>
-                        @php
-                            $statusMap = [
-                                'pending'  => 'bg-amber-50 text-amber-700 border-amber-200',
-                                'success'  => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                'failed'   => 'bg-rose-50 text-rose-700 border-rose-200',
-                                'refunded' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                            ];
-                        @endphp
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 {{ $statusMap[$payment->status] ?? 'bg-slate-100 text-slate-700 border-slate-200' }}">
-                            {{ ucfirst($payment->status) }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="text-xs text-slate-500 font-medium">{{ $payment->created_at->format('M d, Y • h:i A') }}</span>
+                        {{ $payment->created_at->format('M j, Y') }}
+                        <div class="res-note">{{ $payment->created_at->format('g:i A') }}</div>
                     </td>
                     <td class="text-end">
-                        <div class="flex items-center justify-end gap-1.5">
-                            <a href="{{ route('payments.show', $payment) }}" class="btn-secondary-clean text-xs py-1 px-2.5" title="View Details">
-                                <i class="bi bi-eye text-slate-500"></i>
-                                <span>Details</span>
-                            </a>
-                            @if($payment->status === 'pending')
-                            <form method="POST" action="{{ route('payments.approve', $payment) }}" class="inline-block"
-                                  onsubmit="return confirm('Approve payment PHP {{ number_format($payment->amount, 2) }}?')">
+                        <div class="unit-actions">
+                            @if($payment->status === 'pending' && $canVerify)
+                            <form method="POST" action="{{ route('payments.approve', $payment) }}" class="m-0"
+                                  onsubmit="return confirm('Approve ₱{{ number_format($payment->amount, 2) }} for {{ $booking->reference_no ?? 'this booking' }}?')">
                                 @csrf
-                                <button type="submit" class="btn-ocean text-xs py-1 px-2.5" title="Approve Payment">
+                                <button type="submit" class="pay-approve" title="Approve payment">
                                     <i class="bi bi-check-lg"></i>
                                     <span>Approve</span>
                                 </button>
                             </form>
                             @endif
+                            <a href="{{ route('payments.show', $payment) }}" class="res-icon-btn" title="Payment details" aria-label="Payment details for {{ $booking->reference_no ?? 'booking' }}">
+                                <i class="bi bi-eye"></i>
+                            </a>
                         </div>
                     </td>
                 </tr>
                 @empty
                 <tr>
                     <td colspan="8" class="text-center py-12 text-slate-400">
-                        <i class="bi bi-credit-card text-3xl block mb-2 text-slate-300"></i>
-                        <p class="text-xs font-semibold mb-0">No payment records found matching your filters.</p>
+                        <p class="text-sm mb-0">{{ request()->anyFilled(['search', 'status', 'gateway']) ? 'No payments match these filters.' : 'No payments yet.' }}</p>
                     </td>
                 </tr>
                 @endforelse
@@ -222,11 +248,13 @@
         </table>
     </div>
 
-    @if($payments->hasPages())
-    <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-        {{ $payments->withQueryString()->links() }}
+    <div data-live-region="payment-pages">
+        @if($payments->hasPages())
+        <div class="p-4 border-t border-slate-100 flex justify-end">
+            {{ $payments->withQueryString()->links() }}
+        </div>
+        @endif
     </div>
-    @endif
 </div>
 
 @endsection

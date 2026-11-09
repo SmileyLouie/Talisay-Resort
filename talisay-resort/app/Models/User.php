@@ -35,7 +35,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 // Declare which fields are allowed to be mass-assigned (for create/update)
 // This prevents mass-assignment vulnerabilities
-#[Fillable(['name', 'email', 'phone', 'password', 'role', 'avatar', 'is_active', 'fcm_token', 'position', 'department', 'duty_status', 'duty_notes', 'staff_id', 'account_status', 'external_id'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'avatar', 'is_active', 'fcm_token', 'position', 'department', 'duty_status', 'duty_notes', 'staff_id', 'account_status', 'external_id', 'google_id', 'facebook_id'])]
 
 // Hide sensitive fields from JSON serialization (API responses)
 #[Hidden(['password', 'remember_token'])]
@@ -78,6 +78,33 @@ class User extends Authenticatable
         } while (static::withTrashed()->where('staff_id', $candidate)->exists());
 
         return $candidate;
+    }
+
+    public function eraseFromDatabase(): void
+    {
+        \Illuminate\Support\Facades\DB::transaction(function () {
+            $dates = \App\Models\Booking::withTrashed()
+                ->where('user_id', $this->id)
+                ->get()
+                ->flatMap(fn ($booking) => $booking->occupiedDates())
+                ->unique()
+                ->values();
+
+            $this->tokens()->delete();
+            \Illuminate\Support\Facades\DB::table('sessions')->where('user_id', $this->id)->delete();
+            $this->forceDelete();
+
+            foreach ($dates as $date) {
+                \App\Models\CapacitySchedule::recalculateForDate($date);
+            }
+        });
+    }
+
+    public static function uniqueActiveColumn(string $column, ?int $ignoreId = null): \Illuminate\Validation\Rules\Unique
+    {
+        $rule = \Illuminate\Validation\Rule::unique('users', $column)->whereNull('deleted_at');
+
+        return $ignoreId ? $rule->ignore($ignoreId) : $rule;
     }
 
     /**

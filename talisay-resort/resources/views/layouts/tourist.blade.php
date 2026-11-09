@@ -9,42 +9,28 @@
     {{-- Fonts & Icons --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    {{-- Tailwind CSS CDN --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                    },
-                    colors: {
-                        ocean: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/client-resort.css') }}?v=40">
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+    <link href="{{ asset('vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Playfair+Display:wght@400;600&family=Julius+Sans+One&display=swap" rel="stylesheet">
 
     {{-- Alpine.js --}}
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+    <script defer src="{{ asset('vendor/alpine/alpine.min.js') }}"></script>
 
     <style>
+        a, a:hover { text-decoration: none; }
         [x-cloak] { display: none !important; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { font-family: "Plus Jakarta Sans", sans-serif; }
         .bg-ocean-gradient { background: #0c4a6e; }
+        .bg-ocean-600,
+        .bg-ocean-700,
+        .bg-ocean-800,
+        .hover\:bg-ocean-700:hover,
+        .hover\:bg-ocean-800:hover {
+            background-color: #0284c7 !important;
+        }
         .glass-card { background: #ffffff; }
         .rounded-3xl { border-radius: 12px !important; }
         .rounded-2xl { border-radius: 8px !important; }
@@ -54,39 +40,29 @@
         .chat-msg.user { background: #0284c7; color: #ffffff; border-bottom-right-radius: 4px; align-self: flex-end; margin-left: auto; }
     </style>
 </head>
-<body class="h-full flex flex-col text-slate-800 antialiased" x-data="{ chatOpen: false, mobileMenuOpen: false }">
+<body class="h-full flex flex-col text-slate-800 antialiased client-resort" x-data="{ chatOpen: false, mobileMenuOpen: false }">
 
-    {{-- ── Top Navigation Bar ─────────────────────────────────────────── --}}
-    <nav class="bg-ocean-900 text-white sticky top-0 z-40 border-b border-ocean-800">
+    {{-- â”€â”€ Top Navigation Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ --}}
+    <nav class="resort-top sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
 
                 {{-- Brand Logo + Title --}}
-                <a href="{{ route('tourist.dashboard') }}" class="flex items-center gap-3 no-underline group">
-                    <img src="{{ asset('images/logo.png') }}" alt="Talisay Logo" class="w-10 h-10 rounded-lg border border-sky-700">
+                <a href="{{ url('/') }}" class="resort-brand flex items-center gap-3 no-underline">
+                    <img src="{{ asset('images/logo.png') }}" alt="Talisay Logo" class="w-10 h-10 rounded-lg">
                     <div>
-                        <span class="text-lg font-extrabold tracking-tight text-white block leading-tight">Talisay Beach Resort</span>
-                        <span class="text-xs font-semibold text-sky-300 tracking-wider uppercase block">Guest Web Portal</span>
+                        <span class="resort-brand-name block leading-tight">Talisay Beach Resort</span>
+                        <span class="resort-brand-sub block">Smart Tourism System</span>
                     </div>
                 </a>
 
-                {{-- Navigation Links (Desktop) --}}
-                <div class="hidden md:flex items-center space-x-1">
-                    <a href="{{ route('tourist.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-semibold transition {{ request()->routeIs('tourist.dashboard') ? 'bg-white/15 text-white' : 'text-sky-100 hover:bg-white/10 hover:text-white' }} no-underline">
-                        <i class="bi bi-house-door me-1.5"></i>Home
-                    </a>
-                    <a href="{{ route('tourist.bookings') }}" class="px-3 py-2 rounded-lg text-sm font-semibold transition {{ request()->routeIs('tourist.bookings') ? 'bg-white/15 text-white' : 'text-sky-100 hover:bg-white/10 hover:text-white' }} no-underline">
-                        <i class="bi bi-calendar-check me-1.5"></i>My Bookings
-                    </a>
-                    <a href="{{ route('tourist.accommodations') }}" class="px-3 py-2 rounded-lg text-sm font-semibold transition {{ request()->routeIs('tourist.accommodations*') ? 'bg-white/15 text-white' : 'text-sky-100 hover:bg-white/10 hover:text-white' }} no-underline">
-                        <i class="bi bi-building me-1.5"></i>Rooms & Cottages
-                    </a>
-                    <a href="{{ route('tour.viewer') }}" target="_blank" class="px-3 py-2 rounded-lg text-sm font-semibold text-sky-100 hover:bg-white/10 hover:text-white transition no-underline">
-                        <i class="bi bi-camera-video me-1.5"></i>360° Virtual Tour
-                    </a>
-                    <a href="{{ route('tourist.reviews') }}" class="px-3 py-2 rounded-lg text-sm font-semibold transition {{ request()->routeIs('tourist.reviews') ? 'bg-white/15 text-white' : 'text-sky-100 hover:bg-white/10 hover:text-white' }} no-underline">
-                        <i class="bi bi-star me-1.5"></i>My Reviews
-                    </a>
+                <div class="hidden md:flex items-center gap-5">
+                    <a href="{{ url('/') }}" class="resort-menu-link {{ request()->is('/') ? 'is-active' : '' }}">Home</a>
+                    <a href="{{ route('tourist.accommodations') }}" class="resort-menu-link {{ request()->routeIs('tourist.accommodations*') ? 'is-active' : '' }}">Rooms</a>
+                    <a href="{{ route('tourist.bookings') }}" class="resort-menu-link {{ request()->routeIs('tourist.bookings') ? 'is-active' : '' }}">Booking</a>
+                    <a href="{{ route('tour.viewer') }}" target="_blank" class="resort-menu-link">360Â° Tour</a>
+                    <a href="{{ route('tourist.reviews') }}" class="resort-menu-link {{ request()->routeIs('tourist.reviews') ? 'is-active' : '' }}">Reviews</a>
+                    <a href="{{ route('tourist.accommodations') }}" class="resort-book">Book Now</a>
                 </div>
 
                 {{-- Right Buttons: Notifications + User Menu + Mobile Hamburger --}}
@@ -127,7 +103,7 @@
                             } catch (e) {}
                         }
                     }">
-                        <button type="button" @click="notifOpen = !notifOpen" :aria-expanded="notifOpen.toString()" aria-controls="touristNotifPanel" aria-label="Notifications" class="relative p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                        <button type="button" @click="notifOpen = !notifOpen" :aria-expanded="notifOpen.toString()" aria-controls="touristNotifPanel" aria-label="Notifications" class="resort-icon relative p-2 rounded-full transition">
                             <i class="bi bi-bell-fill text-base" aria-hidden="true"></i>
                             <span x-show="unread > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-extrabold rounded-full w-5 h-5 flex items-center justify-center shadow" x-text="unread"></span>
                         </button>
@@ -184,7 +160,7 @@
 
                     {{-- Profile / Logout Dropdown --}}
                     <div class="relative" x-data="{ open: false }">
-                        <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="touristUserMenu" aria-label="Account menu" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 p-1.5 pr-3 rounded-full transition border border-white/10">
+                        <button type="button" @click="open = !open" :aria-expanded="open.toString()" aria-controls="touristUserMenu" aria-label="Account menu" class="resort-icon flex items-center gap-2 p-1.5 pr-3 rounded-full transition border">
                             <div class="w-8 h-8 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center border border-white/30">
                                 {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                             </div>
@@ -214,7 +190,7 @@
                     @endauth
 
                     {{-- Mobile Hamburger Toggle Button --}}
-                    <button type="button" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="touristMobileMenu" aria-label="Toggle navigation menu" class="md:hidden text-white p-2 rounded-lg bg-white/10 hover:bg-white/20 text-lg">
+                    <button type="button" @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-controls="touristMobileMenu" aria-label="Toggle navigation menu" class="resort-icon md:hidden p-2 rounded-lg text-lg">
                         <i class="bi" :class="mobileMenuOpen ? 'bi-x-lg' : 'bi-list'" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -223,22 +199,12 @@
         </div>
 
         {{-- Mobile Dropdown Menu --}}
-        <div id="touristMobileMenu" x-show="mobileMenuOpen" x-transition x-cloak class="md:hidden bg-ocean-950 border-t border-white/10 px-4 pt-3 pb-4 space-y-1">
-            <a href="{{ route('tourist.dashboard') }}" class="block px-3 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 no-underline">
-                <i class="bi bi-house-door me-2"></i>Home
-            </a>
-            <a href="{{ route('tourist.bookings') }}" class="block px-3 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 no-underline">
-                <i class="bi bi-calendar-check me-2"></i>My Bookings
-            </a>
-            <a href="{{ route('tourist.accommodations') }}" class="block px-3 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 no-underline">
-                <i class="bi bi-building me-2"></i>Rooms & Cottages
-            </a>
-            <a href="{{ route('tour.viewer') }}" target="_blank" class="block px-3 py-2.5 rounded-lg text-sm font-semibold text-sky-200 hover:bg-white/10 no-underline">
-                <i class="bi bi-camera-video me-2"></i>360° Virtual Tour
-            </a>
-            <a href="{{ route('tourist.reviews') }}" class="block px-3 py-2.5 rounded-lg text-sm font-semibold text-white hover:bg-white/10 no-underline">
-                <i class="bi bi-star me-2"></i>My Reviews
-            </a>
+        <div id="touristMobileMenu" x-show="mobileMenuOpen" x-transition x-cloak class="md:hidden bg-white border-t border-slate-200 px-4 pt-3 pb-4 space-y-1">
+            <a href="{{ url('/') }}" class="block px-3 py-2.5 text-sm text-slate-800 no-underline">Home</a>
+            <a href="{{ route('tourist.accommodations') }}" class="block px-3 py-2.5 text-sm text-slate-800 no-underline">Rooms</a>
+            <a href="{{ route('tourist.bookings') }}" class="block px-3 py-2.5 text-sm text-slate-800 no-underline">Booking</a>
+            <a href="{{ route('tour.viewer') }}" target="_blank" class="block px-3 py-2.5 text-sm text-slate-800 no-underline">360Â° Tour</a>
+            <a href="{{ route('tourist.reviews') }}" class="block px-3 py-2.5 text-sm text-slate-800 no-underline">Reviews</a>
         </div>
     </nav>
 
@@ -297,18 +263,18 @@
         @yield('content')
     </main>
 
-    {{-- ── Footer ─────────────────────────────────────────────────────── --}}
+    {{-- â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ --}}
     <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center">
             <div class="flex items-center justify-center gap-2 mb-3">
                 <img src="{{ asset('images/logo.png') }}" alt="Talisay Beach Resort logo" class="w-6 h-6 rounded-md">
                 <span class="text-sm font-bold text-white">Talisay Beach Resort Smart Tourism</span>
             </div>
-            <p class="text-xs text-slate-500 mb-0">&copy; {{ date('Y') }} Talisay Beach Resort. {{ setting('resort_address', 'Barangay Maslug, Baybay City, Leyte') }}. All rights reserved.</p>
+            <p class="text-xs text-slate-500 mb-0">&copy; Talisay Beach Resort. {{ setting('resort_address', 'Barangay Maslug, Baybay City, Leyte') }}. All rights reserved.</p>
         </div>
     </footer>
 
-    {{-- ── Floating AI Chatbot Widget ──────────────────────────────────── --}}
+    {{-- â”€â”€ Floating AI Chatbot Widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ --}}
     <style>
         .chat-msg-user  { align-self:flex-end; background:#0c4a6e; color:#fff; border-radius:18px 18px 4px 18px; padding:8px 14px; max-width:82%; font-size:13px; line-height:1.5; }
         .chat-msg-bot   { align-self:flex-start; background:#fff; color:#1e293b; border:1px solid #e2e8f0; border-radius:18px 18px 18px 4px; padding:8px 14px; max-width:88%; font-size:13px; line-height:1.6; white-space:pre-wrap; }
@@ -334,7 +300,7 @@
                 </div>
                 <div class="flex-1">
                     <h4 id="touristChatTitle" class="text-sm font-extrabold mb-0">Talisay AI Assistant</h4>
-                    <p class="text-xs text-sky-300 mb-0">Online • Real-time Resort Info</p>
+                    <p class="text-xs text-sky-300 mb-0">Online â€¢ Real-time Resort Info</p>
                 </div>
                 <button type="button" @click="open = false" class="text-white/60 hover:text-white text-lg" aria-label="Close chat">
                     <i class="bi bi-x-lg" aria-hidden="true"></i>
@@ -345,13 +311,13 @@
             <div class="flex-1 p-4 overflow-y-auto flex flex-col gap-2 bg-slate-50" style="max-height:380px;" x-ref="messagesBox" aria-live="polite">
                 <div class="chat-msg-bot">
                     Hello {{ first_name(auth()->user()->name) }}! Welcome back to Talisay Beach Resort.
-                    How can I help you today? You can check your bookings, inquire about room rates, payment methods, or explore the 360° virtual tour!
+                    How can I help you today? You can check your bookings, inquire about room rates, payment methods, or explore the 360Â° virtual tour!
                 </div>
                 <div class="flex flex-wrap gap-1 mt-1">
                     <button type="button" @click="sendChip('My Bookings')" class="chat-chip">My Bookings</button>
                     <button type="button" @click="sendChip('Room Rates')" class="chat-chip">Room Rates</button>
                     <button type="button" @click="sendChip('GCash payment')" class="chat-chip">GCash Guide</button>
-                    <button type="button" @click="sendChip('virtual tour')" class="chat-chip">360° Tour</button>
+                    <button type="button" @click="sendChip('virtual tour')" class="chat-chip">360Â° Tour</button>
                     <button type="button" @click="sendChip('Check Availability')" class="chat-chip">Availability</button>
                 </div>
 
@@ -408,7 +374,7 @@
                         .replace(/>/g, "&gt;")
                         .replace(/"/g, "&quot;");
 
-                    escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">•</span><span>$1</span></div>');
+                    escaped = escaped.replace(/^[â€¢\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">â€¢</span><span>$1</span></div>');
 
                     return escaped
                         .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900">$1</strong>')
@@ -452,7 +418,7 @@
 
                         const data = await res.json();
                         this.typing = false;
-                        const reply = data.reply || data.response || 'I am here to help! You can ask about room rates, how to book, directions, payment methods, or the 360° virtual tour.';
+                        const reply = data.reply || data.response || 'I am here to help! You can ask about room rates, how to book, directions, payment methods, or the 360Â° virtual tour.';
                         const chips = Array.isArray(data.chips) ? data.chips.map(c => String(c)) : [];
                         this.messages.push({ sender: 'bot', text: reply, chips: chips });
                     } catch (e) {
@@ -493,7 +459,8 @@
     });
     </script>
     {{-- Bootstrap JS Bundle --}}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ asset('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+    @include('partials.required-stars')
     @stack('scripts')
 </body>
 </html>

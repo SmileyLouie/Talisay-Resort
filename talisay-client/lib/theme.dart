@@ -5,7 +5,9 @@ class ResortTheme {
   static const ink = Color(0xFF1E293B);
   static const muted = Color(0xFF64748B);
   static const line = Color(0xFFE2E8F0);
-  static const paper = Color(0xFFF8FAFC);
+  static const paper = Color(0xFFF0F7FB);
+  static const sand = Color(0xFFF59E0B);
+  static const inkDeep = Color(0xFF0F172A);
   static const ocean900 = Color(0xFF0C4A6E);
   static const ocean800 = Color(0xFF075985);
   static const ocean600 = Color(0xFF0284C7);
@@ -46,19 +48,20 @@ class ResortTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: ocean600,
-          foregroundColor: Colors.white,
+          backgroundColor: sand,
+          foregroundColor: inkDeep,
           minimumSize: const Size.fromHeight(48),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: ocean900,
           side: const BorderSide(color: line),
-          minimumSize: const Size.fromHeight(46),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          minimumSize: const Size.fromHeight(44),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

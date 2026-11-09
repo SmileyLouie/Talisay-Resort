@@ -54,11 +54,11 @@ class TouristPortalTest extends TestCase
             'password' => 'password',
         ]);
 
-        $response->assertRedirect(route('tourist.dashboard'));
+        $response->assertRedirect(route('home'));
 
         $this->actingAs($tourist);
         $dashboardResponse = $this->get('/tourist/dashboard');
-        $dashboardResponse->assertStatus(200);
+        $dashboardResponse->assertRedirect(route('home'));
     }
 
     public function test_tourist_can_place_online_booking(): void

@@ -87,6 +87,25 @@ class Payment extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    public function guestReference(): ?string
+    {
+        $reference = trim((string) $this->transaction_id);
+        if ($reference === '' || preg_match('/^(TXN|CASH|MNL)-/', $reference)) {
+            return null;
+        }
+
+        return $reference;
+    }
+
+    public function proofUrl(): ?string
+    {
+        if (!$this->proof_path) {
+            return null;
+        }
+
+        return '/storage/' . ltrim($this->proof_path, '/');
+    }
+
     // ──────────────────────────────────────────────────────────
     // QUERY SCOPES
     // ──────────────────────────────────────────────────────────
@@ -115,5 +134,65 @@ class Payment extends Model
     {
         // Add WHERE status = 'refunded' to filter refunded payment records
         return $query->where('status', 'refunded');
+    }
+
+    /** What the guest originally paid, before any cancellation or refund changed `amount`. */
+    public function paidAmount(): float
+    {
+        return round((float) ($this->metadata['paid_amount'] ?? $this->amount), 2);
+    }
+
+    /** @return array{amount: float, reference: ?string, note: ?string, by: ?string, by_id: ?int, at: string}|null */
+    public function refundSent(): ?array
+    {
+        return $this->metadata['refund_sent'] ?? null;
+    }
+
+    /**
+     * Where this payment stands on refunds:
+     *  - 'sent'      the resort recorded returning money to the guest,
+     *  - 'due'       the booking was cancelled and the policy owes the guest money,
+     *  - 'available' the guest may have paid (declined with a receipt, or a cancelled stay
+     *                the policy keeps), so staff can still return money if they choose,
+     *  - null        nothing to refund.
+     */
+    public function refundState(): ?string
+    {
+        if ($this->refundSent()) {
+            return 'sent';
+        }
+
+        if ($this->status === 'failed') {
+            return ($this->proof_path || $this->guestReference()) ? 'available' : null;
+        }
+
+        $cancelled = $this->booking && $this->booking->status === Booking::STATUS_CANCELLED;
+        if ($cancelled && in_array($this->status, ['success', 'refunded'], true)) {
+            return (float) ($this->metadata['refund_amount'] ?? 0) > 0 ? 'due' : 'available';
+        }
+
+        return null;
+    }
+
+    public function suggestedRefund(): float
+    {
+        return match ($this->refundState()) {
+            'due' => round((float) ($this->metadata['refund_amount'] ?? 0), 2),
+            'available' => $this->status === 'failed' ? $this->paidAmount() : 0.0,
+            default => 0.0,
+        };
+    }
+
+    /**
+     * Money the resort has to return: full refunds plus partial refunds
+     * recorded on a payment the resort still partly keeps.
+     */
+    public static function refundedTotal(): float
+    {
+        $full = (float) static::where('status', 'refunded')->sum('amount');
+        $partial = (float) static::where('status', 'success')->get()
+            ->sum(fn (self $payment) => (float) ($payment->metadata['refund_amount'] ?? 0));
+
+        return round($full + $partial, 2);
     }
 }

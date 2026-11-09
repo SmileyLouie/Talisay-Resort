@@ -1,198 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Staff Management – Talisay Beach Smart Tourism')
+@section('title', 'Staff Role Management – Talisay Beach Smart Tourism')
 
 @push('styles')
 <style>
-/* ── Modern Staff Management Design System ──────────────────────── */
-.sm-page-header {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-}
-
-/* Glassmorphism Tab Bar */
-.smtab-bar {
-    display: inline-flex;
-    gap: 6px;
-    background: #f1f5f9;
-    border-radius: 8px;
-    padding: 4px;
-    border: 1px solid #e2e8f0;
-    max-width: 100%;
-    overflow-x: auto;
-}
-.smtab-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 6px;
-    border: none;
-    background: transparent;
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: #64748b;
-    cursor: pointer;
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    white-space: nowrap;
-}
-.smtab-btn:hover {
-    color: #0f172a;
-    background: rgba(255, 255, 255, 0.6);
-}
-.smtab-btn.active {
-    background: #ffffff;
-    color: #0c4a6e;
-    border: 1px solid #e2e8f0;
-}
+/* Tabs */
 .smtab-panel { display: none; }
 .smtab-panel.active { display: block; }
-@keyframes tabFadeSlide {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* KPI Stat Cards */
-.kpi-stat-card {
-    background: #ffffff;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
-    padding: 20px;
-    position: relative;
-    overflow: hidden;
-}
-.kpi-stat-card:hover {
-    border-color: #cbd5e1;
-}
-.kpi-accent-bar {
-    display: none;
-}
-
-/* Staff Card */
-.staff-card {
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    padding: 22px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
-    overflow: visible;
-    transition: border-color 0.15s ease;
-    box-shadow: none;
-}
-.staff-card:hover {
-    border-color: #cbd5e1;
-}
-.staff-card-top-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-}
-
-/* Avatar styling */
-.staff-avatar-wrap {
-    position: relative;
-    width: 52px;
-    height: 52px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: #ffffff;
-    flex-shrink: 0;
-    background: #0c4a6e;
-}
-.avatar-status-beacon {
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2.5px solid #ffffff;
-}
-
-/* Pulsing beacon */
-.beacon-pulse {
-    animation: none;
-}
-@keyframes beaconPulse {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
-    70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-/* Status Badges */
-.pill-duty {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    font-size: 0.68rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.pill-duty.available {
-    background: #ecfdf5;
-    color: #065f46;
-    border: 1px solid #a7f3d0;
-}
-.pill-duty.busy {
-    background: #fffbeb;
-    color: #92400e;
-    border: 1px solid #fde68a;
-}
-.pill-duty.on_leave {
-    background: #fff7ed;
-    color: #9a3412;
-    border: 1px solid #fed7aa;
-}
-.pill-duty.off_duty {
-    background: #f8fafc;
-    color: #475569;
-    border: 1px solid #e2e8f0;
-}
-
-.pill-account {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 9999px;
-    font-size: 0.66rem;
-    font-weight: 700;
-}
-.pill-account.active { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-.pill-account.inactive { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
-.pill-account.suspended { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-.pill-account.on_leave { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
-
-/* Module Chips */
-.mod-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: 9px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    background: #f0f9ff;
-    color: #0284c7;
-    border: 1px solid #bae6fd;
-    transition: all 0.15s ease;
-}
-.mod-chip:hover {
-    background: #e0f2fe;
-    border-color: #7dd3fc;
-}
 
 /* Modals */
 .sm-modal-backdrop {
@@ -227,46 +41,28 @@
 
 /* Preset buttons */
 .preset-btn {
-    padding: 7px 15px;
-    border-radius: 11px;
-    font-size: 0.76rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    border: 1.5px solid #e2e8f0;
-    background: #ffffff;
-    color: #475569;
-}
-.preset-btn:hover {
-    border-color: #38bdf8;
-    background: #f0f9ff;
-    color: #0284c7;
-    transform: translateY(-1px);
-}
-.preset-btn.selected {
-    border-color: #0284c7;
-    background: #0284c7;
-    color: #ffffff;
-    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.28);
-}
-
-/* Action Badges in Log */
-.log-action-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
+    gap: 6px;
+    padding: 6px 12px;
     border-radius: 8px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    background: #f1f5f9;
-    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, color .15s;
+    border: 1px solid #e6e8ec;
+    background: #ffffff;
+    color: #334155;
 }
-.log-action-badge.create  { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-.log-action-badge.update  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-.log-action-badge.status  { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
-.log-action-badge.danger  { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-.log-action-badge.access  { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+.preset-btn:hover {
+    border-color: #1d6fbf;
+    color: #155a9c;
+}
+.preset-btn.selected {
+    border-color: #1d6fbf;
+    background: #e8f2fb;
+    color: #155a9c;
+}
 
 /* Custom Radio Tile */
 .duty-radio-tile {
@@ -281,488 +77,296 @@
     background: #ffffff;
 }
 .duty-radio-tile:hover {
-    border-color: #7dd3fc;
+    border-color: #cbd5e1;
     background: #f8fafc;
 }
+/* Generic checked state */
 .duty-radio-tile:has(:checked) {
     border-color: #0284c7;
     background: #f0f9ff;
-    box-shadow: none;
+}
+/* On Duty — green when checked */
+.duty-radio-tile:has([value="available"]:checked) {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+/* Busy — amber when checked */
+.duty-radio-tile:has([value="busy"]:checked) {
+    border-color: #fcd34d;
+    background: #fffbeb;
+}
+/* On Leave — orange when checked */
+.duty-radio-tile:has([value="on_leave"]:checked) {
+    border-color: #fdba74;
+    background: #fff7ed;
+}
+/* Off Duty — slate when checked */
+.duty-radio-tile:has([value="off_duty"]:checked) {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+/* Hide the native radio but keep it focusable */
+.duty-radio-tile input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
 }
 </style>
 @endpush
 
 @section('content')
 
-{{-- ══════════════════════════════════════════════════════
-     PAGE HEADER — Modern Resort Operations Banner
-══════════════════════════════════════════════════════ --}}
-<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-    <div>
-        <div class="flex items-center gap-2 mb-1">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
-                <i class="bi bi-people-fill text-[10px] text-sky-600"></i>
-                Staff Directory
-            </span>
-        </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">Staff Management</h1>
-        <p class="text-sm text-slate-500 mb-0">
-            Oversee staff duty, role assignments, module permissions, and the activity log.
-        </p>
-    </div>
-    <div class="flex items-center gap-3">
-        <button type="button" onclick="openAddStaffModal()" class="btn-ocean text-xs">
-            <i class="bi bi-person-plus"></i>
-            <span>Add Staff</span>
-        </button>
-    </div>
-</div>
-
-{{-- Success Flash Alert --}}
-@if(session('success'))
-<div class="mb-6 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-sm">
-    <div class="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-        <i class="bi bi-check-circle-fill text-emerald-600"></i>
-    </div>
-    <div class="flex-1">{{ session('success') }}</div>
-    <button class="text-emerald-400 hover:text-emerald-700 text-base" onclick="this.closest('.mb-6').remove()">
-        <i class="bi bi-x-lg"></i>
-    </button>
-</div>
-@endif
-
-{{-- Error Flash Alert --}}
-@if(session('error'))
-<div class="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-800 rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-sm">
-    <div class="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
-        <i class="bi bi-exclamation-triangle-fill text-red-600"></i>
-    </div>
-    <div class="flex-1">{{ session('error') }}</div>
-    <button class="text-red-400 hover:text-red-700 text-base" onclick="this.closest('.mb-6').remove()">
-        <i class="bi bi-x-lg"></i>
-    </button>
-</div>
-@endif
-
-{{-- ══════════════════════════════════════════════════════
-     TOP KPI METRICS CARDS
-══════════════════════════════════════════════════════ --}}
 @php
-    $totalStaff     = $staffMembers->count();
-    $availableStaff = $staffMembers->where('duty_status','available')->count();
-    $busyStaff      = $staffMembers->where('duty_status','busy')->count();
-    $onLeaveStaff   = $staffMembers->where('duty_status','on_leave')->count();
+    $totalStaff = $staffMembers->count();
+    $dutyCounts = $staffMembers->countBy(fn ($s) => $s->duty_status ?? 'available');
+    $awayCount = ($dutyCounts['on_leave'] ?? 0) + ($dutyCounts['off_duty'] ?? 0);
+    $accountIssues = $staffMembers->whereIn('account_status', ['inactive', 'suspended'])->count();
+    $dutyLabels = ['available' => 'On duty', 'busy' => 'Busy', 'on_leave' => 'On leave', 'off_duty' => 'Off duty'];
+    $accountLabels = ['active' => 'Active', 'inactive' => 'Inactive', 'on_leave' => 'On leave', 'suspended' => 'Suspended'];
+    $initials = fn ($name) => collect(preg_split('/\s+/', trim((string) $name)))->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('');
+    $moduleNames = fn ($staff) => $staff->permissions->map(fn ($p) => $modules[$p->module]['name'] ?? ucfirst($p->module));
+    $logBadge = fn ($action) => match (true) {
+        str_contains($action, 'created') => 'res-status-paid',
+        str_contains($action, 'unauthorized') => 'res-status-cancelled',
+        str_contains($action, 'reset') || str_contains($action, 'password') => 'res-status-waiting',
+        str_contains($action, 'status') => 'res-status-pending',
+        default => 'res-status-check_in',
+    };
 @endphp
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-6">
-    {{-- Card 1: Total Staff --}}
-    <div class="kpi-stat-card">
-        <div class="kpi-accent-bar bg-gradient-to-r from-sky-400 to-blue-600"></div>
-        <div class="flex items-center justify-between gap-3 mb-3">
-            <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Total Staff</span>
-            <div class="w-10 h-10 rounded-lg bg-ocean-800 text-white flex items-center justify-center">
-                <i class="bi bi-people-fill text-base"></i>
-            </div>
-        </div>
-        <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900 leading-none">{{ $totalStaff }}</span>
-            <span class="text-xs font-bold text-slate-400">Members</span>
-        </div>
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Roster capacity</span>
-            <span class="font-extrabold text-sky-700">100% Configured</span>
-        </div>
-    </div>
 
-    {{-- Card 2: On Duty / Ready --}}
-    <div class="kpi-stat-card">
-        <div class="kpi-accent-bar bg-gradient-to-r from-cyan-400 to-teal-500"></div>
-        <div class="flex items-center justify-between gap-3 mb-3">
-            <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">On Duty</span>
-            <div class="w-10 h-10 rounded-lg bg-ocean-600 text-white flex items-center justify-center">
-                <i class="bi bi-person-check-fill text-base"></i>
-            </div>
-        </div>
-        <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-black text-teal-700 leading-none">{{ $availableStaff }}</span>
-            <span class="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 beacon-pulse"></span> Ready
-            </span>
-        </div>
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Available right now</span>
-            <span class="font-extrabold text-teal-700">Open for tasks</span>
-        </div>
+<div class="res-head">
+    <div>
+        <h1>{{ __('Staff Role Management') }}</h1>
+        <p>Add staff accounts, choose what each person can open, and keep duty status current. Guest accounts are in File Maintenance and System Settings.</p>
     </div>
-
-    {{-- Card 4: Busy / In Task --}}
-    <div class="kpi-stat-card">
-        <div class="kpi-accent-bar bg-gradient-to-r from-amber-400 to-orange-500"></div>
-        <div class="flex items-center justify-between gap-3 mb-3">
-            <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Busy / In Task</span>
-            <div class="w-10 h-10 rounded-lg bg-amber-600 text-white flex items-center justify-center">
-                <i class="bi bi-hourglass-split text-base"></i>
-            </div>
-        </div>
-        <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-black text-amber-700 leading-none">{{ $busyStaff }}</span>
-            <span class="text-xs font-bold text-amber-600">Handling Tasks</span>
-        </div>
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Active assignments</span>
-            <span class="font-extrabold text-amber-700">{{ $onLeaveStaff }} On Leave</span>
-        </div>
-    </div>
-</div>
-
-{{-- ══════════════════════════════════════════════════════
-     MODERN SEGMENTED TAB BAR
-══════════════════════════════════════════════════════ --}}
-<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-    <div class="smtab-bar">
-        <button type="button" class="smtab-btn" id="btn-tab-roster" onclick="switchTab('roster')">
-            <i class="bi bi-people-fill text-sm"></i>
-            <span>Staff Directory</span>
-            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700">{{ $totalStaff }}</span>
-        </button>
-        <button type="button" class="smtab-btn" id="btn-tab-rbac" onclick="switchTab('rbac')">
-            <i class="bi bi-shield-lock-fill text-sm"></i>
-            <span>Job &amp; Role Assignments</span>
-            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">RBAC</span>
-        </button>
-        <button type="button" class="smtab-btn" id="btn-tab-activity" onclick="gotoActivity()">
-            <i class="bi bi-clock-history text-sm"></i>
-            <span>Activity Log</span>
-        </button>
-    </div>
-
-    {{-- Instant Directory Search for Staff Cards --}}
-    <div class="relative w-full sm:w-72" id="directorySearchBox">
-        <i class="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-        <input
-            type="text"
-            id="quickStaffSearch"
-            placeholder="Search staff, position, ID..."
-            class="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-500 transition"
-        >
-        <button type="button" id="clearQuickSearch" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
-            <i class="bi bi-x-circle-fill"></i>
+    <div class="res-head-actions">
+        <button type="button" onclick="openAddStaffModal()" class="btn-ocean">
+            <i class="bi bi-person-plus"></i>
+            <span>{{ __('Add staff') }}</span>
         </button>
     </div>
 </div>
 
-{{-- ======================================================
-     TAB 1: STAFF DIRECTORY ROSTER
-====================================================== --}}
+<div class="unit-stats" data-live-region="staff-stats">
+    <div>
+        <span>{{ __('Staff') }}</span>
+        <strong>{{ $totalStaff }}</strong>
+        <em>No limit on accounts</em>
+    </div>
+    <div>
+        <span>{{ __('On duty') }}</span>
+        <strong class="{{ ($dutyCounts['available'] ?? 0) ? 'is-good' : '' }}">{{ $dutyCounts['available'] ?? 0 }}</strong>
+        <em>Available for tasks</em>
+    </div>
+    <div>
+        <span>{{ __('Busy') }}</span>
+        <strong class="{{ ($dutyCounts['busy'] ?? 0) ? 'is-warn' : '' }}">{{ $dutyCounts['busy'] ?? 0 }}</strong>
+        <em>Handling a task</em>
+    </div>
+    <div>
+        <span>{{ __('Away') }}</span>
+        <strong>{{ $awayCount }}</strong>
+        <em>{{ $dutyCounts['on_leave'] ?? 0 }} on leave · {{ $dutyCounts['off_duty'] ?? 0 }} off duty</em>
+    </div>
+    <div>
+        <span>{{ __('Account issues') }}</span>
+        <strong class="{{ $accountIssues ? 'is-bad' : '' }}">{{ $accountIssues }}</strong>
+        <em>Inactive or suspended</em>
+    </div>
+</div>
+
+<div class="staff-tabs" role="tablist">
+    <button type="button" class="staff-tab smtab-btn" id="btn-tab-roster" onclick="switchTab('roster')">
+        <i class="bi bi-people"></i>
+        <span>{{ __('Staff Directory') }}</span>
+        <span class="unit-filter-count">{{ $totalStaff }}</span>
+    </button>
+    <button type="button" class="staff-tab smtab-btn" id="btn-tab-rbac" onclick="switchTab('rbac')">
+        <i class="bi bi-shield-lock"></i>
+        <span>{{ __('Job & Role Assignments') }}</span>
+    </button>
+    <button type="button" class="staff-tab smtab-btn" id="btn-tab-activity" onclick="gotoActivity()">
+        <i class="bi bi-clock-history"></i>
+        <span>{{ __('Activity Log') }}</span>
+    </button>
+</div>
+
+{{-- Staff directory --}}
 <div class="smtab-panel" id="panel-roster">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="staffCardsContainer">
-        @forelse($staffMembers as $staff)
-        @php
-            $ds = $staff->duty_status ?? 'available';
-            $initial = strtoupper(substr($staff->name, 0, 1));
-            $dutyAccent = match($ds) {
-                'available' => 'bg-emerald-500',
-                'busy'      => 'bg-amber-500',
-                'on_leave'  => 'bg-orange-500',
-                default     => 'bg-slate-400',
-            };
-        @endphp
-        <div class="staff-card group" data-name="{{ strtolower($staff->name) }}" data-email="{{ strtolower($staff->email) }}" data-id="{{ strtolower($staff->staff_id ?? '') }}" data-pos="{{ strtolower($staff->position ?? '') }}" data-dept="{{ strtolower($staff->department ?? '') }}">
-            <div>
-                {{-- Staff Header Row --}}
-                <div class="flex items-start justify-between gap-3 mb-4">
-                    <div class="flex items-center gap-3 min-w-0">
-                        {{-- Avatar with duty beacon --}}
-                        <div class="staff-avatar-wrap">
-                            @if($staff->avatar)
-                                <img src="{{ asset('storage/'.$staff->avatar) }}" alt="{{ $staff->name }}" class="w-full h-full object-cover rounded-2xl">
-                            @else
-                                <span>{{ $initial }}</span>
-                            @endif
-                            <span class="avatar-status-beacon {{ $dutyAccent }} {{ $ds==='available' ? 'beacon-pulse' : '' }}"></span>
-                        </div>
-
-                        <div class="min-w-0">
-                            <h3 class="text-sm font-extrabold text-slate-900 leading-snug group-hover:text-sky-700 transition truncate">{{ $staff->name }}</h3>
-                            <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-100 truncate">
-                                    {{ $staff->position ?? 'Resort Staff' }}
-                                </span>
-                            </div>
-                            <span class="text-[11px] font-medium text-slate-400 flex items-center gap-1 mt-0.5">
-                                <i class="bi bi-building text-[10px]"></i> {{ $staff->department ?? 'Operations' }}
-                            </span>
-                        </div>
-                    </div>
-
-                    {{-- Badges Column --}}
-                    <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
-                        <span class="pill-duty {{ $ds }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $dutyAccent }} {{ $ds==='available' ? 'beacon-pulse' : '' }}"></span>
-                            {{ ucfirst(str_replace('_', ' ', $ds)) }}
-                        </span>
-                    </div>
-                </div>
-
-                {{-- Contact & Credentials Box --}}
-                <div class="p-3.5 rounded-xl bg-slate-50/90 border border-slate-100 text-xs space-y-2 mb-4">
-                    @if($staff->staff_id)
-                    <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 text-slate-600">
-                            <i class="bi bi-upc-scan text-sky-500 text-xs"></i>
-                            <span class="font-mono font-bold text-sky-900 bg-sky-100/70 px-2 py-0.5 rounded text-[11px]">{{ $staff->staff_id }}</span>
-                        </div>
-                        <button type="button" onclick="navigator.clipboard.writeText('{{ $staff->staff_id }}'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 1500)" class="text-[10px] font-bold text-slate-400 hover:text-sky-600 transition">
-                            Copy
-                        </button>
-                    </div>
-                    @endif
-
-                    <div class="flex items-center gap-2 text-slate-600 truncate">
-                        <i class="bi bi-envelope-fill text-slate-400 text-xs flex-shrink-0"></i>
-                        <a href="mailto:{{ $staff->email }}" class="text-slate-700 hover:text-sky-600 hover:underline truncate">{{ $staff->email }}</a>
-                    </div>
-
-                    <div class="flex items-center gap-2 text-slate-600">
-                        <i class="bi bi-telephone-fill text-slate-400 text-xs flex-shrink-0"></i>
-                        <span class="text-slate-700">{{ $staff->phone ?? 'No phone recorded' }}</span>
-                    </div>
-
-                    @if($staff->duty_notes)
-                    <div class="flex items-start gap-2 text-amber-800 bg-amber-50/80 p-2 rounded-lg border border-amber-200/60 text-[11px] leading-snug">
-                        <i class="bi bi-pin-angle-fill text-amber-500 mt-0.5 flex-shrink-0"></i>
-                        <span>{{ $staff->duty_notes }}</span>
-                    </div>
-                    @endif
-                </div>
-
-                {{-- Modules Chips Section --}}
-                <div class="mb-4">
-                    <div class="flex items-center justify-between text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                        <span>Assigned Modules</span>
-                        <span class="text-sky-700 font-black">{{ $staff->permissions->count() }} Access Keys</span>
-                    </div>
-                    @if($staff->permissions->isNotEmpty())
-                    <div class="flex flex-wrap gap-1.5">
-                        @foreach($staff->permissions->take(4) as $perm)
-                        <span class="mod-chip">
-                            <i class="{{ $modules[$perm->module]['icon'] ?? 'bi-puzzle' }} text-[10px]"></i>
-                            {{ $modules[$perm->module]['name'] ?? ucfirst($perm->module) }}
-                        </span>
-                        @endforeach
-                        @if($staff->permissions->count() > 4)
-                        <span class="mod-chip" style="background:#f1f5f9;color:#64748b;border-color:#e2e8f0;">
-                            +{{ $staff->permissions->count() - 4 }} more
-                        </span>
-                        @endif
-                    </div>
-                    @else
-                    <p class="text-[11px] text-slate-400 italic mb-0">No system modules assigned yet</p>
-                    @endif
-                </div>
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="res-toolbar">
+            <div class="res-search unit-search">
+                <i class="bi bi-search"></i>
+                <input type="search" id="quickStaffSearch" class="form-control-clean" placeholder="Find staff by name, ID, or position..." aria-label="Find staff" data-live-pause-if-filled>
             </div>
-
-            {{-- Card Footer Action Buttons --}}
-            <div class="pt-3.5 border-t border-slate-100 flex items-center gap-2">
-                <button
-                    type="button"
-                    onclick="openDutyModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->duty_status ?? 'available') }}, {{ Js::from($staff->duty_notes ?? '') }})"
-                    class="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm hover:border-slate-300"
-                >
-                    <i class="bi bi-arrow-repeat text-sky-600"></i>
-                    <span>Duty Status</span>
-                </button>
-
-                <button
-                    type="button"
-                    onclick="openPermissionsModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->permissions) }}, {{ Js::from($staff->staff_id ?? '') }}, {{ Js::from($staff->position ?? '') }}, {{ Js::from($staff->department ?? '') }}, {{ Js::from($staff->account_status ?? 'active') }})"
-                    class="flex-1 py-2.5 px-3 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5"
-                >
-                    <i class="bi bi-shield-lock-fill"></i>
-                    <span>Permissions</span>
-                </button>
-
-                {{-- Action Menu Dropdown --}}
-                <div class="relative" x-data="{ open: false }">
-                    <button
-                        @click="open = !open"
-                        type="button"
-                        class="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition flex items-center justify-center text-xs"
-                    >
-                        <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <div
-                        x-show="open"
-                        @click.outside="open = false"
-                        x-transition
-                        class="absolute right-0 top-full mt-2 z-[80] bg-white border border-slate-200 rounded-xl shadow-xl w-52 py-1.5"
-                    >
-                        <div class="px-3 py-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Account Actions</div>
-                        <button @click="open=false; quickStatus({{ $staff->id }},'active')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
-                            <i class="bi bi-check-circle-fill text-emerald-500"></i> Activate Account
-                        </button>
-                        <button @click="open=false; quickStatus({{ $staff->id }},'on_leave')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50">
-                            <i class="bi bi-calendar-x-fill text-amber-500"></i> Set On Leave
-                        </button>
-                        <button @click="open=false; quickStatus({{ $staff->id }},'inactive')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                            <i class="bi bi-slash-circle-fill text-slate-400"></i> Deactivate
-                        </button>
-                        <div class="border-t border-slate-100 my-1"></div>
-                        <button @click="open=false; quickStatus({{ $staff->id }},'suspended')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50">
-                            <i class="bi bi-ban-fill text-red-500"></i> Suspend Account
-                        </button>
-                        <button @click="open=false; openResetPasswordModal({{ $staff->id }}, {{ Js::from($staff->name) }})" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
-                            <i class="bi bi-key-fill text-indigo-500"></i> Reset Password
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <span class="unit-count" id="staffCount" data-total="{{ $totalStaff }}" data-label="{{ $totalStaff }} {{ $totalStaff === 1 ? 'staff member' : 'staff members' }}" data-live-region="staff-count">{{ $totalStaff }} {{ $totalStaff === 1 ? 'staff member' : 'staff members' }}</span>
         </div>
-        @empty
-        <div class="col-span-full bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">
-            <div class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center text-3xl mx-auto mb-4">
-                <i class="bi bi-people"></i>
-            </div>
-            <h3 class="text-base font-extrabold text-slate-800 mb-1">No Staff Members Found</h3>
-            <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">There are currently no staff registered matching the selected criteria.</p>
-            <button onclick="openAddStaffModal()" class="btn-ocean text-xs">
-                <i class="bi bi-person-plus-fill me-1"></i> Add First Staff Member
-            </button>
-        </div>
-        @endforelse
-    </div>
-</div>
-
-{{-- ======================================================
-     TAB 2: JOB & ROLE ASSIGNMENTS (RBAC Table)
-====================================================== --}}
-<div class="smtab-panel" id="panel-rbac">
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm mb-6">
-        <div class="px-6 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-slate-50">
-            <div>
-                <h2 class="text-base font-extrabold text-slate-900 mb-0.5 flex items-center gap-2">
-                    <i class="bi bi-shield-check text-sky-600"></i> Role-Based Access Control (RBAC)
-                </h2>
-                <p class="text-xs text-slate-500 mb-0">Granular permission matrix mapping staff members to resort operation modules.</p>
-            </div>
-            <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 font-semibold text-xs">
-                <i class="bi bi-shield-check text-sky-700"></i> Admin role maintains master oversight
-            </div>
-        </div>
-
-        {{-- Filter Bar --}}
-        <form method="GET" action="{{ route('tasks.staff') }}" class="px-6 py-4 border-b border-slate-100 bg-slate-50/40 flex flex-wrap gap-3 items-end">
-            <input type="hidden" name="tab" value="rbac">
-            <div>
-                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, email, staff ID..." class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none w-60 shadow-sm">
-            </div>
-            <div>
-                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Department</label>
-                <input type="text" name="department" value="{{ request('department') }}" placeholder="e.g. Front Office" class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none w-48 shadow-sm">
-            </div>
-            <button type="submit" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                <i class="bi bi-funnel-fill"></i> Filter
-            </button>
-            @if(request()->hasAny(['search','department']))
-            <a href="{{ route('tasks.staff',['tab'=>'rbac']) }}" class="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold transition shadow-sm">
-                Clear
-            </a>
-            @endif
-        </form>
-
-        {{-- Table Container --}}
-        <div>
-            <table class="w-full text-sm">
+        <div class="table-responsive" data-live-region="staff-list">
+            <table class="table-clean staff-table">
                 <thead>
-                    <tr class="border-b border-slate-100 bg-slate-50/70">
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-6 py-3.5">Staff Member</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Staff ID</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Position / Dept.</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Assigned Modules</th>
-                        <th class="text-right text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-6 py-3.5">Actions</th>
+                    <tr>
+                        <th>Staff</th>
+                        <th>Position</th>
+                        <th>Duty</th>
+                        <th>Account</th>
+                        <th>Access</th>
+                        <th></th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody>
                     @forelse($staffMembers as $staff)
-                    <tr class="hover:bg-sky-50/30 transition-colors">
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-xl bg-ocean-800 text-white flex items-center justify-center font-black text-xs shadow-sm flex-shrink-0">
-                                    {{ strtoupper(substr($staff->name,0,1)) }}
-                                </div>
-                                <div>
-                                    <p class="font-extrabold text-slate-900 text-xs mb-0">{{ $staff->name }}</p>
-                                    <p class="text-[11px] text-slate-400 truncate max-w-[180px]">{{ $staff->email }}</p>
+                    @php
+                        $ds = $staff->duty_status ?? 'available';
+                        $acct = $staff->account_status ?? 'active';
+                        $names = $moduleNames($staff);
+                    @endphp
+                    <tr class="staff-row" data-search="{{ strtolower($staff->name.' '.$staff->email.' '.$staff->staff_id.' '.$staff->position.' '.$staff->department) }}">
+                        <td>
+                            <div class="staff-person">
+                                <span class="pay-avatar staff-avatar">
+                                    @if($staff->avatar)
+                                        <img src="{{ '/storage/' . ltrim($staff->avatar, '/') }}" alt="">
+                                    @else
+                                        {{ $initials($staff->name) }}
+                                    @endif
+                                </span>
+                                <div class="min-w-0">
+                                    <span class="res-guest">{{ $staff->name }}</span>
+                                    <div class="res-note">{{ $staff->email }}</div>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-4 py-4">
-                            <span class="font-mono font-bold text-sky-800 text-xs bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
-                                {{ $staff->staff_id ?? '—' }}
-                            </span>
+                        <td>
+                            {{ $staff->position ?? 'Resort staff' }}
+                            <div class="res-note">{{ $staff->department ?? 'Operations' }}@if($staff->staff_id) · <span class="staff-id">{{ $staff->staff_id }}</span>@endif</div>
                         </td>
-                        <td class="px-4 py-4">
-                            <p class="font-bold text-slate-800 text-xs mb-0.5">{{ $staff->position ?? '—' }}</p>
-                            <p class="text-[11px] text-slate-400">{{ $staff->department ?? '—' }}</p>
-                        </td>
-                        <td class="px-4 py-4">
-                            @if($staff->permissions->isEmpty())
-                            <span class="text-[11px] text-slate-400 italic">No modules assigned</span>
-                            @else
-                            <div class="flex flex-wrap gap-1">
-                                @foreach($staff->permissions->take(3) as $perm)
-                                <span class="mod-chip">
-                                    {{ $modules[$perm->module]['name'] ?? ucfirst($perm->module) }}
-                                </span>
-                                @endforeach
-                                @if($staff->permissions->count() > 3)
-                                <span class="mod-chip" style="background:#f1f5f9;color:#64748b;border-color:#e2e8f0;">
-                                    +{{ $staff->permissions->count() - 3 }}
-                                </span>
-                                @endif
-                            </div>
+                        <td>
+                            <span class="staff-duty is-{{ $ds }}">{{ $dutyLabels[$ds] ?? ucfirst(str_replace('_', ' ', $ds)) }}</span>
+                            @if($staff->duty_notes)
+                            <div class="res-note staff-note" title="{{ $staff->duty_notes }}">{{ \Illuminate\Support\Str::limit($staff->duty_notes, 32) }}</div>
                             @endif
                         </td>
-                        <td class="px-6 py-4 text-right">
-                            <div class="flex items-center justify-end gap-1.5">
-                                <button
-                                    type="button"
-                                    onclick="openPermissionsModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->permissions) }}, {{ Js::from($staff->staff_id ?? '') }}, {{ Js::from($staff->position ?? '') }}, {{ Js::from($staff->department ?? '') }}, {{ Js::from($staff->account_status ?? 'active') }})"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs font-bold hover:bg-sky-100 transition shadow-sm"
-                                >
-                                    <i class="bi bi-shield-lock-fill text-sky-600"></i> Edit Roles
+                        <td><span class="res-status staff-account-{{ $acct }}">{{ $accountLabels[$acct] ?? ucfirst($acct) }}</span></td>
+                        <td>
+                            @if($names->isEmpty())
+                                <span class="res-note m-0">No access yet</span>
+                            @else
+                                {{ $names->count() }} {{ $names->count() === 1 ? 'module' : 'modules' }}
+                                <div class="res-note staff-note" title="{{ $names->implode(', ') }}">{{ $names->take(2)->implode(', ') }}{{ $names->count() > 2 ? ' +'.($names->count() - 2) : '' }}</div>
+                            @endif
+                        </td>
+                        <td class="text-end">
+                            <div class="unit-actions">
+                                <button type="button" class="res-icon-btn" title="Change duty status" aria-label="Change duty status for {{ $staff->name }}"
+                                        onclick="openDutyModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($ds) }}, {{ Js::from($staff->duty_notes ?? '') }})">
+                                    <i class="bi bi-arrow-repeat"></i>
                                 </button>
-                                <div class="relative" x-data="{ open: false }">
-                                    <button @click="open = !open" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">
+                                <button type="button" class="res-icon-btn" title="Edit access" aria-label="Edit access for {{ $staff->name }}"
+                                        onclick="openPermissionsModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->permissions) }}, {{ Js::from($staff->staff_id ?? '') }}, {{ Js::from($staff->position ?? '') }}, {{ Js::from($staff->department ?? '') }}, {{ Js::from($acct) }})">
+                                    <i class="bi bi-shield-lock"></i>
+                                </button>
+                                <div class="dropdown">
+                                    <button type="button" class="res-icon-btn" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="More actions for {{ $staff->name }}">
                                         <i class="bi bi-three-dots"></i>
                                     </button>
-                                    <div x-show="open" @click.outside="open = false" x-transition class="absolute right-0 top-9 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl w-52 py-1.5 text-left">
-                                        <button @click="open=false; quickStatus({{ $staff->id }},'active')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
-                                            <i class="bi bi-check-circle-fill text-emerald-500"></i> Activate Account
-                                        </button>
-                                        <button @click="open=false; quickStatus({{ $staff->id }},'on_leave')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50">
-                                            <i class="bi bi-calendar-x-fill text-amber-500"></i> Set On Leave
-                                        </button>
-                                        <button @click="open=false; quickStatus({{ $staff->id }},'inactive')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                                            <i class="bi bi-slash-circle-fill text-slate-400"></i> Deactivate
-                                        </button>
-                                        <div class="border-t border-slate-100 my-1"></div>
-                                        <button @click="open=false; quickStatus({{ $staff->id }},'suspended')" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50">
-                                            <i class="bi bi-ban-fill text-red-500"></i> Suspend Account
-                                        </button>
-                                        <button @click="open=false; openResetPasswordModal({{ $staff->id }}, {{ Js::from($staff->name) }})" class="flex items-center gap-2 w-full px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
-                                            <i class="bi bi-key-fill text-indigo-500"></i> Reset Password
-                                        </button>
-                                    </div>
+                                    <ul class="dropdown-menu dropdown-menu-end manual-kind-menu staff-menu">
+                                        <li><button type="button" class="dropdown-item" onclick="quickStatus({{ $staff->id }}, 'active')"><i class="bi bi-check-circle"></i> Activate account</button></li>
+                                        <li><button type="button" class="dropdown-item" onclick="quickStatus({{ $staff->id }}, 'on_leave')"><i class="bi bi-calendar-x"></i> Set on leave</button></li>
+                                        <li><button type="button" class="dropdown-item" onclick="quickStatus({{ $staff->id }}, 'inactive')"><i class="bi bi-slash-circle"></i> Deactivate</button></li>
+                                        <li><button type="button" class="dropdown-item" onclick="openResetPasswordModal({{ $staff->id }}, {{ Js::from($staff->name) }})"><i class="bi bi-key"></i> Reset password</button></li>
+                                        <li><hr class="dropdown-divider my-1"></li>
+                                        <li><button type="button" class="dropdown-item is-danger" onclick="quickStatus({{ $staff->id }}, 'suspended')"><i class="bi bi-ban"></i> Suspend account</button></li>
+                                    </ul>
                                 </div>
                             </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="text-center py-16 text-slate-400">
-                            <i class="bi bi-person-x text-4xl mb-2 block"></i>
-                            <p class="font-bold text-slate-600">No staff members found matching criteria</p>
+                        <td colspan="6" class="text-center py-12">
+                            <p class="text-sm text-slate-500 mb-3">No staff accounts yet. Add as many as you need.</p>
+                            <button type="button" onclick="openAddStaffModal()" class="btn-ocean">
+                                <i class="bi bi-person-plus"></i>
+                                <span>{{ __('Add staff') }}</span>
+                            </button>
+                        </td>
+                    </tr>
+                    @endforelse
+                    @if($staffMembers->isNotEmpty())
+                    <tr id="staffNoMatch" hidden>
+                        <td colspan="6" class="text-center py-10 text-slate-400">
+                            <p class="text-sm mb-0">No staff match that search.</p>
+                        </td>
+                    </tr>
+                    @endif
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{{-- Job & role assignments --}}
+<div class="smtab-panel" id="panel-rbac">
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-4">
+        <form method="GET" action="{{ route('tasks.staff') }}" class="res-toolbar">
+            <input type="hidden" name="tab" value="rbac">
+            <div class="res-search">
+                <i class="bi bi-search"></i>
+                <input type="search" name="search" value="{{ request('search') }}" class="form-control-clean" placeholder="Name, email, or staff ID" aria-label="Search staff">
+            </div>
+            <div class="res-search">
+                <i class="bi bi-building"></i>
+                <input type="search" name="department" value="{{ request('department') }}" class="form-control-clean" placeholder="Department" aria-label="Department">
+            </div>
+            <button type="submit" class="btn-secondary-clean staff-filter-btn">Filter</button>
+            @if(request()->hasAny(['search', 'department']))
+            <a href="{{ route('tasks.staff', ['tab' => 'rbac']) }}" class="res-clear">Clear</a>
+            @endif
+            <span class="unit-count ms-auto">Admins always have full access</span>
+        </form>
+        <div class="table-responsive">
+            <table class="table-clean staff-table">
+                <thead>
+                    <tr>
+                        <th>Staff</th>
+                        <th>Staff ID</th>
+                        <th>Position</th>
+                        <th>Can open</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($staffMembers as $staff)
+                    @php $names = $moduleNames($staff); @endphp
+                    <tr>
+                        <td>
+                            <span class="res-guest">{{ $staff->name }}</span>
+                            <div class="res-note">{{ $staff->email }}</div>
+                        </td>
+                        <td><span class="staff-id">{{ $staff->staff_id ?? '—' }}</span></td>
+                        <td>
+                            {{ $staff->position ?? '—' }}
+                            <div class="res-note">{{ $staff->department ?? '—' }}</div>
+                        </td>
+                        <td class="staff-modules">
+                            @if($names->isEmpty())
+                                <span class="res-note m-0">No access yet</span>
+                            @else
+                                {{ $names->implode(', ') }}
+                            @endif
+                        </td>
+                        <td class="text-end">
+                            <button type="button" class="btn-secondary-clean staff-edit-btn"
+                                    onclick="openPermissionsModal({{ $staff->id }}, {{ Js::from($staff->name) }}, {{ Js::from($staff->permissions) }}, {{ Js::from($staff->staff_id ?? '') }}, {{ Js::from($staff->position ?? '') }}, {{ Js::from($staff->department ?? '') }}, {{ Js::from($staff->account_status ?? 'active') }})">
+                                <i class="bi bi-shield-lock"></i>
+                                <span>Edit access</span>
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" class="text-center py-12 text-slate-400">
+                            <p class="text-sm mb-0">{{ request()->hasAny(['search', 'department']) ? 'No staff match these filters.' : 'No staff accounts yet.' }}</p>
                         </td>
                     </tr>
                     @endforelse
@@ -771,175 +375,116 @@
         </div>
     </div>
 
-    {{-- Role Presets Reference Cards --}}
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2 mb-0">
-                <i class="bi bi-bookmark-star-fill text-sky-600"></i> Standard Staff Role Presets
-            </h3>
-            <span class="text-xs text-slate-400 font-medium">Click on any role in Edit Modal for 1-click assignment</span>
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+        <div class="staff-card-head">
+            <h2>Role presets</h2>
+            <p>Pick one of these in the Add staff or Edit access window to fill in the usual access for that job.</p>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="staff-presets">
             @foreach($presets as $key => $preset)
-            <div class="p-4 rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-sky-200 transition-all duration-200 shadow-sm">
-                <div class="flex items-center justify-between gap-2 mb-1.5">
-                    <p class="text-xs font-extrabold text-slate-900 mb-0">{{ $preset['name'] ?? $preset['label'] ?? ucfirst(str_replace('_',' ',$key)) }}</p>
-                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {{ count($preset['modules']) }} modules
-                    </span>
-                </div>
-                <p class="text-[11px] text-slate-500 font-semibold mb-2">
-                    <i class="bi bi-briefcase text-slate-400"></i> {{ $preset['position'] ?? '' }} &bull; {{ $preset['department'] ?? '' }}
-                </p>
-                <div class="flex flex-wrap gap-1">
-                    @foreach($preset['modules'] as $mKey => $actions)
-                    <span class="mod-chip text-[10px]" title="{{ implode(', ', (array)$actions) }}">
-                        <i class="{{ $modules[$mKey]['icon'] ?? 'bi-puzzle' }} text-[9px]"></i>
-                        {{ $modules[$mKey]['name'] ?? ucfirst($mKey) }}
-                    </span>
-                    @endforeach
-                </div>
+            <div class="staff-preset">
+                <strong>{{ $preset['name'] ?? $preset['label'] ?? ucfirst(str_replace('_', ' ', $key)) }}</strong>
+                <span>{{ $preset['position'] ?? '' }}{{ !empty($preset['department']) ? ' · '.$preset['department'] : '' }} · {{ count($preset['modules']) }} modules</span>
+                <p>{{ collect(array_keys($preset['modules']))->map(fn ($m) => $modules[$m]['name'] ?? ucfirst($m))->implode(', ') }}</p>
+                @if(isset($takenPresets[$key]))
+                    <em class="staff-preset-status is-taken">Filled by {{ $takenPresets[$key]['name'] }}</em>
+                @else
+                    <em class="staff-preset-status is-open">Open</em>
+                @endif
             </div>
             @endforeach
         </div>
     </div>
 </div>
 
-{{-- ======================================================
-     TAB 3: ACTIVITY AUDIT LOG
-====================================================== --}}
+{{-- Activity log --}}
 <div class="smtab-panel" id="panel-activity">
-    <form method="GET" action="{{ route('tasks.staff') }}" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6 py-5 mb-6 flex flex-wrap gap-3 items-end">
-        <input type="hidden" name="tab" value="activity">
-        <div>
-            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search Events</label>
-            <input type="text" name="activity_search" value="{{ request('activity_search') }}" placeholder="Staff name, action..." class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-sky-300 outline-none w-52 shadow-sm">
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="staff-card-head">
+            <h2>Staff Activity Log</h2>
+            <p>Every account, access, duty, and password change, plus blocked attempts to open a page without access.</p>
         </div>
-        <div>
-            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Staff Member</label>
-            <select name="staff_user_id" class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-sky-300 outline-none w-48 shadow-sm">
-                <option value="">All Staff</option>
+        <form method="GET" action="{{ route('tasks.staff') }}" class="res-toolbar">
+            <input type="hidden" name="tab" value="activity">
+            <div class="res-search">
+                <i class="bi bi-search"></i>
+                <input type="search" name="activity_search" value="{{ request('activity_search') }}" class="form-control-clean" placeholder="Staff name or action" aria-label="Search activity">
+            </div>
+            <select name="staff_user_id" class="form-select-clean res-select" aria-label="Staff member">
+                <option value="">All staff</option>
                 @foreach($staffMembers as $s)
-                <option value="{{ $s->id }}" {{ request('staff_user_id')==$s->id?'selected':'' }}>{{ $s->name }}</option>
+                <option value="{{ $s->id }}" {{ request('staff_user_id') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
                 @endforeach
             </select>
-        </div>
-        <div>
-            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Action Type</label>
-            <select name="action_filter" class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-sky-300 outline-none shadow-sm">
-                <option value="">All Actions</option>
-                <option value="staff_account_created" {{ request('action_filter')==='staff_account_created'?'selected':'' }}>Account Created</option>
-                <option value="staff_permissions_updated" {{ request('action_filter')==='staff_permissions_updated'?'selected':'' }}>Permissions Updated</option>
-                <option value="staff_account_status_changed" {{ request('action_filter')==='staff_account_status_changed'?'selected':'' }}>Status Changed</option>
-                <option value="staff_duty_status_updated" {{ request('action_filter')==='staff_duty_status_updated'?'selected':'' }}>Duty Status</option>
-                <option value="staff_password_reset_by_admin" {{ request('action_filter')==='staff_password_reset_by_admin'?'selected':'' }}>Password Reset</option>
-                <option value="unauthorized_access_attempt" {{ request('action_filter')==='unauthorized_access_attempt'?'selected':'' }}>Unauthorized Access</option>
+            <select name="action_filter" class="form-select-clean res-select" aria-label="Action">
+                <option value="">All actions</option>
+                <option value="staff_account_created" {{ request('action_filter') === 'staff_account_created' ? 'selected' : '' }}>Account created</option>
+                <option value="staff_permissions_updated" {{ request('action_filter') === 'staff_permissions_updated' ? 'selected' : '' }}>Access updated</option>
+                <option value="staff_account_status_changed" {{ request('action_filter') === 'staff_account_status_changed' ? 'selected' : '' }}>Account status</option>
+                <option value="staff_duty_status_updated" {{ request('action_filter') === 'staff_duty_status_updated' ? 'selected' : '' }}>Duty status</option>
+                <option value="staff_password_reset_by_admin" {{ request('action_filter') === 'staff_password_reset_by_admin' ? 'selected' : '' }}>Password reset</option>
+                <option value="unauthorized_access_attempt" {{ request('action_filter') === 'unauthorized_access_attempt' ? 'selected' : '' }}>Blocked access</option>
             </select>
-        </div>
-        <div>
-            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date From</label>
-            <input type="date" name="date_from" value="{{ request('date_from') }}" class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-sky-300 outline-none shadow-sm">
-        </div>
-        <div>
-            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date To</label>
-            <input type="date" name="date_to" value="{{ request('date_to') }}" class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-sky-300 outline-none shadow-sm">
-        </div>
-        <button type="submit" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-            <i class="bi bi-funnel-fill"></i> Filter
-        </button>
-        @if(request()->hasAny(['activity_search','staff_user_id','action_filter','date_from','date_to']))
-        <a href="{{ route('tasks.staff',['tab'=>'activity']) }}" class="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold transition shadow-sm">
-            Clear
-        </a>
-        @endif
-    </form>
-
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-            <div>
-                <h2 class="text-base font-extrabold text-slate-900 mb-0.5">Staff Activity Log</h2>
-                <p class="text-xs text-slate-400 mb-0">Immutable system records of all staff permissions, duty changes, and logins</p>
-            </div>
-        </div>
-        @if($activityLogs && $activityLogs->isNotEmpty())
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm" style="min-width:750px">
+            <label class="res-dates">From <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control-clean"></label>
+            <label class="res-dates">To <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control-clean"></label>
+            <button type="submit" class="btn-secondary-clean staff-filter-btn">Filter</button>
+            @if(request()->hasAny(['activity_search', 'staff_user_id', 'action_filter', 'date_from', 'date_to']))
+            <a href="{{ route('tasks.staff', ['tab' => 'activity']) }}" class="res-clear">Clear</a>
+            @endif
+        </form>
+        <div class="table-responsive">
+            <table class="table-clean staff-table">
                 <thead>
-                    <tr class="border-b border-slate-100 bg-slate-50/70">
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-6 py-3.5">Timestamp</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Performed By</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Action</th>
-                        <th class="text-left text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-4 py-3.5">Details</th>
+                    <tr>
+                        <th>When</th>
+                        <th>By</th>
+                        <th>Action</th>
+                        <th>Details</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                    @foreach($activityLogs as $log)
-                    @php
-                        $bc = match(true) {
-                            str_contains($log->action,'created')  => 'create',
-                            str_contains($log->action,'permissions') || str_contains($log->action,'updated') => 'update',
-                            str_contains($log->action,'status')   => 'status',
-                            str_contains($log->action,'reset') || str_contains($log->action,'password') => 'danger',
-                            str_contains($log->action,'unauthorized') => 'access',
-                            default => '',
-                        };
-                        $al = ucwords(str_replace(['staff_','_'],['',' '],$log->action));
-                    @endphp
-                    <tr class="hover:bg-slate-50/50 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <p class="text-xs font-bold text-slate-900 mb-0">{{ $log->created_at->format('M d, Y') }}</p>
-                            <p class="text-[11px] text-slate-400 mb-0">{{ $log->created_at->format('g:i:s A') }}</p>
+                <tbody>
+                    @forelse($activityLogs ?? [] as $log)
+                    <tr>
+                        <td>
+                            {{ $log->created_at->format('M j, Y') }}
+                            <div class="res-note">{{ $log->created_at->format('g:i A') }}</div>
                         </td>
-                        <td class="px-4 py-4">
+                        <td>
                             @if($log->user)
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-xl bg-ocean-800 text-white flex items-center justify-center text-xs font-black flex-shrink-0 shadow-sm">
-                                    {{ strtoupper(substr($log->user->name,0,1)) }}
-                                </div>
-                                <div>
-                                    <p class="text-xs font-extrabold text-slate-900 mb-0">{{ $log->user->name }}</p>
-                                    <p class="text-[11px] text-slate-400 capitalize mb-0">{{ $log->user->role ?? 'Staff' }}</p>
-                                </div>
-                            </div>
+                                <span class="res-guest">{{ $log->user->name }}</span>
+                                <div class="res-note">{{ ucfirst($log->user->role ?? 'staff') }}</div>
                             @else
-                            <span class="inline-flex items-center gap-1 text-xs text-slate-400 font-semibold">
-                                <i class="bi bi-cpu"></i> System Auto
-                            </span>
+                                <span class="res-note m-0">System</span>
                             @endif
                         </td>
-                        <td class="px-4 py-4">
-                            <span class="log-action-badge {{ $bc }}">{{ $al }}</span>
-                        </td>
-                        <td class="px-4 py-4">
+                        <td><span class="res-status {{ $logBadge($log->action) }}">{{ ucfirst(strtolower(str_replace(['staff_', '_'], ['', ' '], $log->action))) }}</span></td>
+                        <td class="staff-log-details">
                             @if($log->new_values)
-                            <div class="text-[11px] text-slate-600 space-y-1">
-                                @foreach(array_slice((array)$log->new_values,0,4) as $k => $v)
+                                @foreach(array_slice((array) $log->new_values, 0, 4) as $k => $v)
                                     @if(!is_array($v))
-                                    <div><span class="font-bold text-slate-400">{{ ucfirst(str_replace('_',' ',$k)) }}:</span> <span class="text-slate-800 font-semibold">{{ Str::limit((string)$v,65) }}</span></div>
+                                    <div><b>{{ ucfirst(str_replace('_', ' ', $k)) }}:</b> {{ \Illuminate\Support\Str::limit((string) $v, 65) }}</div>
                                     @elseif(count($v))
-                                    <div><span class="font-bold text-slate-400">{{ ucfirst(str_replace('_',' ',$k)) }}:</span> <span class="text-slate-800 font-semibold">{{ implode(', ',array_slice($v,0,4)) }}{{ count($v)>4?'...':'' }}</span></div>
+                                    <div><b>{{ ucfirst(str_replace('_', ' ', $k)) }}:</b> {{ implode(', ', array_slice($v, 0, 4)) }}{{ count($v) > 4 ? '…' : '' }}</div>
                                     @endif
                                 @endforeach
-                            </div>
                             @else
-                            <span class="text-[11px] text-slate-400">—</span>
+                                <span class="res-note m-0">—</span>
                             @endif
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="4" class="text-center py-12 text-slate-400">
+                            <p class="text-sm mb-0">No activity yet. Staff changes are recorded here automatically.</p>
+                        </td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
-        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/40">
+        @if($activityLogs && $activityLogs->hasPages())
+        <div class="p-4 border-t border-slate-100 flex justify-end">
             {{ $activityLogs->withQueryString()->links() }}
-        </div>
-        @else
-        <div class="text-center py-16 text-slate-400">
-            <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto mb-3">
-                <i class="bi bi-clock-history"></i>
-            </div>
-            <p class="font-extrabold text-slate-700 mb-1">No Activity Logs Found</p>
-            <p class="text-xs text-slate-400">Staff actions will automatically record in this audit trail.</p>
         </div>
         @endif
     </div>
@@ -1034,134 +579,150 @@
 {{-- ══════════════════════════════════════════════════════
      MODAL 2: ADD NEW STAFF
 ══════════════════════════════════════════════════════ --}}
-<div class="sm-modal-backdrop" id="add-staff-modal">
-    <div class="sm-modal-box wide">
-        <button type="button" onclick="closeAddStaffModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-700 text-xl transition">
-            <i class="bi bi-x-lg"></i>
-        </button>
-
-        <div class="flex items-center gap-3 mb-1">
-            <div class="w-10 h-10 rounded-xl bg-ocean-800 text-white flex items-center justify-center text-lg shadow-sm">
-                <i class="bi bi-person-plus-fill"></i>
-            </div>
+@php
+    $addOld = old('_form') === 'add_staff';
+    $addOldModules = $addOld ? (array) old('modules', []) : [];
+@endphp
+<div class="sm-modal-backdrop" id="add-staff-modal" @if($addOld && $errors->any()) data-reopen="1" @endif>
+    <div class="sm-modal-box staff-modal" role="dialog" aria-modal="true" aria-labelledby="addStaffTitle">
+        <div class="manual-head">
             <div>
-                <h3 class="text-lg font-extrabold text-slate-900 mb-0">Create New Staff Account</h3>
-                <p class="text-xs text-slate-500 mb-0">Provision credentials, job assignment, and module permissions.</p>
+                <h5 id="addStaffTitle">Add staff</h5>
+                <p>Create a login for a team member and choose which pages they can open.</p>
             </div>
+            <button type="button" class="manual-close" onclick="closeAddStaffModal()" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
 
-        <form method="POST" action="{{ route('tasks.staff.store') }}" class="mt-5">
+        <form method="POST" action="{{ route('tasks.staff.store') }}" data-loading>
             @csrf
+            <input type="hidden" name="_form" value="add_staff">
+            <div class="manual-body">
+                @if($addOld && $errors->any())
+                    <div class="staff-form-error" role="alert">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <div>
+                            <strong>The account was not created.</strong>
+                            @foreach($errors->all() as $message)
+                                <span>{{ $message }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
-            {{-- Quick Presets Banner --}}
-            <div class="mb-5 p-4 bg-sky-50 rounded-2xl border border-sky-200/80">
-                <p class="text-xs font-extrabold text-sky-900 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                    <i class="bi bi-magic text-sky-600"></i> One-Click Role Presets
-                </p>
-                <div class="flex flex-wrap gap-2" id="add-preset-btns">
-                    @foreach($presets as $key => $preset)
-                    <button type="button" class="preset-btn add-preset-btn" data-preset="{{ $key }}">
-                        {{ $preset['name'] ?? $preset['label'] ?? ucfirst(str_replace('_',' ',$key)) }}
-                    </button>
-                    @endforeach
-                    <button type="button" class="preset-btn" id="add-clear-btn">
-                        <i class="bi bi-arrow-counterclockwise"></i> Custom / Clear
-                    </button>
+                @php
+                    $addPreset = $addOld && isset($presets[old('preset')]) && ! isset($takenPresets[old('preset')]) ? old('preset') : '';
+                    $openJobs = count($presets) - count($takenPresets);
+                @endphp
+                <div class="manual-row manual-row-top">
+                    <label for="add-preset-toggle">Job <span class="req-star">*</span></label>
+                    <div>
+                        <input type="hidden" name="preset" id="add-preset" value="{{ $addPreset }}">
+                        <div class="dropdown" id="add-preset-btns">
+                            <button type="button" class="manual-kind-btn staff-preset-toggle {{ $addPreset ? 'is-active' : '' }}" id="add-preset-toggle"
+                                    data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
+                                <span id="add-preset-label">{{ $addPreset ? $presets[$addPreset]['name'] : 'Choose a job' }}</span>
+                            </button>
+                            <ul class="dropdown-menu manual-kind-menu staff-preset-menu">
+                                @foreach($presets as $key => $preset)
+                                    @php $holder = $takenPresets[$key] ?? null; @endphp
+                                    <li>
+                                        <button type="button" class="dropdown-item add-preset-btn {{ $addPreset === $key ? 'active' : '' }}" data-preset="{{ $key }}" @disabled($holder)>
+                                            <span class="staff-preset-name">{{ $preset['name'] }}</span>
+                                            <small>{{ $holder ? 'Taken by '.$holder['name'] : $preset['position'].' · '.$preset['department'] }}</small>
+                                        </button>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <span class="manual-hint" id="add-preset-hint">
+                            @if($openJobs === 0)
+                                Every job already has a staff member.
+                            @else
+                                Sets their position, department, and access. Jobs that already have someone can't be picked.
+                            @endif
+                        </span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Full Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="e.g. Maria Santos">
+                <div class="manual-row">
+                    <label for="add-first-name">Name <span class="req-star">*</span></label>
+                    <div class="manual-split manual-split-3">
+                        <input type="text" name="first_name" id="add-first-name" class="form-control-clean" value="{{ $addOld ? old('first_name') : '' }}" maxlength="80" placeholder="First name" aria-label="First name" autocomplete="off" required>
+                        <input type="text" name="middle_name" id="add-middle-name" class="form-control-clean" value="{{ $addOld ? old('middle_name') : '' }}" maxlength="80" placeholder="Middle name (optional)" aria-label="Middle name" autocomplete="off">
+                        <input type="text" name="last_name" id="add-last-name" class="form-control-clean" value="{{ $addOld ? old('last_name') : '' }}" maxlength="80" placeholder="Last name" aria-label="Last name" autocomplete="off" required>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
-                    <input type="email" name="email" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="staff@talisayresort.com">
+                <div class="manual-row">
+                    <label for="add-email">Email <span class="req-star">*</span></label>
+                    <div>
+                        <input type="email" name="email" id="add-email" class="form-control-clean w-100" value="{{ $addOld ? old('email') : '' }}" maxlength="255" placeholder="staff@talisayresort.com" required>
+                        <span class="manual-hint">They log in with this email.</span>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Contact Number</label>
-                    <input type="text" name="phone" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="+63 9xx xxx xxxx">
+                <div class="manual-row">
+                    <label for="add-phone">Phone</label>
+                    <input type="tel" name="phone" id="add-phone" class="form-control-clean" value="{{ $addOld ? old('phone') : '' }}" maxlength="20" placeholder="+63 9xx xxx xxxx">
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Staff ID <span class="text-slate-400 font-normal">(auto-generated if blank)</span></label>
-                    <input type="text" name="staff_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="EMP-003">
+                <div class="manual-row">
+                    <label for="add-staff-id">Staff ID</label>
+                    <div>
+                        <input type="text" id="add-staff-id" class="form-control-clean w-100 staff-locked" value="{{ \App\Models\User::nextStaffId() }}" readonly tabindex="-1">
+                        <span class="manual-hint">Assigned automatically when the account is created.</span>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Position / Job Title <span class="text-red-500">*</span></label>
-                    <input type="text" name="position" id="add-position" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="e.g. Front Desk Officer">
+                <div class="manual-row manual-row-top">
+                    <label for="add-password">Password</label>
+                    <div>
+                        <div class="staff-password">
+                            <input type="text" name="password" id="add-password" class="form-control-clean staff-locked" minlength="8" autocomplete="off" spellcheck="false" readonly>
+                            <button type="button" class="btn-secondary-clean" id="add-password-new"><i class="bi bi-arrow-repeat"></i> New</button>
+                            <button type="button" class="btn-secondary-clean" id="add-password-copy"><i class="bi bi-clipboard"></i> <span>Copy</span></button>
+                        </div>
+                        <span class="manual-hint">Made for you automatically. Copy it and give it to them privately; they can change it after logging in.</span>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Department <span class="text-red-500">*</span></label>
-                    <input type="text" name="department" id="add-department" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="e.g. Front Office">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Account Status</label>
-                    <select name="account_status" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="on_leave">On Leave</option>
-                        <option value="suspended">Suspended</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Duty Status</label>
-                    <select name="duty_status" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
-                        <option value="available">Available (On Duty)</option>
-                        <option value="busy">Busy (In Task)</option>
-                        <option value="on_leave">On Leave</option>
-                        <option value="off_duty">Off Duty</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Password <span class="text-red-500">*</span></label>
-                    <input type="password" name="password" required minlength="8" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="Min. 8 characters">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Confirm Password <span class="text-red-500">*</span></label>
-                    <input type="password" name="password_confirmation" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="Repeat password">
-                </div>
-            </div>
 
-            <div class="border-t border-slate-200 pt-5 mb-6">
-                <div class="flex items-center justify-between mb-3">
-                    <p class="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-0 flex items-center gap-1.5">
-                        <i class="bi bi-shield-lock-fill text-indigo-600"></i> System Module Access
-                    </p>
-                    <span class="text-[11px] text-slate-400">Toggle modules and configure granular action permissions</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="add-modules-grid">
-                    @foreach($modules as $key => $mod)
-                    <div class="p-3.5 rounded-2xl border-2 border-slate-200 transition-all duration-200 hover:border-slate-300 bg-white" id="add-card-{{ $key }}">
-                        <label class="flex items-start gap-3 cursor-pointer">
-                            <input type="checkbox" name="modules[{{ $key }}][enabled]" value="1" class="mt-1 accent-indigo-600 add-mod-cb" data-module="{{ $key }}">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-xs font-extrabold text-slate-800 mb-0.5 flex items-center gap-1.5">
-                                    <i class="{{ $mod['icon'] }} text-indigo-500 text-sm"></i> {{ $mod['name'] }}
-                                </p>
-                                <p class="text-[11px] text-slate-400 leading-snug mb-0">{{ $mod['description'] }}</p>
-                                <div class="add-actions-row hidden mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
+                <div class="staff-access">
+                    <div class="staff-access-head">
+                        <div>
+                            <strong>Access</strong>
+                            <span>Tick each page they can open, then choose what they can do there.</span>
+                        </div>
+                        <em id="add-access-count">0 of {{ count($modules) }} pages</em>
+                    </div>
+                    <div class="staff-module-grid" id="add-modules-grid">
+                        @foreach($modules as $key => $mod)
+                            @php
+                                $moduleOn = $addOld && ! empty($addOldModules[$key]['enabled']);
+                                $checkedActions = $addOld ? (array) ($addOldModules[$key]['actions'] ?? []) : $mod['default'];
+                            @endphp
+                            <div class="staff-module {{ $moduleOn ? 'is-on' : '' }}" id="add-card-{{ $key }}">
+                                <label class="staff-module-head">
+                                    <input type="checkbox" name="modules[{{ $key }}][enabled]" value="1" class="add-mod-cb" data-module="{{ $key }}" @checked($moduleOn)>
+                                    <span>
+                                        <strong><i class="{{ $mod['icon'] }}"></i> {{ $mod['name'] }}</strong>
+                                        <small>{{ $mod['description'] }}</small>
+                                    </span>
+                                </label>
+                                <div class="staff-module-actions add-actions-row" @if(! $moduleOn) hidden @endif>
                                     @foreach($mod['actions'] as $action)
-                                    <label class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] cursor-pointer font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200">
-                                        <input type="checkbox" name="modules[{{ $key }}][actions][]" value="{{ $action }}" class="accent-indigo-500" {{ in_array($action,$mod['default'])?'checked':'' }}>
-                                        <span>{{ ucwords(str_replace('_',' ',$action)) }}</span>
-                                    </label>
+                                        <label>
+                                            <input type="checkbox" name="modules[{{ $key }}][actions][]" value="{{ $action }}" @checked(in_array($action, $checkedActions, true)) @disabled(! $moduleOn)>
+                                            <span>{{ ucwords(str_replace('_', ' ', $action)) }}</span>
+                                        </label>
                                     @endforeach
                                 </div>
                             </div>
-                        </label>
+                        @endforeach
                     </div>
-                    @endforeach
                 </div>
             </div>
 
-            <div class="flex gap-3">
-                <button type="button" onclick="closeAddStaffModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">
-                    Cancel
-                </button>
-                <button type="submit" class="flex-1 py-3 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5">
-                    <i class="bi bi-person-plus-fill"></i> Create Staff Account
-                </button>
+            <div class="manual-foot">
+                <button type="button" class="btn-secondary-clean" onclick="closeAddStaffModal()">Cancel</button>
+                <button type="submit" class="btn-ocean" @disabled($openJobs === 0)><i class="bi bi-person-plus"></i> Create staff account</button>
             </div>
         </form>
     </div>
@@ -1171,103 +732,101 @@
      MODAL 3: EDIT PERMISSIONS (RBAC)
 ══════════════════════════════════════════════════════ --}}
 <div class="sm-modal-backdrop" id="perm-modal">
-    <div class="sm-modal-box wide">
-        <button type="button" onclick="closePermissionsModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-700 text-xl transition">
-            <i class="bi bi-x-lg"></i>
-        </button>
-
-        <div class="flex items-center gap-3 mb-1">
-            <div class="w-10 h-10 rounded-xl bg-ocean-800 text-white flex items-center justify-center text-lg shadow-sm">
-                <i class="bi bi-shield-lock-fill"></i>
-            </div>
+    <div class="sm-modal-box staff-modal" role="dialog" aria-modal="true" aria-labelledby="permStaffTitle">
+        <div class="manual-head">
             <div>
-                <h3 class="text-lg font-extrabold text-slate-900 mb-0">Edit Role &amp; Permissions</h3>
-                <p class="text-xs text-slate-500 mb-0">Configuring access matrix for: <strong id="perm-staff-name" class="text-slate-800">—</strong></p>
+                <h5 id="permStaffTitle">Edit access</h5>
+                <p>Update the job and pages for <strong id="perm-staff-name">—</strong>.</p>
             </div>
+            <button type="button" class="manual-close" onclick="closePermissionsModal()" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
 
-        <form id="perm-form" method="POST" class="mt-5">
+        <form id="perm-form" method="POST" data-loading>
             @csrf @method('PUT')
+            <input type="hidden" name="position" id="perm-position" value="">
+            <input type="hidden" name="department" id="perm-department" value="">
+            <div class="manual-body">
+                <div class="manual-row manual-row-top">
+                    <label for="perm-preset-toggle">Job <span class="req-star">*</span></label>
+                    <div>
+                        <div class="dropdown" id="perm-preset-btns">
+                            <button type="button" class="manual-kind-btn staff-preset-toggle" id="perm-preset-toggle"
+                                    data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
+                                <span id="perm-preset-label">Choose a job</span>
+                            </button>
+                            <ul class="dropdown-menu manual-kind-menu staff-preset-menu">
+                                @foreach($presets as $key => $preset)
+                                    @php $holder = $takenPresets[$key] ?? null; @endphp
+                                    <li>
+                                        <button type="button" class="dropdown-item perm-preset-btn" data-preset="{{ $key }}"
+                                                data-holder-id="{{ $holder['id'] ?? '' }}" data-holder-name="{{ $holder['name'] ?? '' }}"
+                                                @disabled($holder)>
+                                            <span class="staff-preset-name">{{ $preset['name'] }}</span>
+                                            <small class="perm-job-note">{{ $holder ? 'Taken by '.$holder['name'] : $preset['position'].' · '.$preset['department'] }}</small>
+                                        </button>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <span class="manual-hint">Sets their position, department, and access. Jobs taken by someone else can't be picked.</span>
+                    </div>
+                </div>
 
-            <div class="mb-5 p-4 bg-sky-50 rounded-2xl border border-sky-200/80">
-                <p class="text-xs font-extrabold text-sky-900 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                    <i class="bi bi-magic text-sky-600"></i> Role Preset Auto-Fill
-                </p>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($presets as $key => $preset)
-                    <button type="button" class="preset-btn perm-preset-btn" data-preset="{{ $key }}">
-                        {{ $preset['name'] ?? $preset['label'] ?? ucfirst(str_replace('_',' ',$key)) }}
-                    </button>
-                    @endforeach
-                    <button type="button" class="preset-btn" id="perm-clear-btn">
-                        <i class="bi bi-arrow-counterclockwise"></i> Custom / Clear
-                    </button>
+                <div class="manual-row">
+                    <label for="perm-staff-id">Staff ID</label>
+                    <div>
+                        <input type="text" name="staff_id" id="perm-staff-id" class="form-control-clean w-100 staff-locked" readonly tabindex="-1">
+                        <span class="manual-hint">Assigned when the account was created.</span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Staff ID</label>
-                    <input type="text" name="staff_id" id="perm-staff-id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Position / Job Title <span class="text-red-500">*</span></label>
-                    <input type="text" name="position" id="perm-position" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Department <span class="text-red-500">*</span></label>
-                    <input type="text" name="department" id="perm-department" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Account Status</label>
-                    <select name="account_status" id="perm-account-status" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm">
+                <div class="manual-row">
+                    <label for="perm-account-status">Account status</label>
+                    <select name="account_status" id="perm-account-status" class="form-select-clean">
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
-                        <option value="on_leave">On Leave</option>
+                        <option value="on_leave">On leave</option>
                         <option value="suspended">Suspended</option>
                     </select>
                 </div>
-            </div>
 
-            <div class="border-t border-slate-200 pt-5 mb-6">
-                <div class="flex items-center justify-between mb-3">
-                    <p class="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-0 flex items-center gap-1.5">
-                        <i class="bi bi-puzzle-fill text-indigo-500"></i> System Module Access
-                    </p>
-                    <span class="text-[11px] text-slate-400">Checked modules will be granted to this staff member</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    @foreach($modules as $key => $mod)
-                    <div class="p-3.5 rounded-2xl border-2 border-slate-200 transition-all duration-200 hover:border-slate-300 bg-white" id="perm-card-{{ $key }}">
-                        <label class="flex items-start gap-3 cursor-pointer">
-                            <input type="checkbox" name="modules[{{ $key }}][enabled]" value="1" class="mt-1 accent-indigo-600 perm-mod-cb" data-module="{{ $key }}">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-xs font-extrabold text-slate-800 mb-0.5 flex items-center gap-1.5">
-                                    <i class="{{ $mod['icon'] }} text-indigo-500 text-sm"></i> {{ $mod['name'] }}
-                                </p>
-                                <p class="text-[11px] text-slate-400 leading-snug mb-2">{{ $mod['description'] }}</p>
-                                <div class="perm-actions-row hidden flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
+                <div class="staff-access">
+                    <div class="staff-access-head">
+                        <div>
+                            <strong>Access</strong>
+                            <span>Tick each page they can open, then choose what they can do there.</span>
+                        </div>
+                        <em id="perm-access-count">0 of {{ count($modules) }} pages</em>
+                    </div>
+                    <div class="staff-module-grid" id="perm-modules-grid">
+                        @foreach($modules as $key => $mod)
+                            <div class="staff-module" id="perm-card-{{ $key }}">
+                                <label class="staff-module-head">
+                                    <input type="checkbox" name="modules[{{ $key }}][enabled]" value="1" class="perm-mod-cb" data-module="{{ $key }}">
+                                    <span>
+                                        <strong><i class="{{ $mod['icon'] }}"></i> {{ $mod['name'] }}</strong>
+                                        <small>{{ $mod['description'] }}</small>
+                                    </span>
+                                </label>
+                                <div class="staff-module-actions perm-actions-row" hidden>
                                     @foreach($mod['actions'] as $action)
-                                    <label class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] cursor-pointer font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200">
-                                        <input type="checkbox" name="modules[{{ $key }}][actions][]" value="{{ $action }}" class="accent-indigo-500 perm-act-cb" data-module="{{ $key }}" data-action="{{ $action }}">
-                                        <span>{{ ucwords(str_replace('_',' ',$action)) }}</span>
-                                    </label>
+                                        <label>
+                                            <input type="checkbox" name="modules[{{ $key }}][actions][]" value="{{ $action }}" class="perm-act-cb" data-module="{{ $key }}" data-action="{{ $action }}" disabled>
+                                            <span>{{ ucwords(str_replace('_', ' ', $action)) }}</span>
+                                        </label>
                                     @endforeach
                                 </div>
                             </div>
-                        </label>
+                        @endforeach
                     </div>
-                    @endforeach
                 </div>
             </div>
 
-            <div class="flex gap-3">
-                <button type="button" onclick="closePermissionsModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">
-                    Cancel
-                </button>
-                <button type="submit" class="flex-1 py-3 rounded-lg bg-ocean-800 hover:bg-ocean-900 text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
-                    <i class="bi bi-shield-check-fill"></i> Save Role &amp; Permissions
-                </button>
+            <div class="manual-foot">
+                <button type="button" class="btn-secondary-clean" onclick="closePermissionsModal()">Cancel</button>
+                <button type="submit" class="btn-ocean"><i class="bi bi-shield-check"></i> Save access</button>
             </div>
         </form>
     </div>
@@ -1284,7 +843,7 @@
 
         <div class="flex items-center gap-3 mb-2">
             <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-lg">
-                <i class="bi bi-key-fill"></i>
+                <i class="bi bi-key"></i>
             </div>
             <div>
                 <h3 class="text-lg font-extrabold text-slate-900 mb-0">Reset Staff Password</h3>
@@ -1295,11 +854,11 @@
         <form id="reset-pwd-form" method="POST" class="mt-5">
             @csrf
             <div class="mb-4">
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">New Password <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">New Password <span class="req-star">*</span></label>
                 <input type="password" name="password" required minlength="8" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="Min. 8 characters">
             </div>
             <div class="mb-5">
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Confirm New Password <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Confirm New Password <span class="req-star">*</span></label>
                 <input type="password" name="password_confirmation" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-300 focus:border-sky-500 outline-none shadow-sm" placeholder="Repeat password">
             </div>
             <div class="flex gap-3">
@@ -1307,7 +866,7 @@
                     Cancel
                 </button>
                 <button type="submit" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition shadow-md shadow-red-600/20 flex items-center justify-center gap-1">
-                    <i class="bi bi-key-fill"></i> Reset Password
+                    <i class="bi bi-key"></i> Reset Password
                 </button>
             </div>
         </form>
@@ -1330,6 +889,8 @@
 <script>
 const MODULE_KEYS = @json(array_keys($modules));
 const PRESETS_DATA = @json($presets);
+const TAKEN_PRESETS = @json($takenPresets);
+let permEditingUserId = null;
 
 // Tab switching
 function switchTab(tab) {
@@ -1337,13 +898,11 @@ function switchTab(tab) {
         const panel = document.getElementById('panel-' + t);
         const btn = document.getElementById('btn-tab-' + t);
         if (panel) panel.classList.toggle('active', t === tab);
-        if (btn) btn.classList.toggle('active', t === tab);
+        if (btn) {
+            btn.classList.toggle('active', t === tab);
+            btn.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+        }
     });
-
-    const dirSearch = document.getElementById('directorySearchBox');
-    if (dirSearch) {
-        dirSearch.style.display = (tab === 'roster') ? 'block' : 'none';
-    }
 }
 
 function gotoActivity() {
@@ -1358,37 +917,20 @@ function gotoActivity() {
     switchTab(t);
 })();
 
-// Real-time Staff Search Filter on Directory Cards
-const searchInput = document.getElementById('quickStaffSearch');
-const clearSearchBtn = document.getElementById('clearQuickSearch');
-
-if (searchInput) {
-    searchInput.addEventListener('input', function() {
-        const val = this.value.toLowerCase().trim();
-        if (clearSearchBtn) clearSearchBtn.classList.toggle('hidden', val.length === 0);
-
-        document.querySelectorAll('#staffCardsContainer .staff-card').forEach(card => {
-            const name = card.dataset.name || '';
-            const email = card.dataset.email || '';
-            const staffId = card.dataset.id || '';
-            const pos = card.dataset.pos || '';
-            const dept = card.dataset.dept || '';
-
-            const match = !val || name.includes(val) || email.includes(val) || staffId.includes(val) || pos.includes(val) || dept.includes(val);
-            card.style.display = match ? 'flex' : 'none';
-        });
+// Staff directory search
+document.getElementById('quickStaffSearch')?.addEventListener('input', function () {
+    const term = this.value.toLowerCase().trim();
+    const count = document.getElementById('staffCount');
+    const noMatch = document.getElementById('staffNoMatch');
+    let shown = 0;
+    document.querySelectorAll('.staff-row').forEach(row => {
+        const match = !term || row.dataset.search.includes(term);
+        row.hidden = !match;
+        if (match) shown++;
     });
-}
-
-if (clearSearchBtn) {
-    clearSearchBtn.addEventListener('click', function() {
-        if (searchInput) {
-            searchInput.value = '';
-            searchInput.dispatchEvent(new Event('input'));
-            searchInput.focus();
-        }
-    });
-}
+    if (noMatch) noMatch.hidden = !term || shown > 0;
+    if (count) count.textContent = term ? `${shown} of ${count.dataset.total} shown` : count.dataset.label;
+});
 
 // Duty Modal
 function openDutyModal(id, name, status, notes) {
@@ -1406,36 +948,77 @@ function closeDutyModal() {
 
 // Add Staff Modal
 function openAddStaffModal() {
+    const password = document.getElementById('add-password');
+    if (password && !password.value) password.value = generateStaffPassword();
     document.getElementById('add-staff-modal').classList.add('open');
+    setTimeout(() => document.getElementById('add-first-name')?.focus(), 50);
 }
+
+function generateStaffPassword() {
+    const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789'];
+    const all = sets.join('');
+    const pick = chars => chars[crypto.getRandomValues(new Uint32Array(1))[0] % chars.length];
+    const chars = sets.map(pick);
+    while (chars.length < 12) chars.push(pick(all));
+    for (let i = chars.length - 1; i > 0; i--) {
+        const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
+}
+document.getElementById('add-password-new')?.addEventListener('click', () => {
+    document.getElementById('add-password').value = generateStaffPassword();
+});
+document.getElementById('add-password-copy')?.addEventListener('click', function () {
+    const input = document.getElementById('add-password');
+    const label = this.querySelector('span');
+    const done = () => { label.textContent = 'Copied'; setTimeout(() => { label.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(done);
+    } else {
+        input.select();
+        document.execCommand('copy');
+        input.setSelectionRange(0, 0);
+        done();
+    }
+});
 function closeAddStaffModal() {
     document.getElementById('add-staff-modal').classList.remove('open');
 }
 
 // Module toggle for add form
+function updateAddAccessCount() {
+    const count = document.getElementById('add-access-count');
+    if (!count) return;
+    const on = document.querySelectorAll('#add-staff-modal .add-mod-cb:checked').length;
+    count.textContent = on + ' of ' + MODULE_KEYS.length + ' pages';
+}
 function toggleAddModule(moduleKey, enable) {
     const card = document.getElementById('add-card-' + moduleKey);
-    const row = card?.querySelector('.add-actions-row');
-    if (row) row.classList.toggle('hidden', !enable);
-    if (card) {
-        card.style.borderColor = enable ? '#6366f1' : '';
-        card.style.background = enable ? '#f5f7ff' : '';
+    if (!card) return;
+    card.classList.toggle('is-on', enable);
+    const row = card.querySelector('.add-actions-row');
+    if (row) {
+        row.hidden = !enable;
+        row.querySelectorAll('input').forEach(input => { input.disabled = !enable; });
     }
+    updateAddAccessCount();
 }
 document.querySelectorAll('.add-mod-cb').forEach(cb => {
     cb.addEventListener('change', function() {
         toggleAddModule(this.dataset.module, this.checked);
     });
 });
+updateAddAccessCount();
+if (document.getElementById('add-staff-modal')?.hasAttribute('data-reopen')) openAddStaffModal();
 
 // Add preset buttons
 document.querySelectorAll('.add-preset-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         const pKey = this.dataset.preset;
         const preset = PRESETS_DATA[pKey];
-        if (!preset) return;
-        if (preset.position) document.getElementById('add-position').value = preset.position;
-        if (preset.department) document.getElementById('add-department').value = preset.department;
+        if (!preset || this.disabled) return;
+        document.getElementById('add-preset').value = pKey;
         const presetMods = preset.modules || {};
         MODULE_KEYS.forEach(m => {
             const cb = document.querySelector('#add-staff-modal .add-mod-cb[data-module="' + m + '"]');
@@ -1449,24 +1032,93 @@ document.querySelectorAll('.add-preset-btn').forEach(btn => {
                 });
             }
         });
-        document.querySelectorAll('#add-preset-btns .preset-btn').forEach(b => b.classList.remove('selected'));
-        this.classList.add('selected');
+        document.querySelectorAll('#add-preset-btns .dropdown-item').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('add-preset-label').textContent = this.querySelector('.staff-preset-name').textContent.trim();
+        const toggle = document.getElementById('add-preset-toggle');
+        toggle.classList.add('is-active');
+        toggle.classList.remove('is-invalid');
     });
 });
 
-document.getElementById('add-clear-btn')?.addEventListener('click', function() {
-    MODULE_KEYS.forEach(m => {
-        const cb = document.querySelector('#add-staff-modal .add-mod-cb[data-module="' + m + '"]');
-        if (cb) {
-            cb.checked = false;
-            toggleAddModule(m, false);
-        }
-    });
-    document.querySelectorAll('#add-preset-btns .preset-btn').forEach(b => b.classList.remove('selected'));
+document.querySelector('#add-staff-modal form')?.addEventListener('submit', function (e) {
+    if (document.getElementById('add-preset').value) return;
+    e.preventDefault();
+    const toggle = document.getElementById('add-preset-toggle');
+    toggle.classList.add('is-invalid');
+    toggle.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    bootstrap.Dropdown.getOrCreateInstance(toggle).show();
 });
 
 // Permissions modal
+function updatePermAccessCount() {
+    const count = document.getElementById('perm-access-count');
+    if (!count) return;
+    const on = document.querySelectorAll('#perm-modal .perm-mod-cb:checked').length;
+    count.textContent = on + ' of ' + MODULE_KEYS.length + ' pages';
+}
+
+function togglePermModule(moduleKey, enable) {
+    const card = document.getElementById('perm-card-' + moduleKey);
+    if (!card) return;
+    card.classList.toggle('is-on', enable);
+    const row = card.querySelector('.perm-actions-row');
+    if (row) {
+        row.hidden = !enable;
+        row.querySelectorAll('input').forEach(input => { input.disabled = !enable; });
+    }
+    updatePermAccessCount();
+}
+
+function findPresetKeyByPosition(position) {
+    const needle = String(position || '').trim().toLowerCase();
+    if (!needle) return '';
+    return Object.keys(PRESETS_DATA).find(key => String(PRESETS_DATA[key].position || '').trim().toLowerCase() === needle) || '';
+}
+
+function refreshPermJobAvailability(currentUserId) {
+    document.querySelectorAll('#perm-modal .perm-preset-btn').forEach(btn => {
+        const key = btn.dataset.preset;
+        const holder = TAKEN_PRESETS[key] || null;
+        const holderId = holder ? Number(holder.id) : 0;
+        const isMine = holderId && Number(currentUserId) === holderId;
+        const takenByOther = holder && !isMine;
+        btn.disabled = Boolean(takenByOther);
+        const note = btn.querySelector('.perm-job-note');
+        if (!note) return;
+        if (isMine) note.textContent = 'Current job';
+        else if (holder) note.textContent = 'Taken by ' + holder.name;
+        else note.textContent = (PRESETS_DATA[key].position || '') + ' · ' + (PRESETS_DATA[key].department || '');
+    });
+}
+
+function selectPermJob(presetKey, fillModules) {
+    const preset = PRESETS_DATA[presetKey];
+    if (!preset) return;
+    document.getElementById('perm-position').value = preset.position || '';
+    document.getElementById('perm-department').value = preset.department || '';
+    document.getElementById('perm-preset-label').textContent = preset.name || presetKey;
+    document.getElementById('perm-preset-toggle').classList.add('is-active');
+    document.querySelectorAll('#perm-modal .perm-preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === presetKey));
+
+    if (!fillModules) return;
+    const presetMods = preset.modules || {};
+    MODULE_KEYS.forEach(m => {
+        const cb = document.querySelector('#perm-modal .perm-mod-cb[data-module="' + m + '"]');
+        if (!cb) return;
+        const isEnabled = Boolean(presetMods[m]);
+        cb.checked = isEnabled;
+        togglePermModule(m, isEnabled);
+        if (isEnabled && Array.isArray(presetMods[m])) {
+            document.querySelectorAll('#perm-modal .perm-act-cb[data-module="' + m + '"]').forEach(a => {
+                a.checked = presetMods[m].includes(a.dataset.action);
+            });
+        }
+    });
+}
+
 function openPermissionsModal(userId, name, perms, staffId, position, department, accountStatus) {
+    permEditingUserId = userId;
     document.getElementById('perm-staff-name').textContent = name;
     document.getElementById('perm-form').action = '/staff-management/' + userId + '/permissions';
     document.getElementById('perm-staff-id').value = staffId || '';
@@ -1474,7 +1126,6 @@ function openPermissionsModal(userId, name, perms, staffId, position, department
     document.getElementById('perm-department').value = department || '';
     document.getElementById('perm-account-status').value = accountStatus || 'active';
 
-    // Reset all
     MODULE_KEYS.forEach(m => {
         const cb = document.querySelector('#perm-modal .perm-mod-cb[data-module="' + m + '"]');
         if (cb) {
@@ -1484,35 +1135,34 @@ function openPermissionsModal(userId, name, perms, staffId, position, department
         document.querySelectorAll('#perm-modal .perm-act-cb[data-module="' + m + '"]').forEach(a => { a.checked = false; });
     });
 
-    // Apply existing permissions
-    perms.forEach(p => {
+    (perms || []).forEach(p => {
         const cb = document.querySelector('#perm-modal .perm-mod-cb[data-module="' + p.module + '"]');
-        if (cb) {
-            cb.checked = true;
-            togglePermModule(p.module, true);
-            (p.actions || []).forEach(action => {
-                const a = document.querySelector('#perm-modal .perm-act-cb[data-module="' + p.module + '"][data-action="' + action + '"]');
-                if (a) a.checked = true;
-            });
-        }
+        if (!cb) return;
+        cb.checked = true;
+        togglePermModule(p.module, true);
+        (p.actions || []).forEach(action => {
+            const a = document.querySelector('#perm-modal .perm-act-cb[data-module="' + p.module + '"][data-action="' + action + '"]');
+            if (a) a.checked = true;
+        });
     });
 
-    document.querySelectorAll('#perm-modal .preset-btn').forEach(b => b.classList.remove('selected'));
+    refreshPermJobAvailability(userId);
+    const matched = findPresetKeyByPosition(position);
+    document.querySelectorAll('#perm-modal .perm-preset-btn').forEach(b => b.classList.remove('active'));
+    if (matched) {
+        selectPermJob(matched, false);
+    } else {
+        document.getElementById('perm-preset-label').textContent = position ? ('Custom · ' + position) : 'Choose a job';
+        document.getElementById('perm-preset-toggle').classList.toggle('is-active', Boolean(position));
+    }
+
+    updatePermAccessCount();
     document.getElementById('perm-modal').classList.add('open');
 }
 
 function closePermissionsModal() {
     document.getElementById('perm-modal').classList.remove('open');
-}
-
-function togglePermModule(module, show) {
-    const card = document.getElementById('perm-card-' + module);
-    const row = card?.querySelector('.perm-actions-row');
-    if (row) row.classList.toggle('hidden', !show);
-    if (card) {
-        card.style.borderColor = show ? '#6366f1' : '';
-        card.style.background = show ? '#f5f7ff' : '';
-    }
+    permEditingUserId = null;
 }
 
 document.querySelectorAll('.perm-mod-cb').forEach(cb => {
@@ -1521,40 +1171,19 @@ document.querySelectorAll('.perm-mod-cb').forEach(cb => {
     });
 });
 
-// Perm preset buttons
 document.querySelectorAll('.perm-preset-btn').forEach(btn => {
     btn.addEventListener('click', function() {
-        const pKey = this.dataset.preset;
-        const preset = PRESETS_DATA[pKey];
-        if (!preset) return;
-        if (preset.position) document.getElementById('perm-position').value = preset.position;
-        if (preset.department) document.getElementById('perm-department').value = preset.department;
-        const presetMods = preset.modules || {};
-        MODULE_KEYS.forEach(m => {
-            const cb = document.querySelector('#perm-modal .perm-mod-cb[data-module="' + m + '"]');
-            if (!cb) return;
-            const isEnabled = Boolean(presetMods[m]);
-            cb.checked = isEnabled;
-            togglePermModule(m, isEnabled);
-            document.querySelectorAll('#perm-modal .perm-act-cb[data-module="' + m + '"]').forEach(a => {
-                a.checked = isEnabled && Array.isArray(presetMods[m]) && presetMods[m].includes(a.dataset.action);
-            });
-        });
-        document.querySelectorAll('#perm-modal .preset-btn').forEach(b => b.classList.remove('selected'));
-        this.classList.add('selected');
+        if (this.disabled) return;
+        selectPermJob(this.dataset.preset, true);
     });
 });
 
-document.getElementById('perm-clear-btn')?.addEventListener('click', function() {
-    MODULE_KEYS.forEach(m => {
-        const cb = document.querySelector('#perm-modal .perm-mod-cb[data-module="' + m + '"]');
-        if (cb) {
-            cb.checked = false;
-            togglePermModule(m, false);
-        }
-        document.querySelectorAll('#perm-modal .perm-act-cb[data-module="' + m + '"]').forEach(a => { a.checked = false; });
-    });
-    document.querySelectorAll('#perm-modal .preset-btn').forEach(b => b.classList.remove('selected'));
+document.querySelector('#perm-form')?.addEventListener('submit', function (e) {
+    if (document.getElementById('perm-position').value.trim()) return;
+    e.preventDefault();
+    const toggle = document.getElementById('perm-preset-toggle');
+    toggle.classList.add('is-invalid');
+    bootstrap.Dropdown.getOrCreateInstance(toggle).show();
 });
 
 // Reset password modal

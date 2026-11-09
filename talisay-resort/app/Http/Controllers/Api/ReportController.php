@@ -31,9 +31,11 @@ class ReportController extends Controller
         
         $driver = \Illuminate\Support\Facades\DB::getDriverName();
         
-        $select = $driver === 'sqlite' 
-            ? "strftime('%Y-%m', created_at) as month, SUM(amount) as total"
-            : "DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total";
+        $select = match ($driver) {
+            'sqlite' => "strftime('%Y-%m', created_at) as month, SUM(amount) as total",
+            'pgsql' => "to_char(created_at, 'YYYY-MM') as month, SUM(amount) as total",
+            default => "DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total",
+        };
 
         $monthlyRevenue = $query->clone()
             ->selectRaw($select)
@@ -65,12 +67,16 @@ class ReportController extends Controller
         $dailyOccupancy = \App\Models\CapacitySchedule::whereBetween('date', [$dateFrom, $dateTo])
             ->orderBy('date')
             ->get()
-            ->map(fn($c) => [
-                'date' => $c->date->format('Y-m-d'),
-                'current_count' => $c->current_count,
-                'max_capacity' => $c->max_capacity,
-                'utilization' => $c->getUtilizationPercent(),
-            ]);
+            ->map(function ($c) {
+                $max = \App\Models\CapacitySchedule::visitorCap();
+
+                return [
+                    'date' => $c->date->format('Y-m-d'),
+                    'current_count' => $c->current_count,
+                    'max_capacity' => $max,
+                    'utilization' => $max > 0 ? round(min(100, $c->current_count / $max * 100), 1) : 0,
+                ];
+            });
 
         $avgOccupancy = $dailyOccupancy->avg('utilization');
 

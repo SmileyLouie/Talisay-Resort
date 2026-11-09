@@ -14,7 +14,7 @@ set DEFAULT_JVM_OPTS=
 set DIRNAME=%~dp0
 if "%DIRNAME%" == "" set DIRNAME=.
 set APP_BASE_NAME=%~n0
-set APP_HOME=%DIRNAME%
+for %%I in ("%DIRNAME%") do set APP_HOME=%%~fsI
 
 @rem Find java.exe
 if defined JAVA_HOME goto findJavaFromJavaHome

@@ -9,9 +9,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class WebStaffManagementController extends Controller
 {
+    /**
+     * The staff member who already holds this job title, if any.
+     */
+    private function jobHolder(string $position, ?int $ignoreId = null): ?User
+    {
+        return User::where('role', 'staff')
+            ->whereRaw('lower(trim(position)) = ?', [mb_strtolower(trim($position))])
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->first();
+    }
+
     /**
      * Admin Staff Management Roster View with RBAC and Activity Audit Trail.
      */
@@ -44,6 +57,20 @@ class WebStaffManagementController extends Controller
         $staffMembers = $staffQuery->orderBy('name')->get();
         $modules      = StaffPermission::MODULES;
         $presets      = StaffPermission::PRESETS;
+
+        $holdersByJob = User::where('role', 'staff')
+            ->whereNotNull('position')
+            ->orderBy('name')
+            ->get(['id', 'name', 'position'])
+            ->groupBy(fn ($u) => mb_strtolower(trim($u->position)));
+        $takenPresets = collect($presets)
+            ->map(function ($preset) use ($holdersByJob) {
+                $holder = $holdersByJob->get(mb_strtolower($preset['position']))?->first();
+
+                return $holder ? ['id' => $holder->id, 'name' => $holder->name] : null;
+            })
+            ->filter()
+            ->all();
 
         // Activity Log query if on the activity tab
         $activityLogs = null;
@@ -93,6 +120,7 @@ class WebStaffManagementController extends Controller
             'tab',
             'modules',
             'presets',
+            'takenPresets',
             'activityLogs'
         ));
     }
@@ -103,17 +131,45 @@ class WebStaffManagementController extends Controller
     public function staffStore(Request $request)
     {
         $data = $request->validate([
-            'name'           => 'required|string|max:255',
-            'email'          => 'required|string|email|max:255|unique:users,email',
+            'first_name'     => 'required_without:name|nullable|string|max:80',
+            'middle_name'    => 'nullable|string|max:80',
+            'last_name'      => 'required_without:name|nullable|string|max:80',
+            'name'           => 'required_without_all:first_name,last_name|nullable|string|max:255',
+            'email'          => ['required', 'string', 'email', 'max:255', User::uniqueActiveColumn('email')],
             'phone'          => 'nullable|string|max:20',
-            'staff_id'       => 'nullable|string|max:50|unique:users,staff_id',
-            'position'       => 'required|string|max:100',
-            'department'     => 'required|string|max:100',
-            'account_status' => 'required|in:active,inactive,on_leave,suspended',
-            'duty_status'    => 'required|in:available,busy,on_leave,off_duty',
-            'password'       => 'required|string|min:8|confirmed',
+            'staff_id'       => ['nullable', 'string', 'max:50', User::uniqueActiveColumn('staff_id')],
+            'preset'         => ['required_without:position', 'nullable', Rule::in(array_keys(StaffPermission::PRESETS))],
+            'position'       => 'nullable|string|max:100',
+            'department'     => 'required_with:position|nullable|string|max:100',
+            'account_status' => 'nullable|in:active,inactive,on_leave,suspended',
+            'duty_status'    => 'nullable|in:available,busy,on_leave,off_duty',
+            'password'       => 'required|string|min:8',
             'modules'        => 'nullable|array',
+        ], [
+            'preset.required_without' => 'Choose a job for this staff member.',
+            'preset.in'               => 'Choose a job from the list.',
         ]);
+
+        if (filled($data['preset'] ?? null)) {
+            $data['position'] = StaffPermission::PRESETS[$data['preset']]['position'];
+            $data['department'] = StaffPermission::PRESETS[$data['preset']]['department'];
+        }
+
+        if ($holder = $this->jobHolder($data['position'])) {
+            throw ValidationException::withMessages([
+                filled($data['preset'] ?? null) ? 'preset' : 'position' => "{$holder->name} is already the {$data['position']}. Each job can only have one staff member.",
+            ]);
+        }
+
+        $data['account_status'] = $data['account_status'] ?? 'active';
+        $data['duty_status'] = $data['duty_status'] ?? 'available';
+
+        if (filled($data['first_name'] ?? null) || filled($data['last_name'] ?? null)) {
+            $data['name'] = collect([$data['first_name'] ?? null, $data['middle_name'] ?? null, $data['last_name'] ?? null])
+                ->map(fn ($part) => trim((string) $part))
+                ->filter()
+                ->implode(' ');
+        }
 
         // Auto-generate staff_id if empty
         $staffId = !empty($data['staff_id'])
@@ -185,13 +241,18 @@ class WebStaffManagementController extends Controller
         }
 
         $data = $request->validate([
-            'staff_id'       => 'nullable|string|max:50|unique:users,staff_id,' . $user->id,
+            'staff_id'       => ['nullable', 'string', 'max:50', User::uniqueActiveColumn('staff_id', $user->id)],
             'position'       => 'required|string|max:100',
             'department'     => 'required|string|max:100',
             'account_status' => 'required|in:active,inactive,on_leave,suspended',
             'duty_status'    => 'nullable|in:available,busy,on_leave,off_duty',
             'modules'        => 'nullable|array',
         ]);
+
+        $positionChanged = mb_strtolower(trim($data['position'])) !== mb_strtolower(trim((string) $user->position));
+        if ($positionChanged && ($holder = $this->jobHolder($data['position'], $user->id))) {
+            return back()->with('error', "{$holder->name} is already the {$data['position']}. Each job can only have one staff member.");
+        }
 
         $oldValues = [
             'staff_id'       => $user->staff_id,
@@ -205,7 +266,7 @@ class WebStaffManagementController extends Controller
             $isActive = in_array($data['account_status'], ['active', 'on_leave']);
 
             $updateData = [
-                'staff_id'       => $data['staff_id'] ?: $user->staff_id,
+                'staff_id'       => ($data['staff_id'] ?? null) ?: $user->staff_id,
                 'position'       => $data['position'],
                 'department'     => $data['department'],
                 'account_status' => $data['account_status'],

@@ -6,6 +6,7 @@ use App\Exceptions\BookingConflictException;
 use App\Http\Controllers\Controller;
 use App\Models\AccommodationUnit;
 use App\Models\Booking;
+use App\Models\PaymentMethod;
 use App\Models\Review;
 use App\Models\User;
 use App\Services\BookingService;
@@ -79,7 +80,9 @@ class MobileIntegrationController extends Controller
             'check_in' => ['required', 'date'],
             'check_out' => ['required', 'date', 'after:check_in'],
             'guests_count' => ['required', 'integer', 'min:1', 'max:100'],
-            'payment_method' => ['required', 'in:gcash,cash,paypal,card'],
+            'payment_method' => PaymentMethod::methodRule(),
+            'activity_ids' => ['nullable', 'array', 'max:12'],
+            'activity_ids.*' => ['integer', 'exists:resort_activities,id'],
             'special_requests' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -108,6 +111,7 @@ class MobileIntegrationController extends Controller
                 'guest_name_manual' => $user->name,
                 'guest_contact_manual' => $user->phone ?: $user->email,
                 'payment_method' => $data['payment_method'],
+                'activity_ids' => $data['activity_ids'] ?? [],
                 'special_requests' => $data['special_requests'] ?? null,
                 'booking_source' => 'mobile',
                 'status' => Booking::STATUS_PENDING,
@@ -146,10 +150,13 @@ class MobileIntegrationController extends Controller
         }
 
         if ($booking->status !== Booking::STATUS_CANCELLED) {
-            $this->bookings->cancel($booking, $data['reason'] ?? 'Cancelled from the mobile app.', 'booking_cancelled_mobile');
+            $booking = $this->bookings->cancel($booking, $data['reason'] ?? 'Cancelled from the mobile app.', 'booking_cancelled_mobile');
         }
 
-        return response()->json($this->bookingPayload($booking->fresh(['payment'])));
+        $payload = $this->bookingPayload($booking->fresh(['payment']));
+        $payload['refund_note'] = $this->bookings->describeCancellation($booking);
+
+        return response()->json($payload);
     }
 
     public function storeReview(Request $request)
