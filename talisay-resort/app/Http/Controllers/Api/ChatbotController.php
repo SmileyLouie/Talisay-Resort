@@ -99,20 +99,26 @@ class ChatbotController extends Controller
         if (preg_match('/(TBRS?-[A-Z0-9]{4,10})/i', $raw)) {
             return ['response' => "To check a booking reference, please **log in** to your account first.\n\nClick **Login / Register** on the menu above.", 'intent' => 'auth_required', 'chips' => ['Login', 'Register', 'Room Rates', 'Directions'], 'ai_powered' => false];
         }
-        $minRoom    = AccommodationUnit::rooms()->min('price_per_night') ?? 1000;
-        $maxRoom    = AccommodationUnit::rooms()->max('price_per_night') ?? 1500;
-        $minCottage = AccommodationUnit::cottages()->min('price_per_night') ?? 1200;
-        $maxCottage = AccommodationUnit::cottages()->max('price_per_night') ?? 2000;
+        $roomCount = AccommodationUnit::rooms()->count();
+        $cottageCount = AccommodationUnit::cottages()->count();
+        $minRoom    = $roomCount ? AccommodationUnit::rooms()->min('price_per_night') : null;
+        $maxRoom    = $roomCount ? AccommodationUnit::rooms()->max('price_per_night') : null;
+        $minCottage = $cottageCount ? AccommodationUnit::cottages()->min('price_per_night') : null;
+        $maxCottage = $cottageCount ? AccommodationUnit::cottages()->max('price_per_night') : null;
         $avail      = AccommodationUnit::available()->count();
         $today      = now()->format('Y-m-d');
         $cap        = CapacitySchedule::getCapacityForDate($today);
-        $maxCap     = $cap ? $cap->max_capacity : (int) SystemSetting::get('daily_visitor_cap', 100);
+        $maxCap     = CapacitySchedule::visitorCap();
         $curr       = $cap ? $cap->current_count : 0;
         $remaining  = max(0, $maxCap - $curr);
-        $minRoomFmt    = number_format($minRoom);
-        $maxRoomFmt    = number_format($maxRoom);
-        $minCottageFmt = number_format($minCottage);
-        $maxCottageFmt = number_format($maxCottage);
+        $minRoomFmt    = $minRoom === null ? 'n/a' : number_format($minRoom);
+        $maxRoomFmt    = $maxRoom === null ? 'n/a' : number_format($maxRoom);
+        $minCottageFmt = $minCottage === null ? 'n/a' : number_format($minCottage);
+        $maxCottageFmt = $maxCottage === null ? 'n/a' : number_format($maxCottage);
+        $payNames = \App\Models\PaymentMethod::catalog()->pluck('name')->implode(', ');
+        $activityLine = \App\Models\ResortActivity::bookable()
+            ->map(fn ($activity) => $activity->title.($activity->price !== null ? ' PHP '.number_format((float) $activity->price, 0) : ''))
+            ->implode('; ');
         $persona      = SystemSetting::get('chatbot_persona', 'You are the friendly AI tourism assistant for Talisay Beach Resort, located in Baybay City, Leyte, Philippines.');
         $customRules  = SystemSetting::get('chatbot_custom_rules', '');
         $announcement = SystemSetting::get('chatbot_announcement', '');
@@ -124,20 +130,26 @@ class ChatbotController extends Controller
         if (!empty($announcement)) {
             $extraContext .= "\nCURRENT RESORT ANNOUNCEMENT:\n" . $announcement . "\n";
         }
+        $savedReplies = $this->savedReplyContext();
+        if ($savedReplies !== '') {
+            $extraContext .= "\n".$savedReplies."\n";
+        }
 
         $systemPrompt  = "{$persona}\n\n"
             . "YOUR ROLE: Talking to a PUBLIC VISITOR (not logged in). You are a tourism and resort information assistant ONLY.\n\n"
             . "LIVE RESORT DATA (use these exact numbers):\n"
-            . "- Rooms: PHP{$minRoomFmt} to PHP{$maxRoomFmt} per night (up to 4 guests, AC, Wi-Fi, private bath)\n"
-            . "- Cottages: PHP{$minCottageFmt} to PHP{$maxCottageFmt} per night (up to 10 guests, oceanfront)\n"
+            . ($roomCount === 0 && $cottageCount === 0
+                ? "- No rooms or cottages are listed for booking right now.\n"
+                : "- Rooms: PHP{$minRoomFmt} to PHP{$maxRoomFmt} per night\n- Cottages: PHP{$minCottageFmt} to PHP{$maxCottageFmt} per night\n")
             . "- Full-Resort Booking: Exclusive events (weddings, reunions, corporate)\n"
             . "- Available Units: {$avail} | Visitor Count Today: {$curr} of {$maxCap} ({$remaining} slots left)\n"
-            . "- Check-In: 2:00 PM | Check-Out: 12:00 PM | Day Tour: 7:00 AM to 5:00 PM\n"
+            . "- Check-In: " . \App\Support\BookingRules::display(\App\Support\BookingRules::checkInTime()) . " | Check-Out: " . \App\Support\BookingRules::display(\App\Support\BookingRules::checkOutTime()) . " | Day Tour: 7:00 AM to 5:00 PM\n"
             . "- Restaurant: 6:00 AM to 10:00 PM\n"
             . "- Location: Barangay Maslug, Baybay City, Leyte, Philippines\n"
             . "- From Tacloban: about 2 hours | From Ormoc: about 1 hour\n"
-            . "- Contact: +63 (053) 563-7000\n"
-            . "- Payment: GCash, Cash on Arrival, Credit/Debit Card, PayPal\n"
+            . "- Contact: " . (setting('contact_phone') ?: setting('resort_phone', '+63 (053) 563-7000')) . "\n"
+            . "- Payment methods guests can use: ".($payNames !== '' ? $payNames : 'cash on arrival').". Online payments need a receipt. Card payments record only the last 4 digits. These do not charge the guest automatically.\n"
+            . ($activityLine !== '' ? "- Bookable activities guests can add to a reservation: {$activityLine}\n" : '')
             . "- Amenities: swimming pool, snorkeling reef, water sports, oceanview restaurant, pavilion, event hall\n"
             . "- 360 degree Virtual Tour available on the website\n"
             . $extraContext . "\n"
@@ -194,11 +206,11 @@ class ChatbotController extends Controller
             . "LIVE RESORT DATA:\n"
             . "- Available Units: {$avail}\n"
             . "- Rooms: PHP{$minRoomFmt} to PHP{$maxRoomFmt} per night | Cottages: PHP{$minCotFmt} to PHP{$maxCotFmt} per night\n"
-            . "- Check-In: 2:00 PM | Check-Out: 12:00 PM\n"
-            . "- Payment: GCash, Cash on Arrival, Card, PayPal\n"
+            . "- Check-In: " . \App\Support\BookingRules::display(\App\Support\BookingRules::checkInTime()) . " | Check-Out: " . \App\Support\BookingRules::display(\App\Support\BookingRules::checkOutTime()) . "\n"
+            . "- Payment: GCash, Cash on Arrival, Card\n"
             . "- Cancellation: 48 hours before check-in | Refunds: 5-7 business days\n"
             . "- Location: Barangay Maslug, Baybay City, Leyte, Philippines\n"
-            . "- Contact: +63 (053) 563-7000\n\n"
+            . "- Contact: " . (setting('contact_phone') ?: setting('resort_phone', '+63 (053) 563-7000')) . "\n\n"
             . "STRICT RULES:\n"
             . "1. ONLY discuss this guest's OWN data\n"
             . "2. NEVER provide admin-level data (all bookings system-wide, all users, total system revenue, system settings)\n"
@@ -244,7 +256,7 @@ class ChatbotController extends Controller
         $avail           = AccommodationUnit::available()->count();
         $total           = AccommodationUnit::count();
         $cap             = CapacitySchedule::getCapacityForDate($today);
-        $maxCap          = $cap ? $cap->max_capacity : (int) SystemSetting::get('daily_visitor_cap', 100);
+        $maxCap          = CapacitySchedule::visitorCap();
         $currCount       = $cap ? $cap->current_count : 0;
         $arrivalList     = $todayArrivals->isEmpty() ? 'No arrivals today.'
             : $todayArrivals->map(fn($b) => "- {$b->reference_no} | " . ($b->user->name ?? 'Guest') . " | Unit: " . ($b->accommodationUnit->unit_number ?? 'TBA') . " | " . ucfirst($b->status))->join("\n");
@@ -284,14 +296,14 @@ class ChatbotController extends Controller
         $staffCount        = User::where('role', 'staff')->count();
         $touristCount      = User::where('role', 'tourist')->count();
         $totalRevenue      = Payment::where('status', 'success')->sum('amount');
-        $monthRevenue      = Payment::where('status', 'success')->whereMonth('created_at', now()->month)->sum('amount');
+        $monthRevenue      = Payment::revenueBetween(now()->startOfMonth(), now());
         $pendingPayments   = Payment::where('status', 'pending')->count();
         $availUnits        = AccommodationUnit::available()->count();
         $totalUnits        = AccommodationUnit::count();
         $today             = now()->format('Y-m-d');
         $todayBookings     = Booking::whereDate('booking_date', $today)->count();
         $cap               = CapacitySchedule::getCapacityForDate($today);
-        $maxCap            = $cap ? $cap->max_capacity : (int) SystemSetting::get('daily_visitor_cap', 100);
+        $maxCap            = CapacitySchedule::visitorCap();
         $currCount         = $cap ? $cap->current_count : 0;
         $totalReviews      = Review::count();
         $avgRating         = Review::avg('rating') ?? 0;
@@ -332,25 +344,30 @@ class ChatbotController extends Controller
     {
         $response = null; $intent = 'general'; $chips = $this->getDefaultChips('guest');
         if ($this->matchesAny($message, ['rate', 'price', 'cost', 'how much', 'room', 'cottage', 'cabin', 'accommodation'])) {
-            $response = "**Talisay Beach Resort Accommodation Rates:**\n\n* **Rooms:** from PHP" . number_format($minRoom) . " to PHP" . number_format($maxRoom) . " per night\n* **Cottages:** from PHP" . number_format($minCottage) . " to PHP" . number_format($maxCottage) . " per night\n\nReady to book? **Register** or **Login** to make a reservation!";
+            $response = ($minRoom === null && $minCottage === null)
+                ? "There are no rooms or cottages listed for booking right now. Please check again later, or contact the resort."
+                : "**Talisay Beach Resort Accommodation Rates:**\n\n"
+                    . ($minRoom !== null ? "* **Rooms:** from PHP" . number_format($minRoom) . " to PHP" . number_format($maxRoom) . " per night\n" : '')
+                    . ($minCottage !== null ? "* **Cottages:** from PHP" . number_format($minCottage) . " to PHP" . number_format($maxCottage) . " per night\n" : '')
+                    . "\nReady to book? **Register** or **Login** to make a reservation!";
             $intent = 'rates'; $chips = ['Book Now', 'Check-in Hours', 'Directions', '360 Virtual Tour'];
         } elseif ($this->matchesAny($message, ['availability', 'available', 'slots', 'capacity', 'open'])) {
             $response = "**Live Availability " . now()->format('M d, Y') . ":**\n* Open Accommodations: {$avail} units\n* Visitor Cap: {$curr} of {$maxCap} ({$remaining} slots remaining)\n\nLog in or register to reserve your preferred date!";
             $intent = 'availability'; $chips = ['Room Rates', 'How to Book', 'Register', 'Login'];
         } elseif ($this->matchesAny($message, ['gcash', 'payment', 'pay', 'cash', 'receipt'])) {
-            $response = "**Payment Methods:**\n1. GCash: Send to our official number and upload proof\n2. Cash on Arrival: Pay at front desk with booking reference\n3. Credit / Debit Card and PayPal: Secure online gateway\n\nPlease **log in** or **register** first to make a booking!";
+            $response = "**Payment Methods:**\n1. GCash: Pay the resort GCash account and upload the receipt or reference number\n2. Cash on Arrival: Pay at the front desk with your booking reference\n3. Card: The resort records the last 4 digits, then staff confirm the payment\n\nPlease **log in** or **register** first to make a booking!";
             $intent = 'payment'; $chips = ['Register', 'Login', 'Room Rates', 'How to Book'];
         } elseif ($this->matchesAny($message, ['360', 'tour', 'virtual', 'vr', 'panorama'])) {
             $response = "**360 Degree Interactive Virtual Tour:**\nExplore Talisay Beach Resort in immersive 360 degree before you visit!\n\nClick **360 Virtual Tour** in the navigation above to launch it!";
             $intent = 'virtual_tour'; $chips = ['Room Rates', 'Book Now', 'Directions'];
         } elseif ($this->matchesAny($message, ['direction', 'location', 'where', 'address', 'map', 'how to get', 'baybay'])) {
-            $response = "**Find Us:**\nTalisay Beach Resort, Barangay Maslug, **Baybay City, Leyte, Philippines**\n\nFrom Tacloban: about 2 hours via Maasin road\nFrom Ormoc City: about 1 hour via Baybay route\nContact: +63 (053) 563-7000";
+            $response = "**Find Us:**\nTalisay Beach Resort, Purok 2, Barangay Maslug, **Baybay City, Leyte, Philippines**\n\nFrom Tacloban: about 2 hours via Maasin road\nFrom Ormoc City: about 1 hour via Baybay route\nContact: 09058895075 | jnetdio79@gmail.com";
             $intent = 'directions'; $chips = ['Room Rates', '360 Virtual Tour', 'Register', 'Login'];
         } elseif ($this->matchesAny($message, ['hour', 'time', 'open', 'close', 'check in', 'check out', 'schedule'])) {
-            $response = "**Resort Operating Hours:**\n* Day Tour: 7:00 AM to 5:00 PM\n* Check-In: 2:00 PM | Check-Out: 12:00 PM\n* Restaurant: 6:00 AM to 10:00 PM";
+            $response = "**Resort Operating Hours:**\n* Open daily: 6:00 AM to 4:30 PM\n* Hourly stays: start between 8:00 AM and 8:00 PM (1 to 12 hours)\n* Overnight check-in follows your booking confirmation";
             $intent = 'hours'; $chips = ['Room Rates', 'Directions', 'Book Now', '360 Virtual Tour'];
         } elseif ($this->matchesAny($message, ['emergency', 'contact', 'hotline', 'phone'])) {
-            $response = "**Resort Contact:**\n* Main: +63 (053) 563-7000\n* Security: Near main entrance, 24/7\n* Emergency: 911 | Baybay PNP: (053) 563-0166";
+            $response = "**Resort Contact:**\n* Mobile: 09058895075\n* Email: jnetdio79@gmail.com\n* Address: Purok 2, Barangay Maslug, Baybay City, Leyte\n* Emergency: 911";
             $intent = 'contact'; $chips = ['Directions', 'Room Rates', 'Opening Hours'];
         }
         if (!$response) { $dbResult = $this->matchDbIntents($message); if ($dbResult) { $response = $dbResult['response']; $intent = $dbResult['intent']; } }
@@ -480,9 +497,24 @@ class ChatbotController extends Controller
     }
 
     // SHARED UTILITIES
+    private function savedReplyContext(): string
+    {
+        $rows = ChatbotIntent::active()->orderBy('category')->get();
+        if ($rows->isEmpty()) {
+            return '';
+        }
+
+        $lines = $rows->map(function (ChatbotIntent $row) {
+            return '- If the guest asks about '.$row->keyword.': '.$row->response;
+        })->implode("\n");
+
+        return "SAVED ANSWERS FROM FILE MAINTENANCE (prefer these when the question matches):\n".$lines;
+    }
+
     private function matchDbIntents(string $message): ?array
     {
-        $intents = ChatbotIntent::active()->get();
+        $intents = ChatbotIntent::active()->get()
+            ->sortByDesc(fn (ChatbotIntent $intent) => mb_strlen((string) $intent->keyword));
         foreach ($intents as $intent) {
             $keywords = array_map('trim', explode(',', strtolower($intent->keyword)));
             foreach ($keywords as $kw) {

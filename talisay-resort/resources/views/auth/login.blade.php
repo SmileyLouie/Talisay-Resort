@@ -1,19 +1,28 @@
 {{-- Extends the base layout designed for unauthenticated guest sessions --}}
 @extends('layouts.guest')
 
+@php
+    $currentPortal = old('portal', request('portal', 'client'));
+    if (!in_array($currentPortal, ['admin', 'client'], true)) {
+        $currentPortal = 'client';
+    }
+    $isStaffPortal = $currentPortal === 'admin';
+@endphp
+
 {{-- Sets the browser tab title specifically for this login page --}}
-@section('title', 'Login - Talisay Smart Tourism')
+@section('title', $isStaffPortal ? 'Login - Talisay Smart Tourism' : 'Log in – Talisay Beach Resort')
 
 @push('styles')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 :root {
-    --auth-primary: #0284c7;
-    --auth-primary-hover: #0369a1;
-    --auth-primary-ring: rgba(2, 132, 199, 0.12);
-    --auth-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --auth-primary: {{ $isStaffPortal ? '#0284c7' : '#0c4a6e' }};
+    --auth-primary-hover: {{ $isStaffPortal ? '#0369a1' : '#082f49' }};
+    --auth-primary-ring: {{ $isStaffPortal ? 'rgba(2, 132, 199, 0.12)' : 'rgba(12, 74, 110, 0.12)' }};
+    --auth-accent: #f59e0b;
+    --auth-font: 'Inter', 'Segoe UI', sans-serif;
 }
 
 /* ── Global Auth Styles ────────────────────────────────────────────── */
@@ -23,7 +32,7 @@
     width: 100vw;
     overflow-x: hidden;
     font-family: var(--auth-font);
-    background: #061430;
+    background: #082f49;
 }
 
 /* ── Left Hero Panel (Same background as Landing Page) ─────────────── */
@@ -59,8 +68,8 @@
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(to top, rgba(6, 20, 48, 0.94) 0%, rgba(6, 20, 48, 0.40) 50%, rgba(6, 20, 48, 0.80) 100%),
-        rgba(4, 14, 38, 0.22);
+        linear-gradient(to top, rgba(8, 47, 73, 0.94) 0%, rgba(8, 47, 73, 0.38) 50%, rgba(8, 47, 73, 0.78) 100%),
+        rgba(8, 47, 73, 0.18);
     z-index: 1;
 }
 
@@ -209,18 +218,18 @@
 }
 
 .feature-tag i {
-    color: #38bdf8;
+    color: #f59e0b;
 }
 
 /* ── Right Form Panel (Clean Minimalist White Style) ────────────────── */
 .auth-form-panel {
-    flex: 0 0 480px;
+    flex: 0 0 520px;
     background: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    padding: 24px 28px;
+    padding: 32px 40px;
     position: relative;
     z-index: 2;
     box-shadow: -12px 0 50px rgba(4, 14, 38, 0.3);
@@ -229,7 +238,7 @@
 
 .auth-form-inner {
     width: 100%;
-    max-width: 380px;
+    max-width: 400px;
     padding: 8px 0;
 }
 
@@ -293,12 +302,13 @@
 }
 
 .auth-form-title {
-    font-size: 23px;
-    font-weight: 800;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 30px;
+    font-weight: 700;
     color: #0f172a;
-    line-height: 1.2;
-    letter-spacing: -0.025em;
-    margin-bottom: 4px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
 }
 
 .auth-form-subtitle {
@@ -388,6 +398,11 @@
     padding-right: 42px;
 }
 
+.auth-input-wrap.password-wrap input::-ms-reveal,
+.auth-input-wrap.password-wrap input::-ms-clear {
+    display: none;
+}
+
 .auth-pw-toggle {
     position: absolute;
     right: 10px;
@@ -412,27 +427,9 @@
 .auth-row-between {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     margin-bottom: 16px;
     font-size: 12.5px;
-}
-
-.auth-remember {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #64748b;
-    font-weight: 500;
-    cursor: pointer;
-    user-select: none;
-}
-
-.auth-remember input[type="checkbox"] {
-    width: 15px;
-    height: 15px;
-    accent-color: var(--auth-primary);
-    border-radius: 4px;
-    cursor: pointer;
 }
 
 .auth-forgot {
@@ -447,15 +444,15 @@
     text-decoration: underline;
 }
 
-/* Solid Blue Pill Submit Button */
+/* Submit button: sand for guests, azure for staff */
 .auth-submit-pill {
     width: 100%;
-    height: 46px;
+    height: 50px;
     border-radius: 9999px;
-    background: var(--auth-primary);
+    background: {{ $isStaffPortal ? 'var(--auth-primary)' : 'var(--auth-accent)' }};
     border: none;
     color: #ffffff;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.01em;
     cursor: pointer;
@@ -463,15 +460,15 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
+    box-shadow: 0 10px 24px {{ $isStaffPortal ? 'rgba(2, 132, 199, 0.28)' : 'rgba(245, 158, 11, 0.35)' }};
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     font-family: inherit;
 }
 
 .auth-submit-pill:hover {
-    background: var(--auth-primary-hover);
+    background: {{ $isStaffPortal ? 'var(--auth-primary-hover)' : '#d97706' }};
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35);
+    box-shadow: 0 14px 28px {{ $isStaffPortal ? 'rgba(2, 132, 199, 0.35)' : 'rgba(245, 158, 11, 0.4)' }};
     color: #ffffff;
 }
 
@@ -483,39 +480,6 @@
     opacity: 0.7;
     cursor: not-allowed;
     transform: none;
-}
-
-/* Portal Switcher */
-.portal-switch-box {
-    margin-top: 14px;
-    padding: 9px 14px;
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-}
-
-.portal-switch-box span {
-    color: #64748b;
-    font-weight: 500;
-}
-
-.portal-switch-box a {
-    color: var(--auth-primary);
-    font-weight: 700;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: color 0.15s;
-}
-
-.portal-switch-box a:hover {
-    color: var(--auth-primary-hover);
-    text-decoration: underline;
 }
 
 /* Register Footer */
@@ -537,13 +501,13 @@
 /* White Pill Button with Subtle Border for Register */
 .auth-register-pill {
     width: 100%;
-    height: 42px;
+    height: 50px;
     border-radius: 9999px;
     background: #ffffff;
-    border: 1.5px solid #e2e8f0;
-    color: #0f172a;
-    font-size: 13.5px;
-    font-weight: 600;
+    border: 2px solid #0c4a6e;
+    color: #0c4a6e;
+    font-size: 15px;
+    font-weight: 700;
     text-decoration: none;
     display: flex;
     align-items: center;
@@ -553,10 +517,10 @@
 }
 
 .auth-register-pill:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-    color: #0f172a;
+    background: #0c4a6e;
+    border-color: #0c4a6e;
+    box-shadow: 0 8px 18px rgba(12, 74, 110, 0.18);
+    color: #ffffff;
     transform: translateY(-1px);
 }
 
@@ -591,61 +555,13 @@
 
 <div class="auth-split-screen">
 
-    {{-- ════════════════════════════════════════════
-         LEFT PANEL — Hero Background (Same as Landing)
-    ════════════════════════════════════════════ --}}
-    <div class="auth-hero-panel">
-        {{-- High-resolution Sunset Beach Background Image with Cinematic Zoom --}}
-        <div class="auth-hero-bg"></div>
-        <div class="auth-hero-overlay"></div>
-
-        {{-- Top: Navigation / Back Button --}}
-        <div class="auth-hero-top">
-            <a href="{{ route('home') }}" class="auth-back-btn">
-                <i class="bi bi-arrow-left"></i>
-                <span>Back to Home</span>
-            </a>
-            <div class="auth-hero-brand-pill">
-                <img src="{{ asset('images/logo.png') }}" alt="Talisay Beach Resort Logo" class="auth-hero-logo-img">
-                <span>Talisay Beach Resort</span>
-            </div>
-        </div>
-
-        {{-- Bottom: Resort Headline & Badges matching Landing Page --}}
-        <div class="auth-hero-content">
-            <div class="auth-hero-badge">
-                <span class="badge-dot"></span>
-                <span>Baybay City, Leyte &bull; Philippines</span>
-            </div>
-            
-            <h1 class="auth-hero-title">
-                Talisay <span>Smart Tourism</span> System
-            </h1>
-            
-            <p class="auth-hero-subtitle">
-                Your all-in-one digital gateway to discovering, booking, and experiencing the beauty of Talisay Beach Resort.
-            </p>
-
-            <div class="auth-hero-features">
-                <span class="feature-tag"><i class="bi bi-camera-video"></i> 360&deg; Virtual Tour</span>
-                <span class="feature-tag"><i class="bi bi-calendar2-check"></i> Instant Booking</span>
-                <span class="feature-tag"><i class="bi bi-shield-check"></i> Verified Guest Access</span>
-            </div>
-        </div>
-    </div>
+    @include('auth.partials.auth-hero')
 
     {{-- ════════════════════════════════════════════
          RIGHT PANEL — Clean Minimalist Login Form
     ════════════════════════════════════════════ --}}
     <div class="auth-form-panel">
         <div class="auth-form-inner">
-
-            @php
-                $currentPortal = old('portal', request('portal', 'client'));
-                if (!in_array($currentPortal, ['admin', 'client'], true)) {
-                    $currentPortal = 'client';
-                }
-            @endphp
 
             {{-- Brand & Header --}}
             <div class="auth-brand-row">
@@ -656,15 +572,12 @@
                 </div>
             </div>
 
-            @if($currentPortal === 'admin')
-                <h2 class="auth-form-title">Admin Log In</h2>
-                <p class="auth-form-subtitle">Authorized administrator access to management controls.</p>
-            @elseif($currentPortal === 'client')
-                <h2 class="auth-form-title">Log In</h2>
-                <p class="auth-form-subtitle">Access your bookings, reviews, and front desk services.</p>
+            @if($isStaffPortal)
+                <h2 class="auth-form-title">{{ __('Login') }}</h2>
+                <p class="auth-form-subtitle">{{ __('For administrators and front-desk staff only.') }}</p>
             @else
-                <h2 class="auth-form-title">Log In</h2>
-                <p class="auth-form-subtitle">Enter your account credentials to access the system.</p>
+                <h2 class="auth-form-title">{{ __('Log in') }}</h2>
+                <p class="auth-form-subtitle">Use your guest account to book a room or cottage, or create one in under a minute.</p>
             @endif
 
             {{-- Error Alert --}}
@@ -684,14 +597,15 @@
             @endif
 
             {{-- Login Form --}}
-            <form id="loginForm" action="{{ route('login.post') }}" method="POST">
+            <form id="loginForm" action="{{ route('login.post') }}" method="POST" @if($isStaffPortal) data-no-required-stars @endif>
                 @csrf
                 <input type="hidden" name="portal" value="{{ $currentPortal }}">
+                <input type="hidden" name="redirect" value="{{ old('redirect', request('redirect')) }}">
 
                 {{-- Email / Username Field --}}
                 <div class="auth-field-group">
                     <label class="auth-field-label" for="emailInput">
-                        Email Address or Username
+                        {{ $isStaffPortal ? __('Email') : __('Email Address') }}
                     </label>
                     <div class="auth-input-wrap">
                         <i class="bi bi-envelope auth-input-icon" aria-hidden="true"></i>
@@ -700,7 +614,7 @@
                             name="email"
                             id="emailInput"
                             class="auth-field-input"
-                            placeholder="Email address or username"
+                            placeholder="{{ $isStaffPortal ? 'Email' : 'Email address' }}"
                             value="{{ old('email') }}"
                             autocomplete="username"
                             @if($errors->has('email')) aria-invalid="true" aria-describedby="loginErrorAlert" @endif
@@ -713,7 +627,7 @@
                 {{-- Password Field --}}
                 <div class="auth-field-group">
                     <label class="auth-field-label" for="passwordField">
-                        Password
+                        {{ __('Password') }}
                     </label>
                     <div class="auth-input-wrap password-wrap">
                         <i class="bi bi-lock auth-input-icon" aria-hidden="true"></i>
@@ -732,29 +646,25 @@
                     </div>
                 </div>
 
-                {{-- Remember Me & Forgot Password --}}
                 <div class="auth-row-between">
-                    <label class="auth-remember" for="rememberMe">
-                        <input type="checkbox" name="remember" id="rememberMe">
-                        <span>Remember me</span>
-                    </label>
-                    <a href="{{ route('password.request') }}" class="auth-forgot">Forgot password?</a>
+                    <a href="{{ route('password.request') }}" class="auth-forgot">{{ __('Forgot password?') }}</a>
                 </div>
 
                 {{-- Solid Ocean Blue Pill Button --}}
                 <button type="submit" class="auth-submit-pill" id="loginSubmitBtn">
                     <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
-                    <span>Log In</span>
+                    <span>{{ __('Log In') }}</span>
                 </button>
             </form>
 
-            @if($currentPortal !== 'admin')
+            @if(!$isStaffPortal)
             <div class="auth-register-footer">
-                <span>Don't have an account yet?</span>
+                <span>New to the resort?</span>
                 <a href="{{ route('register') }}" class="auth-register-pill">
-                    <i class="bi bi-person-plus text-sky-600"></i>
-                    <span>Register as Tourist</span>
+                    <i class="bi bi-person-plus"></i>
+                    <span>Create an account</span>
                 </a>
+                @include('auth.partials.social-buttons', ['socialFrom' => 'login', 'socialDivider' => 'before'])
             </div>
             @endif
 
@@ -783,7 +693,6 @@ function togglePassword() {
 document.addEventListener('DOMContentLoaded', function () {
     const form      = document.getElementById('loginForm');
     const submitBtn = document.getElementById('loginSubmitBtn');
-
     if (form && submitBtn) {
         form.addEventListener('submit', function () {
             submitBtn.disabled = true;

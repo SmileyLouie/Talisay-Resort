@@ -85,6 +85,24 @@ if (!function_exists('initials')) {
 // Used by the chatbot to greet users personally.
 // Usage: first_name('Maria Santos') → 'Maria'
 // ─────────────────────────────────────────────────────────────
+// Philippine date and time. The app clock is Asia/Manila.
+// ph_date($stay) → Nov 16, 2026
+// ph_date($stay, 'g:i A') → 2:00 PM
+if (!function_exists('ph_date')) {
+    function ph_date(mixed $value, string $format = 'M j, Y'): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        $date = $value instanceof \Carbon\CarbonInterface
+            ? $value->copy()
+            : \Carbon\Carbon::parse($value);
+
+        return $date->timezone(config('app.timezone', 'Asia/Manila'))->format($format);
+    }
+}
+
 if (!function_exists('first_name')) {
     function first_name(string $name): string
     {

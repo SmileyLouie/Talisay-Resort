@@ -7,31 +7,22 @@
 {{-- Defines the main content area section of the template --}}
 @section('content')
 
-{{-- Header layout block --}}
-<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+<div class="res-head">
     <div>
-        <div class="flex items-center gap-2 mb-1">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
-                <i class="bi bi-calendar-check-fill text-[10px] text-sky-600"></i>
-                Reservations
-            </span>
-        </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
-            Bookings Management
-        </h1>
-        <p class="text-sm text-slate-500 mb-0">
-            View, track, and manage guest stays, front-desk walk-in reservations, and exclusive bookings.
-        </p>
+        <h1>{{ __('Bookings') }}</h1>
+        <p>{{ __('All reservations. Create a walk-in with Manual Booking, or a full-resort stay with Exclusive Booking.') }}</p>
     </div>
-
-    <div class="flex items-center gap-3">
-        <button type="button" class="btn-ocean text-xs flex items-center gap-1.5 shadow-sm" data-bs-toggle="modal" data-bs-target="#manualBookingModal">
-            <i class="bi bi-pencil-square"></i>
-            <span>+ Manual Booking</span>
+    <div class="res-head-actions">
+        @if(auth()->user()->isAdmin() || auth()->user()->hasPermission('bookings', 'create'))
+        <button type="button" class="btn-secondary-clean" data-bs-toggle="modal" data-bs-target="#exclusiveBookingModal">
+            <i class="bi bi-stars"></i>
+            <span>{{ __('Exclusive') }}</span>
         </button>
-        <span class="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 shadow-sm">
-            Total Records: <strong class="text-slate-900">{{ $bookings->total() }}</strong>
-        </span>
+        @endif
+        <button type="button" class="btn-ocean" data-bs-toggle="modal" data-bs-target="#manualBookingModal">
+            <i class="bi bi-plus-lg"></i>
+            <span>{{ __('Manual Booking') }}</span>
+        </button>
     </div>
 </div>
 
@@ -39,9 +30,9 @@
 @if(isset($errors) && $errors->any())
 <div class="mb-6 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3.5 rounded-2xl shadow-sm">
     <div class="flex items-start gap-3">
-        <i class="bi bi-exclamation-triangle-fill text-rose-500 text-lg flex-shrink-0 mt-0.5"></i>
+        <i class="bi bi-exclamation-triangle text-rose-500 text-lg flex-shrink-0 mt-0.5"></i>
         <div>
-            <span class="text-sm font-bold block mb-1">Please correct the following errors:</span>
+            <span class="text-sm font-bold block mb-1">{{ __('Please correct the following errors:') }}</span>
             <ul class="text-xs list-disc list-inside space-y-0.5 mb-0 font-medium text-rose-700">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -52,175 +43,94 @@
 </div>
 @endif
 
-{{-- Filters Card --}}
-<div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 mb-6">
-    <form method="GET" action="{{ route('bookings.index') }}" id="filterForm">
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-            
-            {{-- Status Filter --}}
-            <div class="sm:col-span-4">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Filter by Status
-                </label>
-                <select name="status" class="w-full form-select-clean text-xs font-medium" onchange="this.form.submit()">
-                    <option value="">All Statuses</option>
-                    <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending Verification</option>
-                    <option value="paid" {{ request('status') === 'paid' ? 'selected' : '' }}>Paid / Confirmed</option>
-                    <option value="checked_in" {{ request('status') === 'checked_in' ? 'selected' : '' }}>Checked In</option>
-                    <option value="checked_out" {{ request('status') === 'checked_out' ? 'selected' : '' }}>Checked Out</option>
-                    <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Completed</option>
-                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                </select>
-            </div>
-
-            {{-- Search Bar --}}
-            <div class="sm:col-span-8">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Search Reservations
-                </label>
-                <div class="flex gap-2">
-                    <div class="relative flex-1">
-                        <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input type="text" name="search" class="w-full pl-9 form-control-clean text-xs" placeholder="Search reference number, guest name, contact, or email..." value="{{ request('search') }}">
-                    </div>
-                    <button type="submit" class="btn-ocean text-xs">
-                        <i class="bi bi-search"></i>
-                        <span>Search</span>
-                    </button>
-                    @if(request('status') || request('search'))
-                    <a href="{{ route('bookings.index') }}" class="btn-secondary-clean text-xs">
-                        <i class="bi bi-x-circle text-slate-400"></i>
-                        <span>Clear</span>
-                    </a>
-                    @endif
-                </div>
-            </div>
-
-        </div>
-    </form>
-</div>
-
-{{-- Bookings Table Card --}}
 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <form method="GET" action="{{ route('bookings.index') }}" id="filterForm" class="res-toolbar">
+        <div class="res-search">
+            <i class="bi bi-search"></i>
+            <input type="search" name="search" class="form-control-clean" placeholder="{{ __('Search...') }}" value="{{ request('search') }}" aria-label="{{ __('Search bookings') }}">
+        </div>
+        <select name="status" class="form-select-clean res-select" aria-label="{{ __('Status') }}" onchange="this.form.submit()">
+            <option value="">{{ __('Status: all') }}</option>
+            <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>{{ __('Pending') }}</option>
+            <option value="waiting" {{ request('status') === 'waiting' ? 'selected' : '' }}>{{ __('Waiting') }}</option>
+            <option value="check_in" {{ request('status') === 'check_in' ? 'selected' : '' }}>{{ __('Check in') }}</option>
+            <option value="check_out" {{ request('status') === 'check_out' ? 'selected' : '' }}>{{ __('Check out') }}</option>
+            <option value="no_show" {{ request('status') === 'no_show' ? 'selected' : '' }}>{{ __('No-show') }}</option>
+            <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>{{ __('Cancelled') }}</option>
+        </select>
+        <select name="type" class="form-select-clean res-select" aria-label="{{ __('Type') }}" onchange="this.form.submit()">
+            <option value="">{{ __('Type: all') }}</option>
+            <option value="nightly" {{ request('type') === 'nightly' ? 'selected' : '' }}>{{ __('Nightly') }}</option>
+            <option value="hourly" {{ request('type') === 'hourly' ? 'selected' : '' }}>{{ __('Hourly') }}</option>
+            <option value="exclusive" {{ request('type') === 'exclusive' ? 'selected' : '' }}>{{ __('Exclusive') }}</option>
+        </select>
+        @if(request()->anyFilled(['status', 'search', 'type']))
+        <a href="{{ route('bookings.index') }}" class="res-clear">{{ __('Clear') }}</a>
+        @endif
+    </form>
     <div class="table-responsive">
         <table class="table-clean">
             <thead>
                 <tr>
-                    <th>Ref #</th>
-                    <th>Guest Details</th>
-                    <th>Room &amp; Cottage</th>
-                    <th>Scheduled Stay</th>
-                    <th>Pax</th>
-                    <th>Total Amount</th>
-                    <th>Status</th>
-                    <th class="text-end">Actions</th>
+                    <th>{{ __('Ref') }}</th>
+                    <th>{{ __('Guest') }}</th>
+                    <th>{{ __('Room/Cottage') }}</th>
+                    <th>{{ __('Variant') }}</th>
+                    <th>{{ __('In') }}</th>
+                    <th>{{ __('Out') }}</th>
+                    <th>{{ __('Status') }}</th>
+                    <th>Type</th>
+                    <th>Total</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
+                @php $paymentMethodNames = \App\Models\PaymentMethod::labels(); @endphp
                 @forelse($bookings as $booking)
                 <tr class="booking-row" data-id="{{ $booking->id }}">
-                    {{-- Ref # & Source --}}
+                    <td><span class="res-ref">{{ $booking->reference_no }}</span></td>
+                    <td><span class="res-guest">{{ $booking->guest_name }}</span></td>
                     <td>
-                        <span class="font-mono text-xs font-extrabold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200/70 inline-block">
-                            {{ $booking->reference_no }}
-                        </span>
-                        @if($booking->isManual() || $booking->booking_type === 'special_resort')
-                        <div class="mt-1 flex flex-wrap items-center gap-1">
-                            @if($booking->isManual())
-                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded uppercase">
-                                    <i class="bi bi-pencil-square text-amber-600"></i> Manual
-                                </span>
-                            @endif
-
-                            @if($booking->booking_type === 'special_resort')
-                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-purple-800 bg-purple-100/90 border border-purple-300 px-1.5 py-0.5 rounded uppercase">
-                                    <i class="bi bi-stars text-purple-600"></i> Full-Resort
-                                </span>
-                            @endif
-                        </div>
-                        @endif
-                    </td>
-
-                    {{-- Guest --}}
-                    <td>
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-lg {{ $booking->isManual() ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-700 border-slate-200' }} font-bold flex items-center justify-center text-xs flex-shrink-0 border">
-                                {{ strtoupper(substr($booking->guest_name, 0, 1)) }}
-                            </div>
-                            <div class="min-w-0">
-                                <div class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                                    <span>{{ $booking->guest_name }}</span>
-                                    @if($booking->isManual() && !$booking->user_id)
-                                        <span class="text-[10px] font-medium text-amber-600 bg-amber-50 px-1 rounded border border-amber-200/60">Walk-in</span>
-                                    @endif
-                                </div>
-                                <div class="text-[11px] text-slate-400 truncate">{{ $booking->guest_contact }}</div>
-                            </div>
-                        </div>
-                    </td>
-
-                    {{-- Accommodation --}}
-                    <td>
-                        <span class="font-semibold text-slate-800 text-xs">
-                            {{ $booking->booking_type === 'special_resort' ? 'All 20 Rooms & Cottages (Full Resort)' : ($booking->accommodationUnit->unit_number ?? 'Room / Cottage') }}
-                        </span>
-                        @if($booking->accommodationUnit)
-                            <div class="text-[11px] text-slate-400">{{ ucfirst(str_replace('_', ' ', $booking->accommodationUnit->type ?? '')) }}</div>
-                        @endif
+                        {{ $booking->booking_type === 'special_resort' ? 'Full resort' : ($booking->accommodationUnit->unit_number ?? '—') }}
                         @if($booking->modified_at)
-                        <div class="text-[10px] text-amber-600 flex items-center gap-1 font-semibold mt-0.5">
-                            <i class="bi bi-arrow-repeat"></i> Modified stay
-                        </div>
+                        <div class="res-note">Modified</div>
                         @endif
                     </td>
-
-                    {{-- Dates --}}
+                    <td>{{ $booking->booking_type === 'special_resort' ? '—' : ($booking->accommodationUnit->variant_label ?? '—') }}</td>
+                    @php
+                        $hourIn = $hourOut = null;
+                        if ($booking->isHourly() && $booking->hour_start) {
+                            [$hourIn, $hourOut] = $booking->stayWindow();
+                        }
+                    @endphp
                     <td>
-                        <div class="text-xs font-semibold text-slate-700">
-                            @if($booking->check_in_date && $booking->check_out_date && $booking->check_in_date->ne($booking->check_out_date))
-                                {{ $booking->check_in_date->format('M d') }} - {{ $booking->check_out_date->format('M d, Y') }}
-                                <span class="text-[10px] text-slate-400 font-normal">({{ $booking->nights_count }}n)</span>
-                            @else
-                                {{ $booking->booking_date->format('M d, Y') }}
-                            @endif
-                        </div>
+                        {{ ph_date($hourIn ?? $booking->checkInDate()) }}
+                        @if($hourIn)
+                        <div class="res-note">{{ $hourIn->format('g:i A') }}</div>
+                        @endif
                     </td>
-
-                    {{-- Pax --}}
                     <td>
-                        <span class="text-xs font-semibold text-slate-700">{{ $booking->guests_count }} pax</span>
+                        {{ ph_date($hourOut ?? $booking->checkOutDate()) }}
+                        @if($hourOut)
+                        <div class="res-note">{{ $hourOut->format('g:i A') }}</div>
+                        @endif
                     </td>
-
-                    {{-- Amount --}}
                     <td>
-                        <span class="text-xs font-extrabold text-slate-900">₱{{ number_format($booking->total_amount, 2) }}</span>
-                    </td>
-
-                    {{-- Status Badge --}}
-                    <td>
-                        @php
-                            $statusStyles = [
-                                'pending'     => 'bg-amber-50 text-amber-700 border-amber-200',
-                                'paid'        => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                'checked_in'  => 'bg-sky-50 text-sky-700 border-sky-200',
-                                'checked_out' => 'bg-slate-100 text-slate-700 border-slate-200',
-                                'completed'   => 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                                'cancelled'   => 'bg-rose-50 text-rose-700 border-rose-200',
-                            ];
-                        @endphp
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 {{ $statusStyles[$booking->status] ?? 'bg-slate-100 text-slate-700 border-slate-200' }}">
-                            {{ ucfirst(str_replace('_', ' ', $booking->status)) }}
-                        </span>
+                        <span class="res-status res-status-{{ $booking->listStage() }}">{{ $booking->listStageLabel() }}</span>
                         @if($booking->booking_type === 'special_resort' && $booking->admin_approval_status === 'pending')
-                        <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
-                            Approval Needed
-                        </span>
+                        <div class="res-note">Needs approval</div>
                         @endif
                     </td>
-
-                    {{-- Actions --}}
+                    <td>
+                        @if($booking->isSpecialResort())
+                        <span class="res-exclusive">Exclusive</span>
+                        @else
+                        {{ $booking->isHourly() ? 'Hourly' : 'Nightly' }}
+                        @endif
+                    </td>
+                    <td class="res-money">₱{{ number_format($booking->total_amount, 2) }}</td>
                     <td class="text-end">
-                        <button class="btn-secondary-clean text-xs py-1.5 px-2.5" 
+                        <button class="res-icon-btn" type="button" aria-label="Details" title="Details" 
                                 data-id="{{ $booking->id }}"
                                 data-ref="{{ $booking->reference_no }}"
                                 data-source="{{ $booking->booking_source ?? 'online' }}"
@@ -229,7 +139,7 @@
                                 data-name="{{ $booking->guest_name }}"
                                 data-phone="{{ $booking->guest_contact }}"
                                 data-email="{{ $booking->user->email ?? 'N/A' }}"
-                                data-unit="{{ $booking->booking_type === 'special_resort' ? 'Exclusive Full-Resort Booking (All 20 Units)' : ($booking->accommodationUnit->unit_number ?? 'Accommodation Unit') }}"
+                                data-unit="{{ $booking->booking_type === 'special_resort' ? 'Exclusive Full-Resort Booking (All '.$openUnitCount.' '.($openUnitCount === 1 ? 'Unit' : 'Units').')' : trim(($booking->accommodationUnit->unit_number ?? 'Accommodation Unit').($booking->accommodationUnit?->variant_label ? ' · '.$booking->accommodationUnit->variant_label : '')) }}"
                                 data-date="{{ $booking->booking_date->format('Y-m-d') }}"
                                 data-checkin="{{ $booking->check_in_date ? $booking->check_in_date->format('Y-m-d') : '' }}"
                                 data-checkout="{{ $booking->check_out_date ? $booking->check_out_date->format('Y-m-d') : '' }}"
@@ -237,17 +147,32 @@
                                 data-guests="{{ $booking->guests_count }}"
                                 data-amount="{{ number_format($booking->total_amount, 2) }}"
                                 data-status="{{ $booking->status }}"
-                                data-requests="{{ $booking->special_requests ?? 'None' }}"
+                                data-pay-id="{{ $booking->payment->id ?? '' }}"
+                                data-pay-method="{{ $booking->payment->gateway ?? '' }}"
+                                data-pay-ref="{{ $booking->payment?->guestReference() ?? '' }}"
+                                data-pay-proof="{{ $booking->payment?->proofUrl() ?? '' }}"
+                                data-requests="{{ $booking->special_requests }}"
+                                data-walkin="{{ $booking->user_id ? '0' : '1' }}"
+                                data-max-guests="{{ $booking->accommodationUnit->max_occupancy ?? 200 }}"
+                                data-guest-manual="{{ $booking->guest_name_manual }}"
+                                data-contact-manual="{{ $booking->guest_contact_manual }}"
                                 data-reason="{{ $booking->cancellation_reason ?? 'None' }}"
+                                data-stage="{{ $booking->listStage() }}"
+                                data-stage-label="{{ $booking->listStageLabel() }}"
+                                data-kind="{{ $booking->isSpecialResort() ? 'Exclusive' : ($booking->isHourly() ? 'Hourly' : 'Nightly') }}"
+                                data-stay-summary="{{ $hourIn
+                                    ? $hourIn->format('M j, Y') . ' · ' . $hourIn->format('g:i A') . ' – ' . $hourOut->format('g:i A') . ' (' . (int) $booking->hours_count . ' ' . ((int) $booking->hours_count === 1 ? 'hour' : 'hours') . ')'
+                                    : $booking->checkInDate()->format('M j, Y') . ' → ' . $booking->checkOutDate()->format('M j, Y') . ' · ' . ($booking->nights_count ?: 1) . ' ' . (($booking->nights_count ?: 1) == 1 ? 'night' : 'nights') }}"
+                                data-pay-label="{{ $booking->payment ? ($paymentMethodNames[$booking->payment->gateway] ?? \Illuminate\Support\Str::headline((string) $booking->payment->gateway)) : '' }}"
+                                data-pay-status="{{ $booking->payment->status ?? '' }}"
                                 onclick="viewBooking(this)">
-                            <i class="bi bi-eye text-slate-500"></i>
-                            <span>Details</span>
+                            <i class="bi bi-eye"></i>
                         </button>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="text-center py-12 text-slate-400">
+                    <td colspan="10" class="text-center py-12 text-slate-400">
                         <i class="bi bi-calendar-x text-3xl block mb-2 text-slate-300"></i>
                         <p class="text-xs font-semibold mb-0">No booking records match your criteria.</p>
                     </td>
@@ -268,19 +193,13 @@
 {{-- Create Manual Booking Modal --}}
 <div class="modal fade" id="manualBookingModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            {{-- Header --}}
-            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-amber-300 text-lg">
-                        <i class="bi bi-pencil-square"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-extrabold text-base mb-0 tracking-tight">Create Manual Reservation</h5>
-                        <p class="text-xs text-sky-200/70 mb-0 font-medium">Create a stay on behalf of walk-in or phone-in guests</p>
-                    </div>
+        <div class="modal-content manual-modal">
+            <div class="manual-head">
+                <div>
+                    <h5>Manual booking</h5>
+                    <p>Create a walk-in or a stay for a registered guest.</p>
                 </div>
-                <button type="button" class="text-white/70 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition" data-bs-dismiss="modal">
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -288,237 +207,332 @@
             {{-- Form Body --}}
             <form method="POST" action="{{ route('bookings.manual-store') }}" id="manualBookingForm" data-loading>
                 @csrf
-                <div class="modal-body p-6 bg-slate-50/60 max-h-[75vh] overflow-y-auto space-y-6">
-
-                    {{-- Guest Type Selector --}}
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-                            Guest Account Type
-                        </label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <label class="relative flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-sky-500 cursor-pointer transition has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50/60">
-                                <input type="radio" name="guest_type" value="walk_in" class="text-sky-600 focus:ring-sky-500" checked onchange="toggleGuestTypeFields()">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                        <i class="bi bi-person-walking text-sky-600"></i> Walk-in / Phone-in Guest
-                                    </div>
-                                    <div class="text-[11px] text-slate-400">No registered account required</div>
-                                </div>
+                <div class="manual-body">
+                    <div class="manual-row">
+                        <label>Guest</label>
+                        <div class="manual-choice">
+                            <label>
+                                <input type="radio" name="guest_type" value="walk_in" checked onchange="toggleGuestTypeFields()">
+                                <span>Walk-in</span>
                             </label>
-
-                            <label class="relative flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-sky-500 cursor-pointer transition has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50/60">
-                                <input type="radio" name="guest_type" value="registered" class="text-sky-600 focus:ring-sky-500" onchange="toggleGuestTypeFields()">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                        <i class="bi bi-person-check-fill text-emerald-600"></i> Registered Tourist
-                                    </div>
-                                    <div class="text-[11px] text-slate-400">Link to existing user portal</div>
-                                </div>
+                            <label>
+                                <input type="radio" name="guest_type" value="registered" onchange="toggleGuestTypeFields()">
+                                <span>Registered guest</span>
                             </label>
                         </div>
                     </div>
 
-                    {{-- Walk-in Guest Fields --}}
-                    <div id="walkInFields" class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                        <h6 class="font-bold text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                            <i class="bi bi-person-badge text-slate-500"></i> Walk-in Guest Information
-                        </h6>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Guest Full Name <span class="text-rose-500">*</span>
-                                </label>
-                                <input type="text" name="guest_name" id="guestNameInput" class="w-full form-control-clean text-xs" placeholder="Guest full name" value="{{ old('guest_name') }}">
+                    @php $manualOld = (bool) old('booking_date'); @endphp
+                    <div id="walkInFields">
+                        <div class="manual-row">
+                            <label>Name <span class="req-star">*</span></label>
+                            <div class="manual-split manual-split-3">
+                                <input type="text" name="first_name" id="guestFirstName" class="form-control-clean" placeholder="First name" aria-label="First name" maxlength="60" value="{{ $manualOld ? old('first_name') : '' }}" required>
+                                <input type="text" name="middle_name" id="guestMiddleName" class="form-control-clean" placeholder="Middle name (optional)" aria-label="Middle name" maxlength="60" value="{{ $manualOld ? old('middle_name') : '' }}">
+                                <input type="text" name="last_name" id="guestLastName" class="form-control-clean" placeholder="Last name" aria-label="Last name" maxlength="60" value="{{ $manualOld ? old('last_name') : '' }}" required>
                             </div>
+                        </div>
+                        <div class="manual-row">
+                            <label>Contact <span class="req-star">*</span></label>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Contact Number / Email <span class="text-rose-500">*</span>
-                                </label>
-                                <input type="text" name="guest_contact" id="guestContactInput" class="w-full form-control-clean text-xs" placeholder="Mobile number or email address" value="{{ old('guest_contact') }}">
+                                <div class="manual-split">
+                                    <input type="tel" name="guest_phone" id="guestPhone" class="form-control-clean" placeholder="Contact number" aria-label="Contact number" maxlength="20" value="{{ $manualOld ? old('guest_phone') : '' }}" oninput="syncWalkInContact()">
+                                    <input type="email" name="guest_email" id="guestEmail" class="form-control-clean" placeholder="Email address" aria-label="Email address" maxlength="120" value="{{ $manualOld ? old('guest_email') : '' }}" oninput="syncWalkInContact()">
+                                </div>
+                                <span class="manual-hint">Enter a contact number, an email address, or both.</span>
                             </div>
                         </div>
                     </div>
 
-                    {{-- Registered Tourist Dropdown --}}
-                    <div id="registeredFields" class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm" style="display: none;">
-                        <h6 class="font-bold text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                            <i class="bi bi-person-check text-emerald-600"></i> Select Tourist Account
-                        </h6>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                Registered User <span class="text-rose-500">*</span>
-                            </label>
-                            <select name="user_id" id="registeredUserSelect" class="w-full form-select-clean text-xs font-medium">
-                                <option value="">-- Choose a Registered Tourist --</option>
-                                @foreach($tourists as $tourist)
-                                    <option value="{{ $tourist->id }}" {{ old('user_id') == $tourist->id ? 'selected' : '' }}>
-                                        {{ $tourist->name }} ({{ $tourist->email }}{{ $tourist->phone ? ' · ' . $tourist->phone : '' }})
-                                    </option>
-                                @endforeach
-                            </select>
+                    <div id="registeredFields" style="display: none;">
+                        <div class="manual-row">
+                            <label for="registeredUserSearch">Account</label>
+                            @php $oldGuest = $tourists->firstWhere('id', (int) old('user_id')); @endphp
+                            <div class="guest-lookup">
+                                <input type="hidden" name="user_id" id="registeredUserId" value="{{ $oldGuest?->id }}">
+                                <input type="text" id="registeredUserSearch" class="form-control-clean" autocomplete="off"
+                                       placeholder="Type name, email, or phone number"
+                                       value="{{ $oldGuest ? $oldGuest->name.' · '.$oldGuest->email : '' }}">
+                                <div id="registeredUserResults" class="guest-lookup-results" hidden></div>                            </div>
                         </div>
                     </div>
 
-                    {{-- Accommodation & Dates --}}
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-                        <h6 class="font-bold text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                            <i class="bi bi-door-open-fill text-sky-600"></i> Stay &amp; Unit Selection
-                        </h6>
-
+                    @php
+                        $unitKind = old('unit_kind', 'room');
+                        $stayType = old('stay_type', 'night');
+                    @endphp
+                    <div class="manual-row">
+                        <label>Book</label>
+                        <div class="manual-choice">
+                            <input type="hidden" name="unit_kind" id="manualUnitKind" value="{{ $unitKind }}">
+                            <input type="hidden" id="manualUnitVariant" value="">
+                            @foreach(['room' => 'Room', 'cottage' => 'Cottage'] as $kind => $kindLabel)
+                                <div class="dropdown">
+                                    <button type="button" class="manual-kind-btn {{ $unitKind === $kind ? 'is-active' : '' }}" data-kind="{{ $kind }}"
+                                            data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
+                                        <span class="manual-kind-text">{{ $kindLabel }}</span>
+                                    </button>
+                                    <ul class="dropdown-menu manual-kind-menu">
+                                        <li><button type="button" class="dropdown-item" data-kind="{{ $kind }}" data-variant="" data-label="">All {{ strtolower($kindLabel) }}s</button></li>
+                                        @foreach(\App\Models\UnitVariant::forKind($kind) as $variant)
+                                            <li><button type="button" class="dropdown-item" data-kind="{{ $kind }}" data-variant="{{ $variant->slug }}" data-label="{{ $variant->label }}">{{ $variant->label }}</button></li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @php $oldUnitIds = collect(old('accommodation_unit_ids', []))->map(fn ($id) => (int) $id)->all(); @endphp
+                    <div class="manual-row manual-row-top">
+                        <label><span id="manualUnitLabel">{{ $unitKind === 'cottage' ? 'Cottage' : 'Room' }}</span> <span class="req-star">*</span></label>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                Room &amp; Cottage <span class="text-rose-500">*</span>
-                            </label>
-                            <select name="accommodation_unit_id" id="manualUnitSelect" class="w-full form-select-clean text-xs font-medium" required onchange="calculateManualTotal()">
-                                <option value="">-- Select Room or Cottage --</option>
+                            <div class="unit-picker" id="manualUnitPicker">
                                 @foreach($accommodationUnits as $unit)
-                                    <option value="{{ $unit->id }}" 
-                                            data-price="{{ $unit->price_per_night }}" 
-                                            data-capacity="{{ $unit->max_occupancy }}"
-                                            data-type="{{ $unit->type }}"
-                                            {{ old('accommodation_unit_id') == $unit->id ? 'selected' : '' }}>
-                                        {{ $unit->unit_number }} ({{ ucfirst(str_replace('_', ' ', $unit->type)) }}) — ₱{{ number_format($unit->price_per_night, 2) }}/night · Max {{ $unit->max_occupancy }} Pax
-                                    </option>
+                                    <label class="unit-pick"
+                                           data-price="{{ $unit->price_per_night }}"
+                                           data-hour-price="{{ $unit->hourlyRate() }}"
+                                           data-capacity="{{ $unit->max_occupancy }}"
+                                           data-type="{{ $unit->unit_type }}"
+                                           data-variant="{{ $unit->variant }}"
+                                           data-name="{{ $unit->unit_number }}">
+                                        <input type="checkbox" name="accommodation_unit_ids[]" value="{{ $unit->id }}" {{ in_array($unit->id, $oldUnitIds, true) ? 'checked' : '' }} onchange="calculateManualTotal()">
+                                        <span class="unit-pick-name">{{ $unit->unit_number }}</span>
+                                        <span class="unit-pick-meta">{{ $unit->variant_label }} · {{ $unit->max_occupancy }} pax · <span class="js-unit-rate">₱{{ number_format($unit->price_per_night, 0) }}/night</span></span>
+                                        <span class="unit-pick-status" hidden></span>
+                                    </label>
+                                @endforeach
+                                <div class="unit-pick-empty" id="manualUnitEmpty" hidden></div>
+                            </div>
+                            <span class="manual-hint" id="manualUnitHint">Tick one or more. A guest can book several rooms or cottages at once.</span>
+                        </div>
+                    </div>
+                    <div class="manual-row">
+                        <label>Rate</label>
+                        <div class="manual-choice">
+                            <label>
+                                <input type="radio" name="stay_type" value="night" {{ $stayType !== 'hour' ? 'checked' : '' }} onchange="toggleManualStayType()">
+                                <span>Per night</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="stay_type" value="hour" {{ $stayType === 'hour' ? 'checked' : '' }} onchange="toggleManualStayType()">
+                                <span>Per hour</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="manual-row">
+                        <label id="manualStayLabel">Stay <span class="req-star">*</span></label>
+                        <div class="manual-split" id="manualStaySplit">
+                            <input type="date" name="booking_date" id="manualCheckInDate" class="form-control-clean" min="{{ now()->format('Y-m-d') }}" value="{{ old('booking_date', now()->format('Y-m-d')) }}" required aria-label="Check-in" onchange="syncCheckoutMin(); syncManualHourOptions(); calculateManualTotal(); refreshManualAvailability();">
+                            <input type="date" name="check_out_date" id="manualCheckOutDate" class="form-control-clean" value="{{ old('check_out_date', now()->addDay()->format('Y-m-d')) }}" required aria-label="Check-out" onchange="calculateManualTotal(); refreshManualAvailability();">
+                        </div>
+                    </div>
+                    <div class="manual-row" id="manualHourRow" style="display: none;">
+                        <label>Time <span class="req-star">*</span></label>
+                        <div class="manual-split">
+                            <select name="hour_start" id="manualHourStart" class="form-select-clean" aria-label="Start time" onchange="calculateManualTotal(); refreshManualAvailability();">
+                                @foreach (range(8, 20) as $hour)
+                                    @php $slot = sprintf('%02d:00', $hour); @endphp
+                                    <option value="{{ $slot }}" {{ old('hour_start') === $slot ? 'selected' : '' }}>{{ \Carbon\Carbon::createFromTime($hour)->format('g:i A') }}</option>
+                                @endforeach
+                            </select>
+                            <select name="hours_count" id="manualHoursCount" class="form-select-clean" aria-label="Hours" onchange="calculateManualTotal(); refreshManualAvailability();">
+                                @foreach (range(1, 12) as $h)
+                                    <option value="{{ $h }}" {{ (int) old('hours_count', 1) === $h ? 'selected' : '' }}>{{ $h }} {{ $h === 1 ? 'hour' : 'hours' }}</option>
                                 @endforeach
                             </select>
                         </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Check-in Date <span class="text-rose-500">*</span>
-                                </label>
-                                <input type="date" name="booking_date" id="manualCheckInDate" 
-                                       class="w-full form-control-clean text-xs" 
-                                       value="{{ old('booking_date', now()->format('Y-m-d')) }}" 
-                                       required onchange="syncCheckoutMin(); calculateManualTotal();">
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Check-out Date <span class="text-rose-500">*</span>
-                                </label>
-                                <input type="date" name="check_out_date" id="manualCheckOutDate" 
-                                       class="w-full form-control-clean text-xs" 
-                                       value="{{ old('check_out_date', now()->addDay()->format('Y-m-d')) }}" 
-                                       required onchange="calculateManualTotal();">
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Number of Guests <span class="text-rose-500">*</span>
-                                </label>
-                                <input type="number" name="guests_count" id="manualGuestsCount" 
-                                       class="w-full form-control-clean text-xs" 
-                                       min="1" max="50" 
-                                       value="{{ old('guests_count', 1) }}" 
-                                       required>
-                                <span class="text-[10px] text-slate-400 mt-0.5 block" id="unitCapacityHint">Select a unit to see capacity</span>
-                            </div>
-                        </div>
                     </div>
-
-                    {{-- Payment & Lifecycle Settings --}}
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-                        <h6 class="font-bold text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                            <i class="bi bi-cash-stack text-emerald-600"></i> Payment &amp; Arrival Status
-                        </h6>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Payment Method <span class="text-rose-500">*</span>
-                                </label>
-                                <select name="payment_method" class="w-full form-select-clean text-xs font-medium" required>
-                                    <option value="cash" {{ old('payment_method') === 'cash' ? 'selected' : '' }}>Cash at Front Desk</option>
-                                    <option value="gcash" {{ old('payment_method') === 'gcash' ? 'selected' : '' }}>GCash (Over Counter / QR)</option>
-                                    <option value="card" {{ old('payment_method') === 'card' ? 'selected' : '' }}>Credit / Debit Card (POS)</option>
-                                    <option value="paypal" {{ old('payment_method') === 'paypal' ? 'selected' : '' }}>PayPal</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                    Initial Status <span class="text-rose-500">*</span>
-                                </label>
-                                <select name="initial_status" class="w-full form-select-clean text-xs font-medium" required>
-                                    <option value="paid" {{ old('initial_status', 'paid') === 'paid' ? 'selected' : '' }}>Paid / Confirmed (Ready)</option>
-                                    <option value="checked_in" {{ old('initial_status') === 'checked_in' ? 'selected' : '' }}>Checked In Immediately</option>
-                                    <option value="pending" {{ old('initial_status') === 'pending' ? 'selected' : '' }}>Pending (Payment on Arrival)</option>
-                                </select>
-                            </div>
-                        </div>
-
+                    <div class="manual-row">
+                        <label for="manualGuestsCount">Guests</label>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                Special Requests / Front Desk Notes <span class="text-slate-400 text-[11px] font-normal">(Optional)</span>
-                            </label>
-                            <textarea name="special_requests" rows="2" class="w-full form-control-clean text-xs" placeholder="Add any special guest preferences, early check-in requests, or front desk reference notes...">{{ old('special_requests') }}</textarea>
+                            <input type="number" name="guests_count" id="manualGuestsCount" class="form-control-clean" min="1" max="200" value="{{ old('guests_count', 1) }}" required oninput="calculateManualTotal()">
+                            <span class="manual-hint" id="unitCapacityHint">Select a room or cottage to see the guest limit.</span>
                         </div>
                     </div>
-
-                    {{-- Live Calculation Summary Box --}}
-                    <div class="bg-gradient-to-br from-sky-50 to-indigo-50/60 p-4 rounded-2xl border border-sky-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div>
-                            <span class="text-xs font-bold text-sky-900 block mb-0.5">Booking Cost Estimate</span>
-                            <div class="text-xs text-sky-700 flex items-center gap-3">
-                                <span>Rate: <strong id="calcRate">₱0.00</strong>/night</span>
-                                <span>·</span>
-                                <span>Duration: <strong id="calcNights">1 night</strong></span>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estimated Total</span>
-                            <span class="text-xl font-extrabold text-sky-700" id="calcTotal">₱0.00</span>
+                    <div class="manual-row manual-row-top">
+                        <label>Activities</label>
+                        <div>@include('partials.activity-addon-picks')</div>
+                    </div>
+                    <div class="manual-row">
+                        <label>Payment <span class="req-star">*</span></label>
+                        <div class="manual-split">
+                            <select name="payment_method" class="form-select-clean" required aria-label="Payment method">
+                                @foreach(($paymentMethods ?? \App\Models\PaymentMethod::catalog()) as $method)
+                                    <option value="{{ $method->code }}" {{ old('payment_method') === $method->code ? 'selected' : '' }}>{{ $method->name }}</option>
+                                @endforeach
+                            </select>
+                            <select name="initial_status" class="form-select-clean" required aria-label="Status">
+                                <option value="pending" {{ old('initial_status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="paid" {{ old('initial_status', 'paid') === 'paid' ? 'selected' : '' }}>Approved</option>
+                                <option value="checked_in" {{ old('initial_status') === 'checked_in' ? 'selected' : '' }}>Check in now</option>
+                            </select>
                         </div>
                     </div>
-
+                    <div class="manual-row manual-row-top">
+                        <label for="manualNotes">Notes</label>
+                        <textarea name="special_requests" id="manualNotes" rows="2" class="form-control-clean" placeholder="Optional notes for the front desk">{{ old('special_requests') }}</textarea>
+                    </div>
+                    <div class="manual-total">
+                        <span>Rate <strong id="calcRate">₱0</strong> · <strong id="calcNights">1 night</strong></span>
+                        <strong id="calcTotal">₱0</strong>
+                    </div>
                 </div>
-
-                {{-- Modal Footer --}}
-                <div class="p-4 bg-white border-t border-slate-100 flex items-center justify-between">
-                    <button type="button" class="btn-secondary-clean text-xs px-4 py-2" data-bs-dismiss="modal">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn-ocean text-xs px-5 py-2 flex items-center gap-1.5 shadow-md">
-                        <i class="bi bi-check2-circle"></i>
-                        <span>Confirm &amp; Create Booking</span>
-                    </button>
+                <div class="manual-foot">
+                    <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-ocean">Create booking</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-{{-- Modern Booking Details Modal --}}
-<div class="modal fade" id="bookingDetailModal" tabindex="-1" aria-hidden="true">
+{{-- Exclusive full-resort booking --}}
+<div class="modal fade" id="exclusiveBookingModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
-                        <i class="bi bi-calendar2-check-fill"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-extrabold text-base mb-0 tracking-tight">Booking Details &amp; Lifecycle</h5>
-                        <p class="text-xs text-sky-200/70 mb-0 font-medium">Review reservation details, manage stay lifecycle, or approve special requests</p>
-                    </div>
+        <div class="modal-content manual-modal">
+            <div class="manual-head">
+                <div>
+                    <h5>Exclusive booking</h5>
+                    <p>Reserve every room and cottage for the selected nights.</p>
                 </div>
-                <button type="button" class="text-white/70 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition" data-bs-dismiss="modal">
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
+            @php
+                $exclusiveOld = old('check_in') && !old('booking_date');
+                $exclusiveGuest = $exclusiveOld ? $tourists->firstWhere('id', (int) old('user_id')) : null;
+                $exclusiveRegisteredOld = $exclusiveOld && old('guest_type') === 'registered';
+            @endphp
+            <form method="POST" action="{{ route('bookings.exclusive-store') }}" id="exclusiveBookingForm">
+                @csrf
+                <div class="manual-body">
+                    <div class="manual-row">
+                        <label>Guest</label>
+                        <div class="manual-choice">
+                            <label>
+                                <input type="radio" name="guest_type" value="walk_in" {{ $exclusiveRegisteredOld ? '' : 'checked' }} onchange="toggleExclusiveGuest()">
+                                <span>Walk-in</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="guest_type" value="registered" {{ $exclusiveRegisteredOld ? 'checked' : '' }} onchange="toggleExclusiveGuest()">
+                                <span>Registered guest</span>
+                            </label>
+                        </div>
+                    </div>
 
-            <div class="modal-body p-6 bg-slate-50/50">
-                <div class="row g-4" id="bookingDetailsContent">
-                    {{-- Dynamically populated via JavaScript --}}
+                    <div id="exclusiveWalkIn">
+                        <div class="manual-row">
+                            <label>Name <span class="req-star">*</span></label>
+                            <div class="manual-split manual-split-3">
+                                <input type="text" name="first_name" id="exclusiveFirstName" class="form-control-clean" placeholder="First name" aria-label="First name" maxlength="60" value="{{ $exclusiveOld ? old('first_name') : '' }}" required>
+                                <input type="text" name="middle_name" id="exclusiveMiddleName" class="form-control-clean" placeholder="Middle name (optional)" aria-label="Middle name" maxlength="60" value="{{ $exclusiveOld ? old('middle_name') : '' }}">
+                                <input type="text" name="last_name" id="exclusiveLastName" class="form-control-clean" placeholder="Last name" aria-label="Last name" maxlength="60" value="{{ $exclusiveOld ? old('last_name') : '' }}" required>
+                            </div>
+                        </div>
+                        <div class="manual-row">
+                            <label>Contact <span class="req-star">*</span></label>
+                            <div>
+                                <div class="manual-split">
+                                    <input type="tel" name="guest_phone" id="exclusivePhone" class="form-control-clean" placeholder="Contact number" aria-label="Contact number" maxlength="20" value="{{ $exclusiveOld ? old('guest_phone') : '' }}" oninput="syncWalkInContact('exclusivePhone', 'exclusiveEmail')">
+                                    <input type="email" name="guest_email" id="exclusiveEmail" class="form-control-clean" placeholder="Email address" aria-label="Email address" maxlength="120" value="{{ $exclusiveOld ? old('guest_email') : '' }}" oninput="syncWalkInContact('exclusivePhone', 'exclusiveEmail')">
+                                </div>
+                                <span class="manual-hint">Enter a contact number, an email address, or both.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="exclusiveRegistered" style="display: none;">
+                        <div class="manual-row">
+                            <label for="exclusiveUserSearch">Account</label>
+                            <div class="guest-lookup">
+                                <input type="hidden" name="user_id" id="exclusiveUserId" value="{{ $exclusiveGuest?->id }}">
+                                <input type="text" id="exclusiveUserSearch" class="form-control-clean" autocomplete="off"
+                                       placeholder="Type name, email, or phone number"
+                                       value="{{ $exclusiveGuest ? $exclusiveGuest->name.' · '.$exclusiveGuest->email : '' }}">
+                                <div id="exclusiveUserResults" class="guest-lookup-results" hidden></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="manual-row">
+                        <label>Stay <span class="req-star">*</span></label>
+                        <div class="manual-split">
+                            <input type="date" name="check_in" id="exclusiveCheckIn" class="form-control-clean" min="{{ now()->format('Y-m-d') }}" value="{{ old('check_in', now()->format('Y-m-d')) }}" required aria-label="Check-in" onchange="syncExclusiveCheckoutMin(); previewExclusiveTotal();">
+                            <input type="date" name="check_out" id="exclusiveCheckOut" class="form-control-clean" value="{{ old('check_out', now()->addDay()->format('Y-m-d')) }}" required aria-label="Check-out" onchange="previewExclusiveTotal()">
+                        </div>
+                    </div>
+                    <div class="manual-row">
+                        <label for="exclusiveGuestsCount">Guests</label>
+                        <div>
+                            <input type="number" name="guests_count" id="exclusiveGuestsCount" class="form-control-clean" min="1" max="{{ \App\Models\CapacitySchedule::visitorCap() }}" value="{{ $exclusiveOld ? old('guests_count', 20) : 20 }}" required>
+                            <span class="manual-hint">Up to {{ \App\Models\CapacitySchedule::visitorCap() }} guests, the daily visitor cap.</span>
+                        </div>
+                    </div>
+                    <div class="manual-row manual-row-top">
+                        <label>Activities</label>
+                        <div>@include('partials.activity-addon-picks')</div>
+                    </div>
+                    <div class="manual-row">
+                        <label>Payment <span class="req-star">*</span></label>
+                        <div class="manual-split">
+                            <select name="payment_method" class="form-select-clean" required aria-label="Payment method">
+                                @foreach(($paymentMethods ?? \App\Models\PaymentMethod::catalog()) as $method)
+                                    <option value="{{ $method->code }}" {{ $exclusiveOld && old('payment_method') === $method->code ? 'selected' : '' }}>{{ $method->name }}</option>
+                                @endforeach
+                            </select>
+                            @php $exclusiveStatus = $exclusiveOld ? old('initial_status', 'paid') : 'paid'; @endphp
+                            <select name="initial_status" class="form-select-clean" required aria-label="Status">
+                                <option value="pending" {{ $exclusiveStatus === 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="paid" {{ $exclusiveStatus === 'paid' ? 'selected' : '' }}>Approved</option>
+                                <option value="checked_in" {{ $exclusiveStatus === 'checked_in' ? 'selected' : '' }}>Check in now</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="manual-row">
+                        <label for="exclusiveOccasion">What is this booking for?</label>
+                        <select name="occasion" id="exclusiveOccasion" class="form-select-clean" required>
+                            <option value="">Choose the occasion</option>
+                            @foreach(\App\Models\Booking::occasions() as $choice)
+                                <option value="{{ $choice }}" {{ $exclusiveOld && old('occasion') === $choice ? 'selected' : '' }}>{{ $choice }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="manual-row manual-row-top">
+                        <label for="exclusiveNotes">Notes</label>
+                        <textarea name="special_requests" id="exclusiveNotes" rows="2" class="form-control-clean" placeholder="Event details or special requests">{{ $exclusiveOld ? old('special_requests') : '' }}</textarea>
+                    </div>
+                    <div class="manual-total">
+                        <span>Rate <strong>₱{{ number_format($exclusiveNightlyRate ?? 0, 2) }}/night</strong> · <strong id="exclusiveCreateNights">1 night</strong></span>
+                        <strong id="exclusiveCreateTotal">₱{{ number_format($exclusiveNightlyRate ?? 0, 2) }}</strong>
+                    </div>
                 </div>
-            </div>
+                <div class="manual-foot">
+                    <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-ocean">Create exclusive booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-            <div class="p-4 bg-white border-t border-slate-100 flex justify-end">
-                <button type="button" class="btn-secondary-clean text-xs px-4 py-2" data-bs-dismiss="modal">
-                    Close
+{{-- Booking Details Modal --}}
+<div class="modal fade" id="bookingDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content manual-modal">
+            <div class="manual-head">
+                <div>
+                    <h5 class="detail-title"><span id="detailRef">Booking</span> <span class="res-status" id="detailStage"></span></h5>
+                    <p id="detailSubtitle"></p>
+                </div>
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
                 </button>
+            </div>
+            <div class="manual-body" id="bookingDetailsContent"></div>
+            <div class="manual-foot">
+                <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn-ocean" form="bookingStatusForm">Save status</button>
             </div>
         </div>
     </div>
@@ -529,26 +543,87 @@
 @push('scripts')
 <script>
 function toggleGuestTypeFields() {
-    const selected = document.querySelector('input[name="guest_type"]:checked')?.value;
+    const selected = document.querySelector('#manualBookingForm input[name="guest_type"]:checked')?.value;
     const walkInFields = document.getElementById('walkInFields');
     const registeredFields = document.getElementById('registeredFields');
-    const nameInput = document.getElementById('guestNameInput');
-    const contactInput = document.getElementById('guestContactInput');
-    const userSelect = document.getElementById('registeredUserSelect');
+    const userSelect = document.getElementById('registeredUserSearch');
+    const walkIn = selected === 'walk_in';
 
-    if (selected === 'walk_in') {
-        walkInFields.style.display = 'block';
-        registeredFields.style.display = 'none';
-        nameInput.setAttribute('required', 'required');
-        contactInput.setAttribute('required', 'required');
-        userSelect.removeAttribute('required');
-    } else {
-        walkInFields.style.display = 'none';
-        registeredFields.style.display = 'block';
-        nameInput.removeAttribute('required');
-        contactInput.removeAttribute('required');
-        userSelect.setAttribute('required', 'required');
-    }
+    walkInFields.style.display = walkIn ? 'block' : 'none';
+    registeredFields.style.display = walkIn ? 'none' : 'block';
+    walkInFields.querySelectorAll('input').forEach(field => { field.disabled = !walkIn; });
+    userSelect.required = !walkIn;
+    userSelect.disabled = walkIn;
+    syncWalkInContact();
+    if (typeof markRequiredStars === 'function') markRequiredStars(document.getElementById('manualBookingForm'));
+}
+
+function syncWalkInContact(phoneId = 'guestPhone', emailId = 'guestEmail') {
+    const phone = document.getElementById(phoneId);
+    const email = document.getElementById(emailId);
+    const missing = !phone.value.trim() && !email.value.trim();
+    phone.setCustomValidity(missing ? 'Enter a contact number or an email address.' : '');
+}
+
+@php $registeredGuestList = $tourists->map->only(['id', 'name', 'email', 'phone'])->values(); @endphp
+const registeredGuests = @json($registeredGuestList);
+
+function escapeGuestText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+
+function setupGuestLookup(searchId, hiddenId, resultsId) {
+    const search = document.getElementById(searchId);
+    const hidden = document.getElementById(hiddenId);
+    const results = document.getElementById(resultsId);
+    if (!search) return;
+
+    const syncValidity = () => search.setCustomValidity(hidden.value ? '' : 'Choose a registered guest from the list.');
+
+    const render = () => {
+        const term = search.value.trim().toLowerCase();
+        if (!term) {
+            results.hidden = true;
+            return;
+        }
+        const digits = term.replace(/\D/g, '');
+        const matches = registeredGuests.filter(g =>
+            g.name.toLowerCase().includes(term) ||
+            g.email.toLowerCase().includes(term) ||
+            (digits && (g.phone || '').replace(/\D/g, '').includes(digits))
+        ).slice(0, 8);
+
+        if (!matches.length) {
+            results.innerHTML = '<div class="guest-lookup-empty">No registered guest found.</div>';
+            results.hidden = false;
+            return;
+        }
+        results.innerHTML = matches.map(g => `
+            <button type="button" class="guest-lookup-item" data-id="${g.id}">
+                <strong>${escapeGuestText(g.name)}</strong>
+                <span>${escapeGuestText(g.email)}${g.phone ? ' · ' + escapeGuestText(g.phone) : ''}</span>
+            </button>`).join('');
+        results.hidden = false;
+    };
+
+    search.addEventListener('input', () => {
+        hidden.value = '';
+        syncValidity();
+        render();
+    });
+    search.addEventListener('focus', render);
+    search.addEventListener('blur', () => setTimeout(() => { results.hidden = true; }, 150));
+    results.addEventListener('mousedown', e => e.preventDefault());
+    results.addEventListener('click', e => {
+        const item = e.target.closest('.guest-lookup-item');
+        if (!item) return;
+        const guest = registeredGuests.find(g => String(g.id) === item.dataset.id);
+        hidden.value = guest.id;
+        search.value = guest.name + ' · ' + guest.email;
+        results.hidden = true;
+        syncValidity();
+    });
+    syncValidity();
 }
 
 function syncCheckoutMin() {
@@ -565,22 +640,188 @@ function syncCheckoutMin() {
     }
 }
 
+function manualStayType() {
+    return document.querySelector('#manualBookingForm input[name="stay_type"]:checked')?.value || 'night';
+}
+
+function refreshManualUnitLabels() {
+    const hourly = manualStayType() === 'hour';
+    document.querySelectorAll('#manualUnitPicker .unit-pick').forEach(pick => {
+        const rate = parseFloat(hourly ? pick.dataset.hourPrice : pick.dataset.price) || 0;
+        pick.querySelector('.js-unit-rate').textContent = `₱${rate.toLocaleString('en-US', {maximumFractionDigits: 2})}/${hourly ? 'hour' : 'night'}`;
+    });
+}
+
+function selectedManualUnits() {
+    return Array.from(document.querySelectorAll('#manualUnitPicker .unit-pick'))
+        .filter(pick => pick.querySelector('input').checked);
+}
+
+function chooseManualKind(kind, variant, variantLabel) {
+    document.getElementById('manualUnitKind').value = kind;
+    document.getElementById('manualUnitVariant').value = variant;
+    document.querySelectorAll('#manualBookingForm .manual-kind-btn').forEach(btn => {
+        const active = btn.dataset.kind === kind;
+        const base = btn.dataset.kind === 'cottage' ? 'Cottage' : 'Room';
+        btn.classList.toggle('is-active', active);
+        btn.querySelector('.manual-kind-text').textContent = active && variantLabel ? `${base} · ${variantLabel}` : base;
+    });
+    document.querySelectorAll('#manualBookingForm .manual-kind-menu .dropdown-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.kind === kind && item.dataset.variant === variant);
+    });
+    filterManualUnits();
+}
+
+function filterManualUnits() {
+    const kind = document.getElementById('manualUnitKind').value || 'room';
+    const variant = document.getElementById('manualUnitVariant').value;
+    const label = kind === 'cottage' ? 'Cottage' : 'Room';
+    document.getElementById('manualUnitLabel').textContent = label;
+
+    let visible = 0;
+    document.querySelectorAll('#manualUnitPicker .unit-pick').forEach(pick => {
+        const match = pick.dataset.type === kind && (!variant || pick.dataset.variant === variant);
+        pick.hidden = !match;
+        if (match) visible++;
+    });
+    const empty = document.getElementById('manualUnitEmpty');
+    empty.hidden = visible > 0;
+    empty.textContent = `No ${label.toLowerCase()} available for this type.`;
+    calculateManualTotal();
+}
+
+function syncManualHourOptions() {
+    const date = document.getElementById('manualCheckInDate').value;
+    const start = document.getElementById('manualHourStart');
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    Array.from(start.options).forEach(option => {
+        option.disabled = date === today && parseInt(option.value, 10) <= now.getHours();
+    });
+    if (start.selectedOptions[0]?.disabled) {
+        const next = Array.from(start.options).find(option => !option.disabled);
+        start.value = next ? next.value : '';
+    }
+}
+
+function toggleManualStayType() {
+    const hourly = manualStayType() === 'hour';
+    const checkOut = document.getElementById('manualCheckOutDate');
+    const hourRow = document.getElementById('manualHourRow');
+    const stayLabel = document.getElementById('manualStayLabel');
+
+    checkOut.style.display = hourly ? 'none' : '';
+    checkOut.disabled = hourly;
+    checkOut.required = !hourly;
+    document.getElementById('manualStaySplit').classList.toggle('manual-split-single', hourly);
+    document.getElementById('manualCheckInDate').setAttribute('aria-label', hourly ? 'Date' : 'Check-in');
+    stayLabel.firstChild.textContent = hourly ? 'Date ' : 'Stay ';
+
+    hourRow.style.display = hourly ? '' : 'none';
+    ['manualHourStart', 'manualHoursCount'].forEach(id => {
+        const field = document.getElementById(id);
+        field.disabled = !hourly;
+        field.required = hourly;
+    });
+
+    if (hourly) syncManualHourOptions();
+    refreshManualUnitLabels();
+    calculateManualTotal();
+    refreshManualAvailability();
+}
+
+let manualAvailabilityTimer = null;
+let manualAvailabilitySeq = 0;
+
+function refreshManualAvailability() {
+    clearTimeout(manualAvailabilityTimer);
+    manualAvailabilityTimer = setTimeout(loadManualAvailability, 150);
+}
+
+async function loadManualAvailability() {
+    const date = document.getElementById('manualCheckInDate').value;
+    if (!date) return applyManualAvailability({});
+
+    const hourly = manualStayType() === 'hour';
+    const params = new URLSearchParams({ date, stay_type: hourly ? 'hour' : 'night' });
+    if (hourly) {
+        params.set('hour_start', document.getElementById('manualHourStart').value);
+        params.set('hours', document.getElementById('manualHoursCount').value);
+    } else {
+        params.set('check_out', document.getElementById('manualCheckOutDate').value);
+    }
+
+    const seq = ++manualAvailabilitySeq;
+    const picker = document.getElementById('manualUnitPicker');
+    picker.classList.add('is-loading');
+    try {
+        const res = await fetch(`{{ route('bookings.unit-availability') }}?${params}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        if (seq === manualAvailabilitySeq) applyManualAvailability(data.unavailable || {});
+    } catch (e) {
+        if (seq === manualAvailabilitySeq) applyManualAvailability({});
+    } finally {
+        if (seq === manualAvailabilitySeq) picker.classList.remove('is-loading');
+    }
+}
+
+function applyManualAvailability(unavailable) {
+    const removed = [];
+    document.querySelectorAll('#manualUnitPicker .unit-pick').forEach(pick => {
+        const box = pick.querySelector('input');
+        const reason = unavailable[box.value];
+        const status = pick.querySelector('.unit-pick-status');
+        pick.classList.toggle('is-booked', !!reason);
+        box.disabled = !!reason;
+        status.hidden = !reason;
+        status.textContent = reason || '';
+        pick.title = reason ? `${pick.dataset.name} is not available — ${reason.toLowerCase()}` : '';
+        if (reason && box.checked) {
+            box.checked = false;
+            removed.push(pick.dataset.name);
+        }
+    });
+    calculateManualTotal();
+    if (removed.length) {
+        const hint = document.getElementById('manualUnitHint');
+        hint.textContent = `${removed.join(', ')} ${removed.length > 1 ? 'are' : 'is'} already booked for that time and ${removed.length > 1 ? 'were' : 'was'} unselected.`;
+        hint.classList.add('is-error');
+    }
+}
+
 function calculateManualTotal() {
-    const unitSelect = document.getElementById('manualUnitSelect');
-    const selectedOption = unitSelect.options[unitSelect.selectedIndex];
-    const price = selectedOption ? parseFloat(selectedOption.getAttribute('data-price') || 0) : 0;
-    const capacity = selectedOption ? parseInt(selectedOption.getAttribute('data-capacity') || 1) : 1;
+    const picks = selectedManualUnits();
+    const hourly = manualStayType() === 'hour';
+    const price = picks.reduce((sum, pick) => sum + (parseFloat(hourly ? pick.dataset.hourPrice : pick.dataset.price) || 0), 0);
+    const capacity = picks.reduce((sum, pick) => sum + (parseInt(pick.dataset.capacity, 10) || 0), 0);
+
+    const unitHint = document.getElementById('manualUnitHint');
+    unitHint.classList.remove('is-error');
+    unitHint.textContent = picks.length
+        ? `${picks.length} selected: ${picks.map(pick => pick.dataset.name).join(', ')}`
+        : 'Tick one or more. A guest can book several rooms or cottages at once.';
 
     const cinVal = document.getElementById('manualCheckInDate').value;
     const coutVal = document.getElementById('manualCheckOutDate').value;
 
     const guestsInput = document.getElementById('manualGuestsCount');
     const hint = document.getElementById('unitCapacityHint');
-    if (selectedOption && selectedOption.value) {
-        hint.textContent = `Capacity limit: Max ${capacity} pax for this unit.`;
-        guestsInput.max = capacity;
+    const guestCount = parseInt(guestsInput.value, 10);
+    if (!picks.length) {
+        hint.textContent = 'Select a room or cottage to see the guest limit.';
+        guestsInput.setCustomValidity('');
+    } else if (Number.isFinite(guestCount) && guestCount > capacity) {
+        hint.textContent = `The selected ${picks.length > 1 ? 'units hold' : 'unit holds'} up to ${capacity} guests.`;
+        guestsInput.setCustomValidity(`Up to ${capacity} guests for the selected rooms and cottages.`);
+    } else if (Number.isFinite(guestCount) && guestCount < picks.length) {
+        hint.textContent = 'Enter at least one guest for each room or cottage.';
+        guestsInput.setCustomValidity('Enter at least one guest for each room or cottage.');
     } else {
-        hint.textContent = 'Select a unit to see capacity.';
+        hint.textContent = `Up to ${capacity} guests${picks.length > 1 ? ' across the selected units' : ''}.`;
+        guestsInput.setCustomValidity('');
     }
 
     let nights = 1;
@@ -592,17 +833,51 @@ function calculateManualTotal() {
         nights = diffDays > 0 ? diffDays : 1;
     }
 
-    const total = price * nights;
-    document.getElementById('calcRate').textContent = `₱${price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    document.getElementById('calcNights').textContent = `${nights} night${nights > 1 ? 's' : ''}`;
+    const units = hourly ? (parseInt(document.getElementById('manualHoursCount').value, 10) || 1) : nights;
+    const total = price * units;
+    document.getElementById('calcRate').textContent = `₱${price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}${hourly ? '/hour' : '/night'}`;
+    document.getElementById('calcNights').textContent = hourly
+        ? `${units} hour${units > 1 ? 's' : ''}`
+        : `${nights} night${nights > 1 ? 's' : ''}`;
     document.getElementById('calcTotal').textContent = `₱${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
 // Initialize listeners on DOM ready
 document.addEventListener('DOMContentLoaded', function () {
     syncCheckoutMin();
-    calculateManualTotal();
+    document.querySelectorAll('#manualBookingForm .manual-kind-menu .dropdown-item').forEach(item => {
+        item.addEventListener('click', () => chooseManualKind(item.dataset.kind, item.dataset.variant, item.dataset.label));
+    });
+    filterManualUnits();
+    toggleManualStayType();
     toggleGuestTypeFields();
+    setupGuestLookup('registeredUserSearch', 'registeredUserId', 'registeredUserResults');
+    setupGuestLookup('exclusiveUserSearch', 'exclusiveUserId', 'exclusiveUserResults');
+    toggleExclusiveGuest();
+    syncExclusiveCheckoutMin();
+    previewExclusiveTotal();
+    @if($errors->any() && old('check_in') && !old('booking_date'))
+    const exclusiveModal = document.getElementById('exclusiveBookingModal');
+    if (exclusiveModal && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(exclusiveModal).show();
+    }
+    @endif
+    @if(old('booking_date') && ($errors->any() || session('error')))
+    const manualModal = document.getElementById('manualBookingModal');
+    if (manualModal && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(manualModal).show();
+    }
+    @endif
+    document.getElementById('manualBookingForm').addEventListener('submit', function (event) {
+        if (!selectedManualUnits().length) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const hint = document.getElementById('manualUnitHint');
+            hint.textContent = 'Choose at least one room or cottage.';
+            hint.classList.add('is-error');
+            document.getElementById('manualUnitPicker').scrollIntoView({block: 'center', behavior: 'smooth'});
+        }
+    }, true);
 });
 
 function escapeBookingHtml(value) {
@@ -631,161 +906,302 @@ function viewBooking(button) {
     const guests = escapeBookingHtml(button.getAttribute('data-guests'));
     const amount = escapeBookingHtml(button.getAttribute('data-amount'));
     const status = escapeBookingHtml(button.getAttribute('data-status'));
-    const requests = escapeBookingHtml(button.getAttribute('data-requests'));
+    const payId = escapeBookingHtml(button.getAttribute('data-pay-id'));
+    const payMethod = escapeBookingHtml(button.getAttribute('data-pay-method'));
+    const payRef = escapeBookingHtml(button.getAttribute('data-pay-ref'));
+    const payProof = button.getAttribute('data-pay-proof') || '';
+    const requests = escapeBookingHtml(button.getAttribute('data-requests') || '');
+    const guestManual = escapeBookingHtml(button.getAttribute('data-guest-manual') || '');
+    const contactManual = escapeBookingHtml(button.getAttribute('data-contact-manual') || '');
     const reason = escapeBookingHtml(button.getAttribute('data-reason'));
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
-    const sourceBadge = source === 'manual'
-        ? '<span class="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300"><i class="bi bi-pencil-square text-amber-600"></i> Staff / Front Desk (Manual)</span>'
-        : '';
+    const kind = button.getAttribute('data-kind') || '';
+    const staySummary = escapeBookingHtml(button.getAttribute('data-stay-summary') || '');
+    const payLabel = escapeBookingHtml(button.getAttribute('data-pay-label') || '');
+    const payStatusRaw = button.getAttribute('data-pay-status') || '';
+    const payPaid = ['success', 'paid', 'completed'].includes(payStatusRaw);
+    const payStatus = payPaid ? 'Paid' : payStatusRaw.replace(/_/g, ' ');
+    const contactLine = [phone, email !== 'N/A' ? email : ''].filter(Boolean).join(' · ');
+
+    document.getElementById('detailRef').textContent = button.getAttribute('data-ref');
+    const stageEl = document.getElementById('detailStage');
+    stageEl.className = `res-status res-status-${button.getAttribute('data-stage') || status}`;
+    stageEl.textContent = button.getAttribute('data-stage-label') || status;
+    document.getElementById('detailSubtitle').textContent = `${kind} booking · ${source === 'manual' ? 'Created at the front desk' : 'Booked online'}`;
+
+    const canApproveSpecialBooking = @json(auth()->user()->isAdmin() || auth()->user()->hasPermission('bookings', 'confirm'));
+    const canEditExclusive = @json(auth()->user()->isAdmin() || auth()->user()->hasPermission('bookings', 'edit'));
+    const canRemoveBooking = @json(auth()->user()->isAdmin() || auth()->user()->hasPermission('bookings', 'delete'));
+    const isWalkIn = button.getAttribute('data-walkin') === '1';
+    const maxGuests = escapeBookingHtml(button.getAttribute('data-max-guests') || '200');
+    const bookingOpen = status !== 'cancelled' && status !== 'checked_out' && status !== 'completed';
 
     let specialApprovalHtml = '';
     if (type === 'special_resort') {
-        if (approval === 'pending') {
+        if (approval === 'pending' && canApproveSpecialBooking) {
             specialApprovalHtml = `
-                <div class="col-12 bg-amber-50 border border-amber-200 rounded-2xl p-4 mt-2 shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                        <div>
-                            <strong class="text-slate-900 d-block text-sm">
-                                <i class="bi bi-exclamation-diamond-fill text-amber-500 me-1"></i> Special Full-Resort Request Awaiting Administrator Approval
-                            </strong>
-                            <p class="text-xs text-slate-500 mb-0 mt-0.5">Approving will lock all 20 units and confirm this exclusive full-resort booking.</p>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <form method="POST" action="/bookings/${id}/approve-special" class="d-inline">
+                <div class="manual-row detail-approval">
+                    <label>Approval</label>
+                    <div class="detail-approval-body">
+                        <span class="detail-value">Waiting for approval. Approving reserves the whole resort for these dates.</span>
+                        <div class="detail-actions">
+                            <form method="POST" action="/bookings/${id}/approve-special">
                                 <input type="hidden" name="_token" value="${csrfToken}">
-                                <button type="submit" class="btn-ocean text-xs py-1.5 px-3">
-                                    <i class="bi bi-check-circle-fill"></i> Approve Full Lock
-                                </button>
+                                <button type="submit" class="btn-ocean">Approve</button>
                             </form>
-                            <form method="POST" action="/bookings/${id}/reject-special" class="d-inline" onsubmit="return confirm('Decline this special booking?');">
+                            <form method="POST" action="/bookings/${id}/reject-special" onsubmit="return confirm('Decline this exclusive booking?');">
                                 <input type="hidden" name="_token" value="${csrfToken}">
-                                <button type="submit" class="btn btn-outline-danger btn-sm text-xs font-bold rounded-xl py-1.5 px-3">
-                                    <i class="bi bi-x-circle"></i> Decline
-                                </button>
+                                <button type="submit" class="btn-secondary-clean detail-danger">Decline</button>
                             </form>
                         </div>
                     </div>
                 </div>
             `;
+        } else if (approval === 'pending') {
+            specialApprovalHtml = `
+                <div class="manual-row detail-approval">
+                    <label>Approval</label>
+                    <span class="detail-value">Waiting for a staff member who can confirm bookings.</span>
+                </div>
+            `;
         } else if (approval === 'approved') {
             specialApprovalHtml = `
-                <div class="col-12 bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-emerald-800 font-bold text-xs mt-2 flex items-center gap-2">
-                    <i class="bi bi-check-circle-fill text-emerald-600 text-sm"></i> Approved Full-Resort Exclusive Reservation
+                <div class="manual-row">
+                    <label>Approval</label>
+                    <span class="detail-value detail-ok">Approved. The whole resort is reserved for these dates.</span>
                 </div>
             `;
         }
     }
 
+    const needsProof = payMethod === 'gcash' || payMethod === 'paypal';
+
     document.getElementById('bookingDetailsContent').innerHTML = `
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Booking Reference</span>
-                <span class="font-mono text-sky-600 font-extrabold text-sm">${ref}</span>
-            </div>
+        <div class="manual-row">
+            <label>Guest</label>
+            <span class="detail-value"><strong>${name}</strong></span>
         </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Reservation Channel</span>
-                <div>${sourceBadge}</div>
-            </div>
+        <div class="manual-row">
+            <label>Contact</label>
+            <span class="detail-value">${contactLine || '—'}</span>
         </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Guest Name</span>
-                <span class="font-bold text-slate-800 text-sm">${name}</span>
-            </div>
+        <div class="manual-row">
+            <label>${type === 'special_resort' ? 'Booked' : 'Room'}</label>
+            <span class="detail-value">${unit}</span>
         </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Contact Details</span>
-                <span class="text-xs font-semibold text-slate-700">${phone || email || 'N/A'}</span>
-            </div>
+        <div class="manual-row">
+            <label>${kind === 'Hourly' ? 'Date & time' : 'Stay'}</label>
+            <span class="detail-value">${staySummary}</span>
         </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Room &amp; Cottage</span>
-                <span class="text-xs font-bold text-slate-800">${unit}</span>
-            </div>
+        <div class="manual-row">
+            <label>Guests</label>
+            <span class="detail-value">${guests} ${guests === '1' ? 'guest' : 'guests'}</span>
         </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">${checkin ? 'Stay Dates' : 'Scheduled Visit'}</span>
-                <span class="text-xs font-bold text-slate-800">${checkin ? `${checkin} to ${checkout} (${nights} Nights)` : date}</span>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Guests</span>
-                <span class="text-xs font-bold text-slate-800">${guests} Guests</span>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Fee</span>
-                <span class="text-sm font-extrabold text-emerald-600">PHP ${amount}</span>
+        <div class="manual-row manual-row-top">
+            <label>Payment</label>
+            <div>
+                <span class="detail-value">${payLabel || 'Not recorded'}${payStatus ? ` <span class="detail-chip${payPaid ? ' is-paid' : ''}">${escapeBookingHtml(payStatus)}</span>` : ''}</span>
+                ${needsProof ? `<span class="manual-hint">${payRef ? 'Reference ' + payRef : 'No reference number yet'}${payProof ? '' : ' · No receipt uploaded'}</span>` : ''}
+                ${(payProof || payId) ? `<div class="detail-links">
+                    ${payProof ? `<a href="${escapeBookingHtml(payProof)}" target="_blank" rel="noopener">Open receipt</a>` : ''}
+                    ${payId ? `<a href="/payments/${payId}">Review payment</a>` : ''}
+                </div>` : ''}
             </div>
         </div>
 
         ${specialApprovalHtml}
 
-        <div class="col-12">
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Special Requests / Front Desk Notes</span>
-                <p class="text-xs text-slate-600 mb-0">${requests}</p>
-            </div>
+        <div class="manual-row manual-row-top">
+            <label>Notes</label>
+            <span class="detail-value detail-notes">${requests || '<span class="detail-muted">None</span>'}</span>
         </div>
 
-        ${status === 'cancelled' ? `
-        <div class="col-12">
-            <div class="bg-rose-50 p-3.5 rounded-2xl border border-rose-200">
-                <span class="text-[11px] font-bold text-rose-700 uppercase tracking-wider block mb-1">Cancellation Reason</span>
-                <p class="text-xs text-rose-800 mb-0 font-medium">${reason}</p>
+        ${(type === 'special_resort' && canEditExclusive && status !== 'cancelled' && status !== 'checked_out' && status !== 'completed') ? `
+        <form method="POST" action="/bookings/${id}/exclusive" class="detail-edit">
+            <input type="hidden" name="_token" value="${csrfToken}">
+            <input type="hidden" name="_method" value="PUT">
+            <div class="detail-section">
+                <strong>Edit exclusive stay</strong>
+                <span>Change the dates, guests, or notes without cancelling. The total uses the current nightly rates.</span>
             </div>
+            <div class="manual-row">
+                <label>Stay</label>
+                <div class="manual-split">
+                    <input type="date" name="check_in" value="${checkin || date}" class="form-control-clean js-ex-in" aria-label="Check-in" required>
+                    <input type="date" name="check_out" value="${checkout}" class="form-control-clean js-ex-out" aria-label="Check-out" required>
+                </div>
+            </div>
+            <div class="manual-row">
+                <label>Guests</label>
+                <input type="number" name="guests_count" min="1" max="{{ \App\Models\CapacitySchedule::visitorCap() }}" value="${guests}" class="form-control-clean detail-narrow" required>
+            </div>
+            <div class="manual-row">
+                <label>Guest</label>
+                <div class="manual-split">
+                    <input type="text" name="guest_name" value="${guestManual || name}" class="form-control-clean" placeholder="Name on this booking" aria-label="Guest name">
+                    <input type="text" name="guest_contact" value="${contactManual || phone}" class="form-control-clean" placeholder="Contact" aria-label="Contact">
+                </div>
+            </div>
+            <div class="manual-row manual-row-top">
+                <label>Notes</label>
+                <textarea name="special_requests" rows="2" class="form-control-clean">${requests}</textarea>
+            </div>
+            <div class="manual-row detail-edit-foot">
+                <span class="detail-value">New total <strong class="js-ex-total">PHP ${amount}</strong></span>
+                <button type="submit" class="btn-secondary-clean">Save stay changes</button>
+            </div>
+        </form>
+        ` : ''}
+
+        ${(type !== 'special_resort' && canEditExclusive && bookingOpen) ? `
+        <form method="POST" action="/bookings/${id}" class="detail-edit">
+            <input type="hidden" name="_token" value="${csrfToken}">
+            <input type="hidden" name="_method" value="PUT">
+            <div class="detail-section">
+                <strong>Edit booking</strong>
+                <span>${kind === 'Hourly'
+                    ? 'Change the guests or notes. The date and time of an hourly stay stay as booked.'
+                    : 'Change the dates, guests, or notes without cancelling. New dates use the current nightly rate.'}</span>
+            </div>
+            ${kind === 'Hourly' ? '' : `
+            <div class="manual-row">
+                <label>Stay</label>
+                <div class="manual-split">
+                    <input type="date" name="check_in" value="${checkin || date}" class="form-control-clean" aria-label="Check-in" required>
+                    <input type="date" name="check_out" value="${checkout}" class="form-control-clean" aria-label="Check-out" required>
+                </div>
+            </div>`}
+            <div class="manual-row">
+                <label>Guests</label>
+                <input type="number" name="guests_count" min="1" max="${maxGuests}" value="${guests}" class="form-control-clean detail-narrow" required>
+            </div>
+            ${isWalkIn ? `
+            <div class="manual-row">
+                <label>Guest</label>
+                <div class="manual-split">
+                    <input type="text" name="guest_name" value="${guestManual}" class="form-control-clean" placeholder="Name on this booking" aria-label="Guest name" maxlength="150">
+                    <input type="text" name="guest_contact" value="${contactManual}" class="form-control-clean" placeholder="Contact" aria-label="Contact" maxlength="100">
+                </div>
+            </div>` : ''}
+            <div class="manual-row manual-row-top">
+                <label>Notes</label>
+                <textarea name="special_requests" rows="2" class="form-control-clean" maxlength="1000">${requests}</textarea>
+            </div>
+            <div class="manual-row detail-edit-foot">
+                <span class="detail-value">Up to ${maxGuests} ${maxGuests === '1' ? 'guest' : 'guests'} for this unit</span>
+                <button type="submit" class="btn-secondary-clean">Save booking changes</button>
+            </div>
+        </form>
+        ` : ''}
+
+        ${status === 'cancelled' ? `
+        <div class="manual-row">
+            <label>Cancel reason</label>
+            <span class="detail-value detail-danger-text">${reason}</span>
         </div>` : ''}
 
-        <div class="col-12 mt-2">
-            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                <h6 class="font-bold text-xs uppercase tracking-wider text-slate-400 mb-3">Update Lifecycle Status</h6>
-                <form method="POST" action="/bookings/${id}/status">
-                    <input type="hidden" name="_token" value="${csrfToken}">
-                    <input type="hidden" name="_method" value="PATCH">
-                    <div class="row align-items-end g-3">
-                        <div class="col-md-6">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">New Status</label>
-                            <select name="status" class="w-full form-select-clean text-xs font-medium" onchange="toggleCancelField(this, ${id})">
-                                <option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option>
-                                <option value="paid" ${status === 'paid' ? 'selected' : ''}>Paid</option>
-                                <option value="checked_in" ${status === 'checked_in' ? 'selected' : ''}>Checked In</option>
-                                <option value="checked_out" ${status === 'checked_out' ? 'selected' : ''}>Checked Out</option>
-                                <option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option>
-                                <option value="cancelled" ${status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6" id="cancelReasonWrapper_${id}" style="display:none;">
-                            <label class="block text-xs font-semibold text-rose-600 mb-1">Cancellation Reason</label>
-                            <input type="text" name="cancellation_reason" class="w-full form-control-clean text-xs" placeholder="Reason for cancellation...">
-                        </div>
-                        <div class="col-12 flex justify-end">
-                            <button type="submit" class="btn-ocean text-xs">
-                                <i class="bi bi-check2-circle"></i>
-                                <span>Save Lifecycle Update</span>
-                            </button>
-                        </div>
-                    </div>
-                </form>
+        ${(status === 'cancelled' && canRemoveBooking) ? `
+        <form method="POST" action="/bookings/${id}" class="manual-row manual-row-top" onsubmit="return confirm('Remove booking ${ref} from the list?');">
+            <input type="hidden" name="_token" value="${csrfToken}">
+            <input type="hidden" name="_method" value="DELETE">
+            <label>Remove</label>
+            <div>
+                <button type="submit" class="btn-secondary-clean detail-danger">Remove booking</button>
+                <span class="manual-hint">Takes this cancelled booking off the list. Record any refund on the Payments page first.</span>
             </div>
+        </form>` : ''}
+
+        <form method="POST" action="/bookings/${id}/status" id="bookingStatusForm" class="manual-row manual-row-top">
+            <input type="hidden" name="_token" value="${csrfToken}">
+            <input type="hidden" name="_method" value="PATCH">
+            <label for="detailStatus">Status</label>
+            <div class="manual-split">
+                <select name="status" id="detailStatus" class="form-select-clean" onchange="toggleCancelField(this, ${id})">
+                    <option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option>
+                    <option value="paid" ${status === 'paid' ? 'selected' : ''}>Paid</option>
+                    <option value="checked_in" ${status === 'checked_in' ? 'selected' : ''}>Checked in</option>
+                    <option value="checked_out" ${status === 'checked_out' ? 'selected' : ''}>Checked out</option>
+                    <option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option>
+                    <option value="cancelled" ${status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                </select>
+                <input type="text" name="cancellation_reason" id="cancelReasonWrapper_${id}" class="form-control-clean" placeholder="Reason for cancelling" aria-label="Cancellation reason" style="display:none;">
+            </div>
+        </form>
+
+        <div class="manual-total">
+            <span>${kind} · ${guests} ${guests === '1' ? 'guest' : 'guests'}</span>
+            <strong>₱${amount}</strong>
         </div>
     `;
 
     const modalObj = new bootstrap.Modal(document.getElementById('bookingDetailModal'));
     modalObj.show();
+    bindExclusivePreview(document.getElementById('bookingDetailsContent'));
+}
+
+function exclusiveNightlyRate() {
+    return {{ (float) ($exclusiveNightlyRate ?? 0) }};
+}
+function exclusiveNights(checkIn, checkOut) {
+    const inn = new Date(checkIn);
+    const out = new Date(checkOut);
+    if (!checkIn || !checkOut || Number.isNaN(inn.getTime()) || Number.isNaN(out.getTime()) || out <= inn) return 1;
+    return Math.round((out - inn) / 86400000);
+}
+function previewExclusiveTotal() {
+    const inn = document.getElementById('exclusiveCheckIn')?.value;
+    const out = document.getElementById('exclusiveCheckOut')?.value;
+    const node = document.getElementById('exclusiveCreateTotal');
+    if (!node) return;
+    const nights = exclusiveNights(inn, out);
+    node.textContent = '₱' + (exclusiveNightlyRate() * nights).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const nightsNode = document.getElementById('exclusiveCreateNights');
+    if (nightsNode) nightsNode.textContent = `${nights} night${nights === 1 ? '' : 's'}`;
+}
+function syncExclusiveCheckoutMin() {
+    const inn = document.getElementById('exclusiveCheckIn');
+    const out = document.getElementById('exclusiveCheckOut');
+    if (!inn?.value || !out) return;
+    const next = new Date(inn.value);
+    next.setDate(next.getDate() + 1);
+    const nextStr = next.toISOString().split('T')[0];
+    out.min = nextStr;
+    if (!out.value || out.value <= inn.value) out.value = nextStr;
+}
+function toggleExclusiveGuest() {
+    const registered = document.querySelector('#exclusiveBookingForm input[name="guest_type"]:checked')?.value === 'registered';
+    const walkIn = document.getElementById('exclusiveWalkIn');
+    const account = document.getElementById('exclusiveRegistered');
+    if (!walkIn || !account) return;
+    walkIn.style.display = registered ? 'none' : '';
+    account.style.display = registered ? '' : 'none';
+    walkIn.querySelectorAll('input').forEach(field => { field.disabled = registered; });
+    syncWalkInContact('exclusivePhone', 'exclusiveEmail');
+    const search = document.getElementById('exclusiveUserSearch');
+    search.required = registered;
+    search.disabled = !registered;
+    if (typeof markRequiredStars === 'function') markRequiredStars(document.getElementById('exclusiveBookingForm'));
+}
+function bindExclusivePreview(root) {
+    if (!root) return;
+    const inn = root.querySelector('.js-ex-in');
+    const out = root.querySelector('.js-ex-out');
+    const total = root.querySelector('.js-ex-total');
+    const paint = () => {
+        if (!inn || !out || !total) return;
+        const nights = exclusiveNights(inn.value, out.value);
+        total.textContent = 'PHP ' + (exclusiveNightlyRate() * nights).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    inn?.addEventListener('change', paint);
+    out?.addEventListener('change', paint);
+    paint();
 }
 
 function toggleCancelField(select, id) {
-    const div = document.getElementById(`cancelReasonWrapper_${id}`);
-    if (div) div.style.display = select.value === 'cancelled' ? 'block' : 'none';
+    const field = document.getElementById(`cancelReasonWrapper_${id}`);
+    if (field) field.style.display = select.value === 'cancelled' ? '' : 'none';
 }
 </script>
 @endpush

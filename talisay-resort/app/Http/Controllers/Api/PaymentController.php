@@ -32,24 +32,41 @@ class PaymentController extends Controller
 
         $request->validate([
             'proof' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'reference_number' => 'required|string|max:40',
         ]);
+
+        $reference = preg_replace('/\D+/', '', (string) $request->input('reference_number'));
+        if (!preg_match('/^\d{13}$/', $reference)) {
+            return response()->json(['message' => 'Enter the 13-digit GCash transaction reference number and upload the receipt screenshot.'], 422);
+        }
 
         if ($payment->status === 'success') {
             return response()->json(['error' => 'This payment has already been verified.'], 422);
         }
 
-        if ($payment->proof_path) {
-            Storage::disk('public')->delete($payment->proof_path);
+        if ($payment->booking?->status === Booking::STATUS_CANCELLED) {
+            return response()->json(['error' => 'This booking was cancelled, so it no longer takes payments. Please make a new booking.'], 422);
         }
 
-        $payment->update([
-            'proof_path' => $request->file('proof')->store('payments', 'public'),
-            'status'     => 'pending',
-        ]);
+        $updates = ['status' => 'pending'];
+
+        if ($request->hasFile('proof')) {
+            if ($payment->proof_path) {
+                Storage::disk('public')->delete($payment->proof_path);
+            }
+            $updates['proof_path'] = $request->file('proof')->store('payments', 'public');
+        }
+
+        if ($reference !== '') {
+            $updates['transaction_id'] = $reference;
+        }
+
+        $payment->update($updates);
 
         AuditLog::log('payment_proof_uploaded', $payment);
 
-        NotificationModel::notifyAdminsAndStaff(
+        NotificationModel::notifyAdminsAndStaffIf(
+            \App\Support\BookingRules::notifyPaymentProof(),
             'payment',
             'Payment Proof Uploaded',
             "Proof of payment uploaded for booking {$payment->booking->reference_no} (₱" . number_format($payment->amount, 2) . ').',
@@ -104,6 +121,8 @@ class PaymentController extends Controller
         Gate::authorize('view', $booking);
 
         $booking->load(['user', 'accommodationUnit', 'payment']);
+
+        $booking->loadMissing('activities');
 
         return Pdf::loadView('pdf.receipt', compact('booking'))->download("receipt-{$booking->reference_no}.pdf");
     }

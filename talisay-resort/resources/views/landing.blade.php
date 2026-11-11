@@ -1,903 +1,451 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Welcome to Talisay Smart Tourism System – your gateway to discovering, booking, and experiencing Talisay Beach Resort in Baybay City, Leyte.">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Welcome – Talisay Smart Tourism System</title>
+@extends('layouts.public')
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+@section('title', $resortInfo['name'].' – Baybay City, Leyte')
+@section('meta_description', 'Book rooms and cottages at Talisay Beach Resort in Baybay City, Leyte. Night or hourly stays, GCash payment, and a 360° virtual tour before you arrive.')
 
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        /* overflow:hidden on body (not html) prevents scroll WITHOUT clipping position:fixed children.
-           The CSS spec propagates body overflow to the viewport when html is overflow:visible,
-           and position:fixed elements are positioned vs the viewport, not the body box. */
-        html { height: 100%; }
-        body { height: 100%; font-family: 'Inter', sans-serif; overflow: hidden; }
-
-        /* ── Full-screen Hero ── */
-        .hero {
-            position: relative; width: 100vw; height: 100vh;
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center;
-            /* Do NOT use overflow:hidden here — it clips position:fixed children (chatbot FAB) */
+@section('content')
+@php
+    $roomUnits = $roomUnits ?? collect();
+    $cottageUnits = $cottageUnits ?? collect();
+    $heroSlides = ($heroSlides ?? collect())->values();
+    $landingReviews = $landingReviews ?? collect();
+    $allUnits = $roomUnits->concat($cottageUnits);
+    $lowestNight = $allUnits->map(fn ($u) => (float) $u->price_per_night)->filter(fn ($p) => $p > 0)->min();
+    $lowestHour = $allUnits->map(fn ($u) => $u->hourlyRate())->filter(fn ($p) => $p > 0)->min();
+    $unitMedia = function ($unit) {
+        if ($unit->first_image) {
+            return ['type' => 'image', 'src' => '/storage/'.ltrim($unit->first_image, '/')];
         }
-
-        .hero-bg {
-            position: absolute; inset: 0;
-            background-image: url('/images/hero-landing.jpg');
-            background-size: cover; background-position: center 40%;
-            transform: scale(1.04);
-            /* Use will-change instead of transform parent to avoid new stacking context clipping fixed children */
-            will-change: transform;
-            animation: slowZoom 18s ease-in-out infinite alternate;
+        if ($unit->tour_video_path) {
+            return ['type' => 'video', 'src' => '/storage/'.ltrim($unit->tour_video_path, '/')];
         }
-        @keyframes slowZoom {
-            from { transform: scale(1.04); }
-            to   { transform: scale(1.10); }
-        }
-
-        .hero-overlay {
-            position: absolute; inset: 0;
-            background:
-                linear-gradient(to top,    rgba(6,20,48,.90) 0%, transparent 48%),
-                linear-gradient(to bottom, rgba(6,20,48,.65) 0%, transparent 28%),
-                rgba(4,14,38,.22);
-        }
-
-        /* ── Top Bar ── */
-        .topbar {
-            position: absolute; top: 0; left: 0; right: 0;
-            padding: 20px 40px;
-            display: flex; align-items: center; justify-content: space-between;
-            z-index: 10;
-        }
-        .topbar-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        .topbar-logo  { width: 44px; height: 44px; border-radius: 12px; object-fit: cover;
-                         border: 2px solid rgba(255,255,255,.3); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
-        .topbar-name  { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .02em; line-height: 1.2; }
-        .topbar-sub   { font-size: 10px; color: rgba(255,255,255,.55); font-weight: 400;
-                         letter-spacing: .08em; text-transform: uppercase; }
-        .topbar-links { display: flex; align-items: center; gap: 6px; }
-        .topbar-link  { color: rgba(255,255,255,.78); font-size: 12px; font-weight: 500;
-                         padding: 7px 16px; border-radius: 20px; text-decoration: none;
-                         border: 1px solid transparent; transition: all .2s; }
-        .topbar-link:hover { color:#fff; background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.2); }
-
-        /* ── Center Card ── */
-        .center-card {
-            position: relative; z-index: 5;
-            display: flex; flex-direction: column; align-items: center; text-align: center;
-            max-width: 720px; padding: 0 24px;
-            animation: fadeSlideUp .9s cubic-bezier(.22,1,.36,1) both;
-        }
-        @keyframes fadeSlideUp {
-            from { opacity: 0; transform: translateY(32px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Location badge */
-        .badge-pill {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,.12);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,.22); border-radius: 50px;
-            padding: 7px 20px; font-size: 11px; font-weight: 600;
-            color: rgba(255,255,255,.9); letter-spacing: .12em;
-            text-transform: uppercase; margin-bottom: 26px;
-        }
-        .badge-dot {
-            width: 7px; height: 7px; border-radius: 50%;
-            background: #f5b942; box-shadow: 0 0 8px #f5b942;
-            animation: blink 2s ease-in-out infinite;
-        }
-        @keyframes blink {
-            0%,100% { opacity: 1; transform: scale(1); }
-            50%      { opacity: .55; transform: scale(.8); }
-        }
-
-        /* Main title */
-        .hero-title {
-            font-family: 'Playfair Display', serif;
-            font-size: clamp(2.5rem, 6.5vw, 4.2rem);
-            font-weight: 800; color: #fff;
-            line-height: 1.1; letter-spacing: -.015em;
-            margin-bottom: 14px;
-            text-shadow: 0 4px 30px rgba(0,0,0,.45);
-        }
-        .hero-title span {
-            background: linear-gradient(130deg, #f5b942 0%, #ffe99a 55%, #f5b942 100%);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero-welcome {
-            font-size: clamp(1rem, 2.4vw, 1.2rem); font-weight: 300;
-            color: rgba(255,255,255,.80); margin-bottom: 12px; line-height: 1.5;
-            letter-spacing: .01em;
-        }
-
-        .hero-desc {
-            font-size: 13.5px; color: rgba(255,255,255,.50);
-            max-width: 490px; line-height: 1.75; margin-bottom: 46px;
-        }
-
-        /* CTA Buttons */
-        .btn-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; }
-
-        .btn-login {
-            display: inline-flex; align-items: center; gap: 10px;
-            background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
-            color: #fff; font-size: 14.5px; font-weight: 700;
-            padding: 15px 42px; border-radius: 50px; text-decoration: none;
-            letter-spacing: .04em;
-            box-shadow: 0 8px 32px rgba(14,165,233,.50), 0 2px 8px rgba(0,0,0,.3);
-            transition: all .28s cubic-bezier(.22,1,.36,1);
-            position: relative; overflow: hidden;
-        }
-        .btn-login::before {
-            content: ''; position: absolute; inset: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,.18) 0%, transparent 60%);
-            opacity: 0; transition: opacity .28s;
-        }
-        .btn-login:hover { transform: translateY(-4px) scale(1.04); color:#fff; text-decoration:none;
-                           box-shadow: 0 16px 40px rgba(14,165,233,.58), 0 4px 12px rgba(0,0,0,.3); }
-        .btn-login:hover::before { opacity: 1; }
-        .btn-login:active { transform: translateY(-1px) scale(1.01); }
-
-        .btn-register {
-            display: inline-flex; align-items: center; gap: 10px;
-            background: rgba(255,255,255,.10);
-            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-            color: #fff; font-size: 14.5px; font-weight: 700;
-            padding: 15px 42px; border-radius: 50px; text-decoration: none;
-            border: 1.5px solid rgba(255,255,255,.35); letter-spacing: .04em;
-            box-shadow: 0 4px 20px rgba(0,0,0,.18);
-            transition: all .28s cubic-bezier(.22,1,.36,1);
-        }
-        .btn-register:hover { background: rgba(255,255,255,.22); border-color:rgba(255,255,255,.60);
-                              transform: translateY(-4px) scale(1.04); color:#fff; text-decoration:none;
-                              box-shadow: 0 12px 34px rgba(0,0,0,.28); }
-        .btn-register:active { transform: translateY(-1px) scale(1.01); }
-
-        /* ── Login Selection Modal (Clean Minimalist White Style) ── */
-        .modal-backdrop {
-            position: fixed; inset: 0;
-            background: rgba(15, 23, 42, 0.55);
-            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            z-index: 9999;
-            display: flex; align-items: center; justify-content: center;
-            padding: 20px;
-            opacity: 0; visibility: hidden; pointer-events: none;
-            transition: opacity .22s cubic-bezier(.16, 1, .3, 1), visibility .22s cubic-bezier(.16, 1, .3, 1);
-        }
-        .modal-backdrop.active {
-            opacity: 1; visibility: visible; pointer-events: auto;
-        }
-
-        .login-dialog {
-            background: #ffffff;
-            border-radius: 22px;
-            width: 100%; max-width: 410px;
-            padding: 28px 26px 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
-            transform: scale(0.95) translateY(8px);
-            transition: transform .25s cubic-bezier(.16, 1, .3, 1);
-            position: relative;
-        }
-        .modal-backdrop.active .login-dialog {
-            transform: scale(1) translateY(0);
-        }
-
-        .login-dialog-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 22px;
-        }
-        .login-dialog-title {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            font-size: 24px; font-weight: 800; color: #111827; line-height: 1.2;
-            letter-spacing: -0.025em; margin: 0;
-        }
-        .login-dialog-close {
-            background: transparent;
-            border: none;
-            color: #111827;
-            width: 34px; height: 34px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px; font-weight: 700; cursor: pointer;
-            transition: background .15s ease, color .15s ease;
-            flex-shrink: 0;
-            padding: 0;
-        }
-        .login-dialog-close:hover {
-            background: #f1f5f9;
-            color: #000000;
-        }
-
-        .login-dialog-options {
-            display: flex; flex-direction: column; gap: 13px;
-            margin-bottom: 0;
-        }
-
-        /* Clean pill buttons matching example image */
-        .login-btn-pill {
-            width: 100%;
-            height: 52px;
-            border-radius: 9999px;
-            display: flex; align-items: center; justify-content: center;
-            gap: 10px;
-            font-family: 'Inter', sans-serif;
-            font-size: 15px;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all .2s cubic-bezier(.16, 1, .3, 1);
-            box-sizing: border-box;
-            user-select: none;
-        }
-
-        /* Top button: White pill with subtle soft blue-tinted border */
-        .login-btn-white {
-            background: #ffffff;
-            border: 1.5px solid #e0e7ff;
-            color: #111827;
-            font-weight: 600;
-        }
-        .login-btn-white:hover {
-            background: #f8fafc;
-            border-color: #cbd5e1;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-            transform: translateY(-1px);
-            color: #0f172a;
-        }
-        .login-btn-white:active {
-            transform: translateY(0);
-        }
-        .login-btn-logo {
-            width: 22px; height: 22px;
-            border-radius: 4px;
-            object-fit: contain;
-        }
-
-        /* Bottom button: Solid vibrant ocean blue pill matching example image */
-        .login-btn-blue {
-            background: #0284c7;
-            border: 1.5px solid transparent;
-            color: #ffffff;
-            font-weight: 700;
-        }
-        .login-btn-blue:hover {
-            background: #0369a1;
-            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35);
-            transform: translateY(-1px);
-            color: #ffffff;
-        }
-        .login-btn-blue:active {
-            transform: translateY(0);
-        }
-
-        /* Responsive */
-        @media (max-width: 640px) {
-            .topbar { padding: 16px 20px; }
-            .hero-desc { display: none; }
-            .btn-login, .btn-register { padding: 13px 28px; font-size: 13px; }
-            .login-dialog { padding: 24px 20px 20px; max-width: 90vw; }
-            .login-dialog-title { font-size: 22px; }
-            .login-btn-pill { height: 48px; font-size: 14.5px; }
-        }
-
-        /* ── Floating Chatbot Widget ── */
-        .landing-chatbot-fab {
-            position: fixed;
-            bottom: 28px;
-            right: 28px;
-            width: 58px;
-            height: 58px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #0c4a6e 0%, #075985 60%, #0284c7 100%);
-            color: #fff;
-            border: 2px solid rgba(255, 255, 255, 0.35);
-            box-shadow: 0 10px 28px rgba(12, 74, 110, 0.45);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            padding: 0;
-            z-index: 850;
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .landing-chatbot-fab:hover {
-            transform: scale(1.08);
-            box-shadow: 0 14px 34px rgba(12, 74, 110, 0.6);
-        }
-        .landing-chatbot-fab i {
-            font-size: 24px;
-            transition: transform 0.2s;
-        }
-
-        .landing-chatbot-card {
-            position: fixed;
-            bottom: 98px;
-            right: 28px;
-            width: 380px;
-            max-width: calc(100vw - 32px);
-            height: 520px;
-            max-height: calc(100vh - 120px);
-            background: #ffffff;
-            border-radius: 22px;
-            box-shadow: 0 25px 55px rgba(7, 30, 61, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            z-index: 850;
-            opacity: 0;
-            transform: translateY(20px) scale(0.96);
-            pointer-events: none;
-            transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .landing-chatbot-card.open {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            pointer-events: auto;
-        }
-        .lcb-header {
-            background: linear-gradient(135deg, #0c4a6e 0%, #075985 60%, #0284c7 100%);
-            padding: 15px 18px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #fff;
-            flex-shrink: 0;
-        }
-        .lcb-header-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .lcb-avatar {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-        }
-        .lcb-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1.2;
-        }
-        .lcb-subtitle {
-            display: inline-block;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            background: rgba(255, 255, 255, 0.22);
-            color: #e0f2fe;
-            padding: 2px 8px;
-            border-radius: 20px;
-            margin-top: 3px;
-        }
-        .lcb-close-btn {
-            background: none;
-            border: none;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 18px;
-            cursor: pointer;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.15s;
-        }
-        .lcb-close-btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.15);
-        }
-        .lcb-body {
-            flex: 1;
-            padding: 16px;
-            overflow-y: auto;
-            background: #f8fafc;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            scroll-behavior: smooth;
-        }
-        .lcb-msg {
-            max-width: 86%;
-            padding: 10px 14px;
-            font-size: 13px;
-            line-height: 1.5;
-            word-wrap: break-word;
-        }
-        .lcb-msg-bot {
-            align-self: flex-start;
-            background: #ffffff;
-            color: #1e293b;
-            border: 1px solid #e2e8f0;
-            border-radius: 16px 16px 16px 4px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-        }
-        .lcb-msg-user {
-            align-self: flex-end;
-            background: #0284c7;
-            color: #ffffff;
-            border-radius: 16px 16px 4px 16px;
-            box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
-        }
-        .lcb-chips-wrap {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 4px;
-            padding: 0 2px;
-        }
-        .lcb-chip-btn {
-            background: #f0f9ff;
-            color: #0369a1;
-            border: 1px solid #bae6fd;
-            border-radius: 20px;
-            padding: 5px 12px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-            font-family: inherit;
-        }
-        .lcb-chip-btn:hover {
-            background: #e0f2fe;
-            border-color: #7dd3fc;
-            transform: translateY(-1px);
-        }
-        .lcb-footer {
-            padding: 12px 14px;
-            background: #ffffff;
-            border-top: 1px solid #e2e8f0;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        .lcb-input {
-            flex: 1;
-            padding: 9px 14px;
-            font-size: 13px;
-            border: 1px solid #cbd5e1;
-            border-radius: 24px;
-            outline: none;
-            font-family: inherit;
-            color: #1e293b;
-            transition: border-color 0.2s;
-        }
-        .lcb-input:focus {
-            border-color: #0284c7;
-            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
-        }
-        .lcb-send-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: #0284c7;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-        .lcb-send-btn:hover {
-            background: #0369a1;
-            transform: scale(1.05);
-        }
-        .lcb-typing {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 10px 14px;
-        }
-        .lcb-typing-dot {
-            width: 6px;
-            height: 6px;
-            background: #94a3b8;
-            border-radius: 50%;
-            animation: lcbBlink 1s infinite alternate;
-        }
-        .lcb-typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .lcb-typing-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes lcbBlink {
-            0% { opacity: 0.3; transform: scale(0.8); }
-            100% { opacity: 1; transform: scale(1.1); }
-        }
-        @media (max-width: 640px) {
-            .landing-chatbot-fab { bottom: 18px; right: 18px; width: 52px; height: 52px; }
-            .landing-chatbot-card { bottom: 82px; right: 16px; width: calc(100vw - 32px); height: 460px; }
-        }
-    </style>
-</head>
-<body>
-
-<section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-overlay"></div>
-
-    {{-- Top Navigation --}}
-    <nav class="topbar">
-        <a href="{{ url('/') }}" class="topbar-brand">
-            <img src="{{ asset('images/logo.png') }}" alt="Talisay Resort Logo" class="topbar-logo">
-            <div>
-                <div class="topbar-name">Talisay Beach Resort</div>
-                <div class="topbar-sub">Smart Tourism System</div>
-            </div>
-        </a>
-        <div class="topbar-links">
-            <a href="{{ route('tour.viewer') }}" target="_blank" class="topbar-link">
-                <i class="bi bi-camera-video"></i>&nbsp;360&deg; Tour
-            </a>
-        </div>
-    </nav>
-
-    {{-- Center Hero Content --}}
-    <div class="center-card">
-
-        <div class="badge-pill">
-            <span class="badge-dot"></span>
-            Baybay City, Leyte &nbsp;&bull;&nbsp; Philippines
-        </div>
-
-        <h1 class="hero-title">
-            Talisay <span>Smart Tourism</span><br>System
-        </h1>
-
-        <p class="hero-welcome">
-            Welcome to Talisay Smart Tourism
-        </p>
-
-        <p class="hero-desc">
-            Your all-in-one digital gateway to discovering, booking, and experiencing
-            the beauty of Talisay Beach Resort. Book accommodations, explore with a
-            360&deg; virtual tour, and manage your entire stay seamlessly online.
-        </p>
-
-        <div class="btn-row">
-            <a href="{{ route('login') }}" class="btn-login" id="btn-landing-login" onclick="openLoginModal(event)" aria-haspopup="dialog" aria-controls="loginModal">
-                <i class="bi bi-box-arrow-in-right" style="font-size:16px;" aria-hidden="true"></i>
-                Login
-            </a>
-            <a href="{{ route('register') }}" class="btn-register" id="btn-landing-register">
-                <i class="bi bi-person-plus" style="font-size:16px;" aria-hidden="true"></i>
-                Register
-            </a>
-        </div>
-
+        return ['type' => 'none', 'src' => null];
+    };
+    // Slides with a photo or video come first so a slideshow never opens on a placeholder.
+    $slideOrder = fn ($units) => $units->sortBy(fn ($u) => $unitMedia($u)['type'] === 'none' ? 1 : 0)->values();
+    $roomSlides = $slideOrder($roomUnits);
+    $cottageSlides = $slideOrder($cottageUnits);
+@endphp
+<section class="lp-hero" id="top">
+    <div class="lp-slides" id="lpSlides">
+        @forelse($heroSlides as $i => $slide)
+            @if($slide['type'] === 'video')
+                <div class="lp-slide lp-slide-video {{ $i === 0 ? 'is-active' : '' }}">
+                    <video data-src="{{ $slide['src'] }}" muted loop playsinline preload="none"></video>
+                </div>
+            @else
+                <div class="lp-slide {{ $i === 0 ? 'is-active' : '' }}"
+                     @if($i === 0) style="background-image:url('{{ $slide['src'] }}')" @else data-bg="{{ $slide['src'] }}" @endif></div>
+            @endif
+        @empty
+            <div class="lp-slide is-active" style="background-image:url('/images/hero-landing.jpg')"></div>
+        @endforelse
     </div>
-
+    <div class="lp-hero-content">
+        <div class="lp-eyebrow">Baybay City, Leyte</div>
+        <h1>{{ $resortInfo['name'] }}<br><em>Your shore, your stay.</em></h1>
+        <p>Rooms and cottages by the beach, a 360° look at the grounds before you arrive, and booking by the night or by the hour with GCash, card, or cash on arrival.</p>
+        <div class="lp-hero-actions">
+            <a class="lp-btn lp-btn-sand" href="{{ route('public.booking') }}" data-book><i class="bi bi-calendar-check"></i> Book a stay</a>
+            <a class="lp-btn lp-btn-ghost" href="{{ route('tour.viewer') }}"><i class="bi bi-badge-vr"></i> Open 360° tour</a>
+        </div>
+        @if($heroSlides->count() > 1)
+            <div class="lp-dots" id="lpHeroDots" aria-label="Slideshow">
+                @foreach($heroSlides as $i => $slide)
+                    <button type="button" class="lp-dot {{ $i === 0 ? 'is-active' : '' }}" data-go="{{ $i }}" aria-label="Photo {{ $i + 1 }}"></button>
+                @endforeach
+            </div>
+        @endif
+        </div>
 </section>
 
-{{-- ── Login Selection Modal ── --}}
-<div id="loginModal" class="modal-backdrop" aria-hidden="true" onclick="handleModalOverlayClick(event)">
-    <div class="login-dialog" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
-        <div class="login-dialog-header">
-            <h2 id="loginModalTitle" class="login-dialog-title">Log in</h2>
-            <button type="button" class="login-dialog-close" onclick="closeLoginModal()" aria-label="Close dialog">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
+@include('partials.public-smart-search')
 
-        <div class="login-dialog-options">
-            {{-- Button 1: Tourist & Staff --}}
-            <a href="{{ route('login', ['portal' => 'client']) }}" class="login-btn-pill login-btn-white" id="portal-client-btn">
-                <img src="{{ asset('images/logo.png') }}" class="login-btn-logo" alt="Talisay Beach Resort logo">
-                <span>Tourist &amp; Staff log in</span>
-            </a>
+{{-- ── Resort information ── --}}
+<section class="lp-section lp-about lp-center lp-reveal" id="about">
+    <div class="lp-label">About the resort</div>
+    <p class="lp-lead">{{ $resortInfo['name'] }} sits on the shore of {{ $resortInfo['address'] }}. Guests can stay overnight in a room or cottage, spend a few hours by the water, and take a 360° tour of the grounds before they ever arrive.</p>
+    <a class="lp-btn lp-btn-navy" href="{{ route('public.about') }}">More about the resort <i class="bi bi-arrow-right"></i></a>
+</section>
 
-            {{-- Button 2: Admin Only --}}
-            <a href="{{ route('login', ['portal' => 'admin']) }}" class="login-btn-pill login-btn-blue" id="portal-admin-btn">
-                <span>Admin log in</span>
-            </a>
+{{-- ── Full-width tour video ── --}}
+<section class="lp-video" id="tour">
+    @if($tourVideoUrl)
+        <video id="lpTourVideo" src="{{ $tourVideoUrl }}" autoplay muted loop playsinline preload="metadata" poster="/images/hero-landing.jpg"></video>
+        <button type="button" class="lp-video-sound" id="lpSoundBtn" aria-label="Turn sound on" title="Sound"><i class="bi bi-volume-mute-fill"></i></button>
+    @else
+        <div class="lp-slide is-active" style="position:absolute;inset:0;background-image:url('/images/hero-landing.jpg');opacity:1;transform:none;"></div>
+    @endif
+    <div class="lp-video-overlay">
+        <div class="lp-label">Tour the resort</div>
+        <h2>{{ $tourVideoTitle }}</h2>
+        <p>Walk the beach, the cottages, and the rooms from your screen. The full 360° tour lets you look around every scene before you reserve.</p>
+        <div class="lp-video-actions">
+            <a class="lp-btn lp-btn-sand" href="{{ route('public.booking') }}" data-book><i class="bi bi-calendar-check"></i> Book a stay</a>
+            <a class="lp-btn lp-btn-ghost" href="{{ route('tour.viewer') }}"><i class="bi bi-badge-vr"></i> Full 360° tour</a>
         </div>
-        
     </div>
-</div>
+</section>
 
-<script>
-function openLoginModal(e) {
-    if (e) e.preventDefault();
-    const modal = document.getElementById('loginModal');
-    if (modal) {
-        modal.classList.add('active');
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeLoginModal() {
-    const modal = document.getElementById('loginModal');
-    if (modal) {
-        modal.classList.remove('active');
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-    }
-}
-
-function handleModalOverlayClick(e) {
-    if (e.target === document.getElementById('loginModal')) {
-        closeLoginModal();
-    }
-}
-
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeLoginModal();
-        if (typeof toggleLandingChatbot === 'function' && window.lcbOpen) {
-            toggleLandingChatbot(false);
-        }
-    }
-});
-</script>
-
-@php
-    $landUser = auth()->user();
-    $landRole = $landUser ? $landUser->role : 'guest';
-    $landFirstName = $landUser ? first_name($landUser->name) : '';
-    $landModeLabel = match($landRole) {
-        'admin' => 'Admin Assistant',
-        'staff' => 'Staff Assistant',
-        'tourist' => 'Tourist Assistant',
-        default => 'Resort Assistant',
-    };
-    $landInitialWelcome = match($landRole) {
-        'admin' => "Hello **{$landFirstName}** (Admin)!\nWelcome to Talisay Beach Resort. How can I assist you with resort management today?",
-        'staff' => "Hello **{$landFirstName}**! Staff Assistant ready.\nAsk about today's arrivals, room availability, or reservations.",
-        'tourist' => "Hello **{$landFirstName}**! Welcome back!\nAsk about your bookings, room rates, GCash payments, or 360° virtual tour.",
-        default => "Hello! Welcome to **Talisay Beach Resort**.\nI'm your virtual guide! How can I help you plan your visit today?",
-    };
-    $landDefaultChips = match($landRole) {
-        'admin' => ["Today's Summary", "Pending Bookings", "Revenue Stats", "Occupancy"],
-        'staff' => ["Today's Arrivals", "Pending Bookings", "Cottage Availability", "Guest Rules"],
-        'tourist' => ["My Bookings", "Room Rates", "GCash Payment", "360° Tour"],
-        default => ["Room Rates", "Check Availability", "Operating Hours", "Directions", "360° Tour"],
-    };
-@endphp
-
-{{-- Floating Chatbot FAB Button --}}
-<button type="button" class="landing-chatbot-fab" id="landingChatbotFab" onclick="toggleLandingChatbot()" title="Open Resort Assistant" aria-label="Open Resort Assistant" aria-expanded="false" aria-controls="landingChatbotCard">
-    <i class="bi bi-chat-dots-fill" id="landingChatbotIcon" aria-hidden="true"></i>
-</button>
-
-{{-- Floating Chatbot Panel --}}
-<div class="landing-chatbot-card" id="landingChatbotCard" role="dialog" aria-labelledby="lcbTitle" aria-hidden="true">
-    <div class="lcb-header">
-        <div class="lcb-header-info">
-            <div class="lcb-avatar">
-                <i class="bi bi-robot" aria-hidden="true"></i>
+{{-- ── Rooms slideshow ── --}}
+<section class="lp-section lp-reveal" id="rooms">
+    <div class="lp-split">
+        <div class="lp-split-text">
+            <div class="lp-label">Time to reconnect</div>
+            <h2 class="lp-title">Our Rooms</h2>
+            <p class="lp-copy">Clean, quiet rooms a short walk from the sand. Every room shows its rate, occupancy, and a 360° look inside, and can be booked for a night or for a stay of 1 to 12 hours.</p>
+            @if($roomUnits->isNotEmpty())
+                <ul class="lp-unit-list">
+                    @foreach($roomUnits as $unit)
+                        <li>{{ $unit->unit_number }} · {{ $unit->variant_label }}</li>
+                    @endforeach
+                </ul>
+            @endif
+            <a class="lp-btn lp-btn-navy" href="{{ route('public.rooms') }}">See all rooms <i class="bi bi-arrow-right"></i></a>
+        </div>
+        @if($roomUnits->isNotEmpty())
+            <div class="lp-slider" data-slider data-interval="5000" aria-label="Room photos">
+                @foreach($roomSlides as $i => $unit)
+                    @php $media = $unitMedia($unit); @endphp
+                    <div class="lp-slider-item {{ $i === 0 ? 'is-active' : '' }}">
+                        @if($media['type'] === 'image')
+                            <img src="{{ $media['src'] }}" alt="{{ $unit->unit_number }}" loading="lazy">
+                        @elseif($media['type'] === 'video')
+                            <video data-src="{{ $media['src'] }}" muted loop playsinline preload="none"></video>
+                        @else
+                            <div class="lp-ph"><i class="bi bi-door-open"></i></div>
+                        @endif
+                        <div class="lp-slider-cap">
+                            <div>
+                                <small>{{ $unit->type_label }} · {{ $unit->variant_label }} · up to {{ $unit->max_occupancy }} {{ $unit->max_occupancy == 1 ? 'guest' : 'guests' }}</small>
+                                <h3><a href="{{ route('public.unit', $unit) }}">{{ $unit->unit_number }} <i class="bi bi-arrow-up-right"></i></a></h3>
+                            </div>
+                            <div class="lp-rate">
+                                <strong>₱{{ number_format($unit->price_per_night, 0) }}</strong>
+                                <span>per night · ₱{{ number_format($unit->hourlyRate(), 0) }} per hour</span>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+                @if($roomUnits->count() > 1)
+                    <button type="button" class="lp-arrow prev" data-prev aria-label="Previous room"><i class="bi bi-chevron-left"></i></button>
+                    <button type="button" class="lp-arrow next" data-next aria-label="Next room"><i class="bi bi-chevron-right"></i></button>
+                    <div class="lp-slider-dots" data-dots></div>
+                @endif
             </div>
+        @else
+            <div class="lp-slider-empty">Rooms will appear here as soon as they are added by the resort.</div>
+        @endif
+    </div>
+</section>
+
+{{-- ── Cottages slideshow ── --}}
+<section class="lp-section lp-reveal" id="cottages" style="padding-top:0;">
+    <div class="lp-split reverse">
+        <div class="lp-split-text">
+            <div class="lp-label">By the water</div>
+            <h2 class="lp-title">Our Cottages</h2>
+            <p class="lp-copy">Open-air cottages for families and groups, right on the beachfront. Choose a nightly stay or a few hours of shade and sea, and pay online with GCash, by card, or in cash when you arrive.</p>
+            @if($cottageUnits->isNotEmpty())
+                <ul class="lp-unit-list">
+                    @foreach($cottageUnits as $unit)
+                        <li>{{ $unit->unit_number }} · {{ $unit->variant_label }}</li>
+                    @endforeach
+                </ul>
+            @endif
+            <a class="lp-btn lp-btn-navy" href="{{ route('public.cottages') }}">See all cottages <i class="bi bi-arrow-right"></i></a>
+        </div>
+        @if($cottageUnits->isNotEmpty())
+            <div class="lp-slider" data-slider data-interval="5600" aria-label="Cottage photos">
+                @foreach($cottageSlides as $i => $unit)
+                    @php $media = $unitMedia($unit); @endphp
+                    <div class="lp-slider-item {{ $i === 0 ? 'is-active' : '' }}">
+                        @if($media['type'] === 'image')
+                            <img src="{{ $media['src'] }}" alt="{{ $unit->unit_number }}" loading="lazy">
+                        @elseif($media['type'] === 'video')
+                            <video data-src="{{ $media['src'] }}" muted loop playsinline preload="none"></video>
+                        @else
+                            <div class="lp-ph"><i class="bi bi-house-heart"></i></div>
+                        @endif
+                        <div class="lp-slider-cap">
+                            <div>
+                                <small>{{ $unit->type_label }} · {{ $unit->variant_label }} · up to {{ $unit->max_occupancy }} {{ $unit->max_occupancy == 1 ? 'guest' : 'guests' }}</small>
+                                <h3><a href="{{ route('public.unit', $unit) }}">{{ $unit->unit_number }} <i class="bi bi-arrow-up-right"></i></a></h3>
+                            </div>
+                            <div class="lp-rate">
+                                <strong>₱{{ number_format($unit->price_per_night, 0) }}</strong>
+                                <span>per night · ₱{{ number_format($unit->hourlyRate(), 0) }} per hour</span>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+                @if($cottageUnits->count() > 1)
+                    <button type="button" class="lp-arrow prev" data-prev aria-label="Previous cottage"><i class="bi bi-chevron-left"></i></button>
+                    <button type="button" class="lp-arrow next" data-next aria-label="Next cottage"><i class="bi bi-chevron-right"></i></button>
+                    <div class="lp-slider-dots" data-dots></div>
+                @endif
+            </div>
+        @else
+            <div class="lp-slider-empty">Cottages will appear here as soon as they are added by the resort.</div>
+        @endif
+        </div>
+</section>
+
+@if(($activities ?? collect())->isNotEmpty())
+<section class="lp-section lp-reveal" id="activities" style="padding-top:0;">
+    <div class="lp-split">
+        <div class="lp-split-text">
+            <div class="lp-label">Things to do</div>
+            <h2 class="lp-title">Resort activities</h2>
+            <p class="lp-copy">Snorkeling, island hopping, and other activities arranged at the resort. Add one when you book a room or cottage.</p>
+            <ul class="lp-unit-list">
+                @foreach($activities as $activity)
+                    <li>{{ $activity->title }}@if($activity->price !== null) · ₱{{ number_format($activity->price, 0) }}@endif</li>
+                @endforeach
+            </ul>
+            <a class="lp-btn lp-btn-navy" href="{{ route('public.activities') }}">See all activities <i class="bi bi-arrow-right"></i></a>
+        </div>
+        <div class="lp-slider" data-slider data-interval="5200" aria-label="Activity photos">
+            @foreach($activities as $i => $activity)
+                <div class="lp-slider-item {{ $i === 0 ? 'is-active' : '' }}">
+                    @if($activity->imageUrl())
+                        <img src="{{ $activity->imageUrl() }}" alt="{{ $activity->title }}" loading="lazy">
+                    @else
+                        <div class="lp-ph"><i class="bi {{ $activity->icon ?: 'bi-water' }}"></i></div>
+                    @endif
+                    <div class="lp-slider-cap">
+                        <div>
+                            <small>Activity{{ $activity->is_bookable ? ' · Bookable' : '' }}@if($activity->schedule) · {{ $activity->schedule }}@endif</small>
+                            <h3><a href="{{ route('public.activities') }}">{{ $activity->title }} <i class="bi bi-arrow-up-right"></i></a></h3>
+                        </div>
+                        <div class="lp-rate">
+                            @if($activity->price !== null)
+                                <strong>₱{{ number_format($activity->price, 0) }}</strong>
+                                <span>per guest</span>
+                            @else
+                                <strong>Included</strong>
+                                <span>with stay</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+            @if($activities->count() > 1)
+                <button type="button" class="lp-arrow prev" data-prev aria-label="Previous activity"><i class="bi bi-chevron-left"></i></button>
+                <button type="button" class="lp-arrow next" data-next aria-label="Next activity"><i class="bi bi-chevron-right"></i></button>
+                <div class="lp-slider-dots" data-dots></div>
+            @endif
+        </div>
+    </div>
+</section>
+@endif
+
+{{-- ── Arrival and registration information ── --}}
+<section class="lp-info" id="info">
+    <div class="lp-section lp-reveal">
+        <div class="lp-label">Convenience</div>
+        <h2 class="lp-title">Arrival and Registration at the Resort</h2>
+        <div class="lp-info-grid">
+            <div class="lp-info-item">
+                <div class="lp-info-icon"><i class="bi bi-receipt"></i></div>
+                <div>
+                    <h4>Bring your booking reference</h4>
+                    <p>Show your reservation reference and your GCash receipt or payment confirmation at the reception area when you arrive. Your My Bookings page keeps both ready on your phone.</p>
+                </div>
+            </div>
+            <div class="lp-info-item">
+                <div class="lp-info-icon"><i class="bi bi-clock-history"></i></div>
+                <div>
+                    <h4>Opening hours</h4>
+                    <p>The resort welcomes guests from {{ $resortInfo['opens'] }} to {{ $resortInfo['closes'] }} daily. Hourly stays can start between 8:00 AM and 8:00 PM and run from 1 to 12 hours.</p>
+                </div>
+            </div>
+            <div class="lp-info-item">
+                <div class="lp-info-icon"><i class="bi bi-wallet2"></i></div>
+                <div>
+                    <h4>Payment at the resort</h4>
+                    <p>Pay online with GCash or a card, {{ \App\Support\BookingRules::downPaymentEnabled() ? 'either in full or with a ' . \App\Support\BookingRules::downPaymentPercent() . '% down payment, and settle' : 'in full, and settle' }} the balance at the desk. Cash on arrival is paid in full when you check in.</p>
+                </div>
+            </div>
+            <div class="lp-info-item">
+                <div class="lp-info-icon"><i class="bi bi-arrow-counterclockwise"></i></div>
             <div>
-                <div class="lcb-title" id="lcbTitle">Talisay Assistant</div>
-                <div class="lcb-subtitle" id="lcbModeLabel">{{ $landModeLabel }}</div>
+                    <h4>Changes and cancellations</h4>
+                    <p>Cancel 48 hours or more before your stay for a full refund of a confirmed payment. Between 24 and 48 hours, {{ $resortInfo['late_refund'] }}% is refunded. Within 24 hours, {{ $resortInfo['same_day'] > 0 ? $resortInfo['same_day'].'% is refunded' : 'the payment is no longer refundable' }}.</p>
+                </div>
             </div>
         </div>
-        <button type="button" class="lcb-close-btn" onclick="toggleLandingChatbot(false)" aria-label="Close Chatbot">
-            <i class="bi bi-x-lg" aria-hidden="true"></i>
-        </button>
     </div>
+</section>
 
-    <div class="lcb-body" id="lcbMessages" aria-live="polite">
-        {{-- Initial Bot Message --}}
-        <div class="lcb-msg lcb-msg-bot" id="lcbInitialMsg"></div>
-        <div class="lcb-chips-wrap" id="lcbChipsContainer"></div>
+{{-- ── Guest reviews slideshow ── --}}
+<section class="lp-reviews" id="reviews">
+    <div class="lp-section lp-reveal">
+        <div class="lp-label">Testimonials</div>
+        <h2 class="lp-title">Guest reviews</h2>
+        @if($reviewCount > 0)
+            <div class="lp-review-summary">
+                <span class="lp-stars">{!! str_repeat('<i class="bi bi-star-fill"></i>', (int) round($averageRating)) !!}</span>
+                {{ number_format($averageRating, 1) }} / 5 from {{ $reviewCount }} {{ $reviewCount === 1 ? 'guest' : 'guests' }}
+            </div>
+        @endif
+        <div class="lp-review-track" id="lpReviewTrack" data-per-view="2" data-interval="6000">
+            @forelse($landingReviews as $review)
+                @php
+                    $author = trim((string) ($review->user?->name ?? ''));
+                    $parts = $author !== '' ? preg_split('/\s+/', $author) : [];
+                    $shown = $author === '' ? 'Resort guest' : $parts[0].(count($parts) > 1 ? ' '.mb_substr(end($parts), 0, 1).'.' : '');
+                    $author = $author !== '' ? $author : 'Resort guest';
+                    $avatar = $review->user?->avatar;
+                @endphp
+                <article class="lp-review">
+                    <div class="lp-review-head">
+                        @if($avatar)
+                            <img class="lp-avatar" src="/storage/{{ ltrim($avatar, '/') }}" alt="">
+                        @else
+                            <div class="lp-avatar">{{ mb_strtoupper(mb_substr($author, 0, 1)) }}</div>
+                        @endif
+                        <div>
+                            <strong>{{ $shown }}</strong>
+                            <small>{{ $review->created_at?->format('F Y') }}</small>
+                        </div>
+                        <span class="lp-stars" aria-label="{{ $review->rating }} out of 5">{!! str_repeat('<i class="bi bi-star-fill"></i>', (int) $review->rating) !!}</span>
+                    </div>
+                    <p>{{ $review->comment }}</p>
+                    @if($review->booking?->accommodationUnit)
+                        <div class="lp-review-unit">Stayed in {{ $review->booking->accommodationUnit->unit_number }}</div>
+                    @endif
+                </article>
+            @empty
+                <div class="lp-review-empty">
+                    Guest reviews appear here automatically after a stay is completed and the guest leaves a comment on My Bookings.
+                </div>
+            @endforelse
+        </div>
+        @if($landingReviews->count() > 2)
+            <div class="lp-review-dots" id="lpReviewDots"></div>
+        @endif
+        <div class="lp-center" style="margin-top:28px;">
+            <a class="lp-btn lp-btn-ghost" href="{{ route('public.reviews') }}">Read all reviews <i class="bi bi-arrow-right"></i></a>
+        </div>
     </div>
+</section>
 
-    <form class="lcb-footer" id="lcbForm" onsubmit="handleLandingChatSubmit(event)">
-        <label for="lcbInput" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Type your message</label>
-        <input type="text" class="lcb-input" id="lcbInput" placeholder="Ask about rates, hours, 360° tour..." autocomplete="off">
-        <button type="submit" class="lcb-send-btn" id="lcbSendBtn" aria-label="Send message">
-            <i class="bi bi-send-fill" aria-hidden="true"></i>
-        </button>
-    </form>
+{{-- ── Contact ── --}}
+<section class="lp-section lp-reveal" id="contact">
+    <div class="lp-contact-grid">
+        <div>
+            <div class="lp-label">Contact us</div>
+            <h2 class="lp-title">Reach us</h2>
+            <p class="lp-copy">Questions about a stay, a group booking, or the resort itself? Call or email the front desk. To reserve a room or the whole resort, use Booking.</p>
+            <div class="lp-contact-card">
+                <i class="bi bi-geo-alt-fill"></i>
+                <div><strong>Address</strong><span>{{ $resortInfo['address'] }}</span></div>
+            </div>
+            @if($resortInfo['phone'])
+                <div class="lp-contact-card">
+                    <i class="bi bi-telephone-fill"></i>
+                    <div><strong>Phone</strong><a href="tel:{{ preg_replace('/[^0-9+]/', '', $resortInfo['phone']) }}">{{ $resortInfo['phone'] }}</a></div>
+                </div>
+            @endif
+            <div class="lp-contact-card">
+                <i class="bi bi-envelope-fill"></i>
+                <div><strong>Email</strong><a href="mailto:{{ $resortInfo['email'] }}">{{ $resortInfo['email'] }}</a></div>
+            </div>
+            <div class="lp-contact-card">
+                <i class="bi bi-clock-fill"></i>
+                <div><strong>Open daily</strong><span>{{ $resortInfo['opens'] }} – {{ $resortInfo['closes'] }}</span></div>
+            </div>
+        </div>
 </div>
+</section>
 
+@endsection
+
+@push('scripts')
 <script>
-let lcbOpen = false;
-const lcbSessionId = 'landing_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
-const lcbInitialWelcome = {!! \Illuminate\Support\Js::from($landInitialWelcome) !!};
-const lcbDefaultChips = {!! \Illuminate\Support\Js::from($landDefaultChips) !!};
-let lcbHistory = [];
-
-function formatLcbText(text) {
-    if (!text) return '';
-    let escaped = String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-
-    escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">•</span><span>$1</span></div>');
-
-    return escaped
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-}
-
-function initLandingChatbot() {
-    const initMsgEl = document.getElementById('lcbInitialMsg');
-    if (initMsgEl) {
-        initMsgEl.innerHTML = formatLcbText(lcbInitialWelcome);
-    }
-    renderLcbChips(lcbDefaultChips);
-}
-
-function toggleLandingChatbot(forceState) {
-    const card = document.getElementById('landingChatbotCard');
-    const icon = document.getElementById('landingChatbotIcon');
-    const fab = document.getElementById('landingChatbotFab');
-    if (!card || !icon) return;
-    if (typeof forceState === 'boolean') {
-        lcbOpen = forceState;
-    } else {
-        lcbOpen = !lcbOpen;
-    }
-    window.lcbOpen = lcbOpen;
-
-    card.setAttribute('aria-hidden', lcbOpen ? 'false' : 'true');
-    if (fab) {
-        fab.setAttribute('aria-expanded', lcbOpen ? 'true' : 'false');
-        fab.setAttribute('aria-label', lcbOpen ? 'Close Resort Assistant' : 'Open Resort Assistant');
-    }
-
-    if (lcbOpen) {
-        card.classList.add('open');
-        icon.className = 'bi bi-x-lg';
-        setTimeout(() => {
-            const input = document.getElementById('lcbInput');
-            if (input) input.focus();
-            scrollLcbBottom();
-        }, 150);
-    } else {
-        card.classList.remove('open');
-        icon.className = 'bi bi-chat-dots-fill';
-    }
-}
-
-function renderLcbChips(chips) {
-    const container = document.getElementById('lcbChipsContainer');
-    if (!container) return;
-    container.innerHTML = '';
-    if (!chips || !chips.length) return;
-
-    chips.forEach(chip => {
-        const label = String(chip);
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'lcb-chip-btn';
-        btn.textContent = label;
-        btn.onclick = () => handleLcbChipClick(label);
-        container.appendChild(btn);
-    });
-}
-
-function handleLcbChipClick(text) {
-    if (text === 'Login' || text === 'Log in') {
-        openLoginModal();
-        return;
-    }
-    if (text === 'Register' || text === 'Sign up') {
-        window.location.href = "{{ route('register') }}";
-        return;
-    }
-    if (text === '360° Virtual Tour' || text === '360° Tour') {
-        window.open("{{ route('tour.viewer') }}", '_blank');
-        return;
-    }
-    sendLandingMessage(text);
-}
-
-function scrollLcbBottom() {
-    const body = document.getElementById('lcbMessages');
-    if (body) {
-        body.scrollTop = body.scrollHeight;
-    }
-}
-
-async function sendLandingMessage(text) {
-    const message = (text || '').trim();
-    if (!message) return;
-
-    const bodyEl = document.getElementById('lcbMessages');
-    const chipsContainer = document.getElementById('lcbChipsContainer');
-
-    // Append user message
-    const userMsgEl = document.createElement('div');
-    userMsgEl.className = 'lcb-msg lcb-msg-user';
-    userMsgEl.textContent = message;
-    bodyEl.appendChild(userMsgEl);
-
-    // Track in conversation history
-    lcbHistory.push({ role: 'user', text: message });
-
-    // Show typing
-    const typingEl = document.createElement('div');
-    typingEl.className = 'lcb-msg lcb-msg-bot lcb-typing';
-    typingEl.id = 'lcbTypingIndicator';
-    typingEl.innerHTML = '<span class="lcb-typing-dot"></span><span class="lcb-typing-dot"></span><span class="lcb-typing-dot"></span>';
-    bodyEl.appendChild(typingEl);
-    scrollLcbBottom();
-
-    // Clear chips while thinking
-    if (chipsContainer) chipsContainer.innerHTML = '';
-
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const res = await fetch('/api/chatbot/message', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify({
-                message: message,
-                session_id: lcbSessionId,
-                history: lcbHistory.slice(-6)
-            })
+(function () {
+    // Hero slideshow (photos and short video clips of the resort).
+    const slides = Array.from(document.querySelectorAll('#lpSlides .lp-slide'));
+    const heroDots = Array.from(document.querySelectorAll('#lpHeroDots .lp-dot'));
+    let heroIndex = 0, heroTimer = null;
+    const loadSlide = (el) => {
+        if (!el) return;
+        if (el.dataset.bg) { el.style.backgroundImage = "url('" + el.dataset.bg + "')"; delete el.dataset.bg; }
+        const v = el.querySelector('video');
+        if (v && !v.getAttribute('src') && v.dataset.src) { v.setAttribute('src', v.dataset.src); v.load(); }
+    };
+    const showHero = (n) => {
+        heroIndex = (n + slides.length) % slides.length;
+        slides.forEach((s, i) => {
+            const active = i === heroIndex;
+            s.classList.toggle('is-active', active);
+            const v = s.querySelector('video');
+            if (!v) return;
+            if (active) { loadSlide(s); v.currentTime = 0; v.play().catch(() => {}); }
+            else if (!v.paused) { v.pause(); }
         });
-
-        const data = await res.json();
-        typingEl.remove();
-
-        const reply = data.response || data.reply || "I'm sorry, I couldn't process that. Please try again or contact our front desk.";
-        lcbHistory.push({ role: 'bot', text: reply });
-
-        const botMsgEl = document.createElement('div');
-        botMsgEl.className = 'lcb-msg lcb-msg-bot';
-        botMsgEl.innerHTML = formatLcbText(reply);
-        bodyEl.appendChild(botMsgEl);
-
-        // Put chips container back at the end
-        if (chipsContainer) {
-            bodyEl.appendChild(chipsContainer);
-            renderLcbChips(Array.isArray(data.chips) && data.chips.length ? data.chips : lcbDefaultChips);
-        }
-    } catch (err) {
-        typingEl.remove();
-        const errEl = document.createElement('div');
-        errEl.className = 'lcb-msg lcb-msg-bot';
-        errEl.textContent = "Sorry, I had trouble connecting. Please check your internet connection or try again.";
-        bodyEl.appendChild(errEl);
-        if (chipsContainer) {
-            bodyEl.appendChild(chipsContainer);
-            renderLcbChips(lcbDefaultChips);
-        }
+        heroDots.forEach((d, i) => d.classList.toggle('is-active', i === heroIndex));
+        loadSlide(slides[(heroIndex + 1) % slides.length]);
+    };
+    const startHero = () => {
+        if (slides.length < 2) return;
+        clearInterval(heroTimer);
+        heroTimer = setInterval(() => showHero(heroIndex + 1), 6000);
+    };
+    if (slides.length > 1) {
+        loadSlide(slides[1]);
+        heroDots.forEach(d => d.addEventListener('click', () => { showHero(Number(d.dataset.go)); startHero(); }));
+        startHero();
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) { clearInterval(heroTimer); } else { startHero(); }
+        });
+    } else if (slides.length === 1) {
+        showHero(0);
     }
 
-    scrollLcbBottom();
-}
+    // Review slideshow: two cards at a time, auto-advancing.
+    const track = document.getElementById('lpReviewTrack');
+    if (track) {
+        const cards = Array.from(track.querySelectorAll('.lp-review'));
+        const dotsWrap = document.getElementById('lpReviewDots');
+        const perView = () => window.matchMedia('(max-width: 960px)').matches ? 1 : (Number(track.dataset.perView) || 2);
+        let page = 0, timer = null;
+        const pages = () => Math.max(1, Math.ceil(cards.length / perView()));
+        const render = () => {
+            const n = perView();
+            page = (page + pages()) % pages();
+            cards.forEach((c, i) => c.classList.toggle('is-active', i >= page * n && i < page * n + n));
+            if (dotsWrap) {
+                dotsWrap.innerHTML = '';
+                for (let i = 0; i < pages(); i++) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'lp-dot' + (i === page ? ' is-active' : '');
+                    b.setAttribute('aria-label', 'Reviews page ' + (i + 1));
+                    b.addEventListener('click', () => { page = i; render(); restart(); });
+                    dotsWrap.appendChild(b);
+                }
+            }
+        };
+        const restart = () => {
+            clearInterval(timer);
+            if (pages() > 1) timer = setInterval(() => { page++; render(); }, Number(track.dataset.interval) || 6000);
+        };
+        if (cards.length) { render(); restart(); window.addEventListener('resize', render); }
+    }
 
-function handleLandingChatSubmit(e) {
-    e.preventDefault();
-    const input = document.getElementById('lcbInput');
-    const text = input ? input.value : '';
-    if (input) input.value = '';
-    sendLandingMessage(text);
-}
-
-document.addEventListener('DOMContentLoaded', initLandingChatbot);
+    // Tour video sound toggle.
+    const video = document.getElementById('lpTourVideo');
+    const soundBtn = document.getElementById('lpSoundBtn');
+    if (video && soundBtn) {
+        soundBtn.addEventListener('click', () => {
+            video.muted = !video.muted;
+            soundBtn.innerHTML = video.muted ? '<i class="bi bi-volume-mute-fill"></i>' : '<i class="bi bi-volume-up-fill"></i>';
+            soundBtn.setAttribute('aria-label', video.muted ? 'Turn sound on' : 'Turn sound off');
+            if (video.paused) video.play().catch(() => {});
+        });
+    }
+})();
 </script>
-
-</body>
-</html>
+@endpush

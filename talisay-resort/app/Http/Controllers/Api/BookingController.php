@@ -10,6 +10,7 @@ use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\CapacitySchedule;
 use App\Models\NotificationModel;
+use App\Models\PaymentMethod;
 use App\Services\BookingService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -32,13 +33,18 @@ class BookingController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'accommodation_unit_id' => 'required|exists:accommodation_units,id',
+            'accommodation_unit_id' => 'bail|required|integer|exists:accommodation_units,id',
             'booking_date'          => 'required|date|after_or_equal:today',
             'check_out_date'        => 'nullable|date|after:booking_date',
+            'stay_type'             => 'nullable|in:night,hour',
+            'hours_count'           => 'required_if:stay_type,hour|nullable|integer|min:1|max:12',
+            'hour_start'            => ['required_if:stay_type,hour', 'nullable', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
             'guests_count'          => 'required|integer|min:1|max:50',
-            'special_requests'      => 'nullable|string|max:500',
-            'payment_method'        => 'nullable|in:gcash,paypal,card,cash',
-        ]);
+            'special_requests'      => 'nullable|string|max:1000',
+            'activity_ids'          => 'nullable|array|max:12',
+            'activity_ids.*'        => 'bail|integer|exists:resort_activities,id',
+            'payment_method'        => PaymentMethod::methodRule(false),
+        ] + PaymentMethod::extraRules($request->input('payment_method')));
 
         $user = $request->user();
         if (!$user->isTourist()) {
@@ -52,10 +58,17 @@ class BookingController extends Controller
                 'unit'             => $unit,
                 'check_in'         => $request->booking_date,
                 'check_out'        => $request->check_out_date,
+                'stay_type'        => $request->input('stay_type', 'night'),
+                'hours_count'      => $request->input('hours_count'),
+                'hour_start'       => $request->input('hour_start'),
                 'guests_count'     => $request->guests_count,
                 'user_id'          => $user->id,
                 'special_requests' => $request->special_requests,
+                'activity_ids'     => $request->input('activity_ids', []),
                 'payment_method'   => $request->input('payment_method', 'gcash'),
+                'payment_plan'     => $request->input('payment_plan', 'full'),
+                'gcash_method'     => $request->input('gcash_method', 'receipt'),
+                'card_last_four'   => PaymentMethod::isCard($request->input('payment_method')) ? $request->input('card_last_four') : null,
                 'booking_source'   => 'online',
             ]);
         } catch (BookingConflictException $e) {
@@ -71,10 +84,13 @@ class BookingController extends Controller
             "Your reservation for {$unit->unit_number} ({$booking->reference_no}) has been received. Please complete payment to secure your stay.",
             ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
         );
-        NotificationModel::notifyAdminsAndStaff(
+        NotificationModel::notifyAdminsAndStaffIf(
+            \App\Support\BookingRules::notifyNewBooking(),
             'booking',
             'New Reservation Received',
-            "{$user->name} reserved {$unit->unit_number} from " . $booking->checkInDate()->format('M d') . ' to ' . $booking->checkOutDate()->format('M d, Y') . " (Ref: {$booking->reference_no}).",
+            $booking->isHourly()
+                ? "{$user->name} reserved {$unit->unit_number} on " . $booking->checkInDate()->format('M d, Y') . " {$booking->time_slot} (Ref: {$booking->reference_no})."
+                : "{$user->name} reserved {$unit->unit_number} from " . $booking->checkInDate()->format('M d') . ' to ' . $booking->checkOutDate()->format('M d, Y') . " (Ref: {$booking->reference_no}).",
             ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
         );
 
@@ -82,6 +98,113 @@ class BookingController extends Controller
             'booking' => $booking->load(['accommodationUnit', 'payment']),
             'message' => 'Booking created successfully. Please proceed to payment.',
         ], 201);
+    }
+
+    public function storeSpecial(Request $request)
+    {
+        $request->validate([
+            'check_in_date'    => 'required|date|after_or_equal:today',
+            'check_out_date'   => 'required|date|after:check_in_date',
+            'guests_count'     => 'required|integer|min:1|max:'.\App\Models\CapacitySchedule::visitorCap(),
+            'special_requests' => 'nullable|string|max:1000',
+            'activity_ids'     => 'nullable|array|max:12',
+            'activity_ids.*'   => 'bail|integer|exists:resort_activities,id',
+            'payment_method'   => PaymentMethod::methodRule(),
+        ] + PaymentMethod::extraRules($request->input('payment_method')));
+
+        $user = $request->user();
+        if (!$user->isTourist()) {
+            return response()->json(['error' => 'Only guest accounts can create online reservations.'], 403);
+        }
+
+        try {
+            $booking = $this->bookings->createSpecialResort([
+                'check_in'         => $request->check_in_date,
+                'check_out'        => $request->check_out_date,
+                'guests_count'     => $request->guests_count,
+                'user_id'          => $user->id,
+                'special_requests' => $request->special_requests,
+                'activity_ids'     => $request->input('activity_ids', []),
+                'payment_method'   => $request->payment_method,
+                'payment_plan'     => $request->input('payment_plan', 'full'),
+                'gcash_method'     => $request->input('gcash_method', 'receipt'),
+                'card_last_four'   => PaymentMethod::isCard($request->payment_method) ? $request->card_last_four : null,
+            ]);
+        } catch (BookingConflictException $e) {
+            return response()->json(['error' => $e->getMessage()], 409);
+        }
+
+        AuditLog::log('special_resort_booking_requested', $booking, null, $booking->toArray());
+
+        NotificationModel::notifyUser(
+            $user->id,
+            'booking',
+            'Exclusive Resort Booking Submitted',
+            "Your exclusive full-resort booking request ({$booking->reference_no}) was submitted. Management will review and confirm availability.",
+            ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
+        );
+        NotificationModel::notifyAdminsAndStaff(
+            'booking',
+            'New Exclusive Resort Booking Request',
+            "{$user->name} requested exclusive full-resort booking for {$booking->checkInDate()->format('M d')} to {$booking->checkOutDate()->format('M d, Y')} ({$booking->nights_count} nights).",
+            ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
+        );
+
+        return response()->json([
+            'booking' => $booking->load(['accommodationUnit', 'payment']),
+            'message' => 'Exclusive full-resort request submitted. Management will review it.',
+        ], 201);
+    }
+
+    public function modify(Request $request, Booking $booking)
+    {
+        Gate::authorize('modify', $booking);
+
+        $currentUnitId = $booking->accommodation_unit_id;
+        $request->validate([
+            'new_accommodation_unit_id' => [
+                'bail',
+                'required',
+                'integer',
+                'exists:accommodation_units,id',
+                function ($attribute, $value, $fail) use ($currentUnitId) {
+                    if ((int) $value === (int) $currentUnitId) {
+                        $fail('Please select a different room or cottage.');
+                    }
+                },
+            ],
+            'modification_notes' => 'nullable|string|max:500',
+        ]);
+
+        $newUnit = AccommodationUnit::findOrFail($request->new_accommodation_unit_id);
+
+        try {
+            $result = $this->bookings->changeUnit($booking, $newUnit, $request->modification_notes);
+            $booking = $result['booking'];
+            $priceDiff = $result['price_diff'];
+        } catch (BookingConflictException|InvalidBookingTransitionException $e) {
+            return response()->json(['error' => $e->getMessage()], 409);
+        }
+
+        NotificationModel::notifyUser(
+            $booking->user_id,
+            'booking',
+            'Reservation Modified',
+            "Your booking {$booking->reference_no} has been switched to {$newUnit->unit_number}.",
+            ['booking_id' => $booking->id]
+        );
+        NotificationModel::notifyAdminsAndStaff(
+            'booking',
+            'Booking Modified by Guest',
+            $request->user()->name . " switched booking {$booking->reference_no} to {$newUnit->unit_number}.",
+            ['booking_id' => $booking->id]
+        );
+
+        return response()->json([
+            'booking' => $booking->load(['accommodationUnit', 'payment']),
+            'price_diff' => $priceDiff,
+            'message' => "Booking changed to {$newUnit->unit_number}.",
+        ]);
     }
 
     public function show(Request $request, Booking $booking)
@@ -124,6 +247,13 @@ class BookingController extends Controller
         ]);
     }
 
+    public function previewCancel(Booking $booking)
+    {
+        Gate::authorize('cancel', $booking);
+
+        return response()->json($this->bookings->previewCancellation($booking));
+    }
+
     public function cancel(Request $request, Booking $booking)
     {
         Gate::authorize('cancel', $booking);
@@ -135,8 +265,9 @@ class BookingController extends Controller
         }
 
         $booking = $this->bookings->cancel($booking, $request->cancellation_reason, 'booking_cancelled_by_tourist');
+        $refundNote = $this->bookings->describeCancellation($booking);
 
-        return response()->json(['message' => 'Booking cancelled successfully.', 'booking' => $booking]);
+        return response()->json(['message' => 'Booking cancelled. ' . $refundNote, 'booking' => $booking]);
     }
 
     /**
@@ -148,7 +279,6 @@ class BookingController extends Controller
 
         $startDate = Carbon::createFromFormat('Y-m', $request->month ?? now()->format('Y-m'))->startOfMonth();
         $endDate   = $startDate->copy()->endOfMonth();
-        $defaultCap = (int) setting('daily_visitor_cap', 100);
 
         $capacities = CapacitySchedule::whereBetween('date', [$startDate, $endDate])
             ->get()
@@ -159,7 +289,7 @@ class BookingController extends Controller
             $key      = $date->format('Y-m-d');
             $capacity = $capacities->get($key);
             $current  = $capacity ? (int) $capacity->current_count : 0;
-            $max      = $capacity ? (int) $capacity->max_capacity : $defaultCap;
+            $max      = CapacitySchedule::visitorCap();
             $util     = $max > 0 ? ($current / $max) * 100 : 0;
 
             $availability[] = [

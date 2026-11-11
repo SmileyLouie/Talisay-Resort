@@ -29,6 +29,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'check_in_date',                    // Check-in date for multi-day / special bookings
     'check_out_date',                   // Check-out date for multi-day / special bookings
     'nights_count',                     // Number of nights for multi-day bookings
+    'stay_type',                        // 'night' or 'hour'
+    'hours_count',                      // Length of an hourly stay
+    'hour_start',                       // Start time of an hourly stay, HH:MM
     'time_slot',                        // Optional time slot string (e.g., '08:00 AM - 05:00 PM')
     'guests_count',                     // Number of guests included in this booking
     'status',                           // Current status: pending|paid|checked_in|checked_out|cancelled|completed
@@ -81,6 +84,55 @@ class Booking extends Model
 
     public const DEFAULT_TIME_SLOT = '2:00 PM Check-in · 12:00 PM Check-out';
 
+    public const EXCLUSIVE_OCCASIONS = [
+        'Wedding or reception',
+        'Birthday',
+        'Family reunion',
+        'Company or group event',
+        'Debut or celebration',
+        'Other private event',
+    ];
+
+    public const DEFAULT_EXCLUSIVE_TITLE = 'Exclusive full resort';
+
+    public const DEFAULT_EXCLUSIVE_DESCRIPTION = 'This booking takes the whole resort for your group. Every room and cottage is held for your nights, so other guests cannot reserve them on the same dates. It is for a private occasion such as a wedding, birthday, reunion, or company gathering. Management reviews the request before the dates are locked in.';
+
+    public const DEFAULT_EXCLUSIVE_INFORMATION = 'A private overnight stay for one group. The nightly rate covers every room and cottage. Management confirms the request before the dates are locked in.';
+
+    public static function exclusiveText(string $key, string $default): string
+    {
+        $value = trim((string) SystemSetting::get($key, ''));
+
+        return $value !== '' ? $value : $default;
+    }
+
+    public static function exclusiveCopy(): array
+    {
+        return [
+            'title' => self::exclusiveText('exclusive_title', self::DEFAULT_EXCLUSIVE_TITLE),
+            'description' => self::exclusiveText('exclusive_description', self::DEFAULT_EXCLUSIVE_DESCRIPTION),
+            'information' => self::exclusiveText('exclusive_information', self::DEFAULT_EXCLUSIVE_INFORMATION),
+        ];
+    }
+
+    public static function occasions(): array
+    {
+        $raw = (string) SystemSetting::get('exclusive_occasions', '');
+        $lines = collect(preg_split('/\r\n|\r|\n/', $raw))
+            ->map(fn ($line) => trim((string) $line))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $lines !== [] ? $lines : self::EXCLUSIVE_OCCASIONS;
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(BookingActivity::class);
+    }
+
     public function canTransitionTo(string $status): bool
     {
         return in_array($status, self::TRANSITIONS[$this->status] ?? [], true);
@@ -94,6 +146,190 @@ class Booking extends Model
     public function isSpecialResort(): bool
     {
         return $this->booking_type === 'special_resort';
+    }
+
+    public function isHourly(): bool
+    {
+        return $this->stay_type === 'hour';
+    }
+
+    /**
+     * Status shown on the bookings list.
+     * Pending until an admin approves. Waiting when the approved stay is still ahead.
+     * Check in on the arrival day until the guest leaves. Check out once the stay is over.
+     */
+    public function listStage(): string
+    {
+        if ($this->status === self::STATUS_CANCELLED) {
+            return 'cancelled';
+        }
+
+        if ($this->status === self::STATUS_PENDING || ($this->isSpecialResort() && $this->admin_approval_status === 'pending')) {
+            return 'pending';
+        }
+
+        if (in_array($this->status, [self::STATUS_CHECKED_OUT, self::STATUS_COMPLETED], true)) {
+            return 'check_out';
+        }
+
+        if ($this->checkInDate()->gt(now()->startOfDay())) {
+            return 'waiting';
+        }
+
+        if (! $this->stayHasEnded()) {
+            return 'check_in';
+        }
+
+        return $this->status === self::STATUS_PAID ? 'no_show' : 'check_out';
+    }
+
+    /** True once the booked night or hourly slot is over, whatever the saved status is. */
+    public function stayHasEnded(): bool
+    {
+        $today = now()->startOfDay();
+
+        if ($this->isHourly()) {
+            if ($this->hour_start) {
+                [, $end] = $this->stayWindow();
+
+                return now()->gte($end);
+            }
+
+            return $this->checkInDate()->lt($today);
+        }
+
+        return $today->gte($this->checkOutDate());
+    }
+
+    public function listStageLabel(): string
+    {
+        return match ($this->listStage()) {
+            'waiting' => 'Waiting',
+            'check_in' => 'Check in',
+            'check_out' => 'Check out',
+            'no_show' => 'No-show',
+            'cancelled' => 'Cancelled',
+            default => 'Pending',
+        };
+    }
+
+    /** Money the resort has actually received for this booking. */
+    public function amountReceived(): float
+    {
+        $payment = $this->payment;
+
+        return $payment && $payment->status === 'success' ? round((float) $payment->amount, 2) : 0.0;
+    }
+
+    /** What the guest still owes on a confirmed booking (down-payment balance, or cash due at arrival). */
+    public function balanceDue(): float
+    {
+        if (! in_array($this->status, [self::STATUS_PAID, self::STATUS_CHECKED_IN, self::STATUS_CHECKED_OUT, self::STATUS_COMPLETED], true)) {
+            return 0.0;
+        }
+
+        return max(0.0, round((float) $this->total_amount - $this->amountReceived(), 2));
+    }
+
+    public function scopeListStage($query, string $stage)
+    {
+        $today = now()->toDateString();
+        $now = now()->format('Y-m-d H:i:s');
+        $approved = [self::STATUS_PAID, self::STATUS_CHECKED_IN];
+        $checkInDate = "date(coalesce(check_in_date, booking_date))";
+        $checkOutDate = "date(coalesce(check_out_date, date(coalesce(check_in_date, booking_date), '+' || CASE WHEN coalesce(nights_count, 0) < 1 THEN 1 ELSE nights_count END || ' days')))";
+        $hourEnd = "datetime(date(coalesce(check_in_date, booking_date)) || ' ' || hour_start, '+' || CASE WHEN coalesce(hours_count, 0) < 1 THEN 1 ELSE hours_count END || ' hours')";
+
+        $awaitingApproval = function ($q) {
+            $q->where('status', self::STATUS_PENDING)
+                ->orWhere(function ($special) {
+                    $special->where('booking_type', 'special_resort')
+                        ->where('admin_approval_status', 'pending');
+                });
+        };
+
+        $stayEnded = function ($q) use ($today, $now, $checkInDate, $checkOutDate, $hourEnd) {
+            $q->where(function ($ended) use ($today, $now, $checkInDate, $checkOutDate, $hourEnd) {
+                $ended->where(function ($hourly) use ($today, $now, $checkInDate, $hourEnd) {
+                    $hourly->where('stay_type', 'hour')->where(function ($done) use ($today, $now, $checkInDate, $hourEnd) {
+                        $done->where(function ($withStart) use ($now, $hourEnd) {
+                            $withStart->whereNotNull('hour_start')
+                                ->where('hour_start', '!=', '')
+                                ->whereRaw("$hourEnd <= ?", [$now]);
+                        })->orWhere(function ($noStart) use ($today, $checkInDate) {
+                            $noStart->where(function ($missing) {
+                                $missing->whereNull('hour_start')->orWhere('hour_start', '');
+                            })->whereRaw("$checkInDate < ?", [$today]);
+                        });
+                    });
+                })->orWhere(function ($nightly) use ($today, $checkOutDate) {
+                    $nightly->where(function ($notHour) {
+                        $notHour->whereNull('stay_type')->orWhere('stay_type', '!=', 'hour');
+                    })->whereRaw("$checkOutDate <= ?", [$today]);
+                });
+            });
+        };
+
+        return match ($stage) {
+            'cancelled' => $query->where('status', self::STATUS_CANCELLED),
+            'pending' => $query->where('status', '!=', self::STATUS_CANCELLED)->where($awaitingApproval),
+            'waiting' => $query->whereIn('status', $approved)
+                ->whereNot($awaitingApproval)
+                ->whereRaw("$checkInDate > ?", [$today]),
+            'check_out' => $query->where(function ($q) use ($awaitingApproval, $stayEnded) {
+                $q->whereIn('status', [self::STATUS_CHECKED_OUT, self::STATUS_COMPLETED])
+                    ->orWhere(function ($open) use ($awaitingApproval, $stayEnded) {
+                        $open->where('status', self::STATUS_CHECKED_IN)
+                            ->whereNot($awaitingApproval)
+                            ->where($stayEnded);
+                    });
+            }),
+            'no_show' => $query->where('status', self::STATUS_PAID)
+                ->whereNot($awaitingApproval)
+                ->where($stayEnded),
+            'check_in' => $query->whereIn('status', $approved)
+                ->whereNot($awaitingApproval)
+                ->whereRaw("$checkInDate <= ?", [$today])
+                ->whereNot($stayEnded),
+            default => $query,
+        };
+    }
+
+    /**
+     * The exact time this reservation occupies.
+     *
+     * @return array{0: \Carbon\Carbon, 1: \Carbon\Carbon}
+     */
+    public function stayWindow(): array
+    {
+        if ($this->isHourly() && $this->hour_start) {
+            $start = Carbon::parse($this->checkInDate()->format('Y-m-d') . ' ' . $this->hour_start);
+            $hours = max(1, (int) $this->hours_count);
+
+            return [$start, $start->copy()->addHours($hours)];
+        }
+
+        return [$this->checkInDate()->copy()->startOfDay(), $this->checkOutDate()->copy()->startOfDay()];
+    }
+
+    /** When the guest is expected: the hourly start, or the check-in date at the resort's check-in time. */
+    public function arrivalAt(): Carbon
+    {
+        if ($this->isHourly() && $this->hour_start) {
+            return $this->stayWindow()[0];
+        }
+
+        return Carbon::parse($this->checkInDate()->format('Y-m-d') . ' ' . \App\Support\BookingRules::checkInTime());
+    }
+
+    /** When the stay ends: the hourly end, or the check-out date at the resort's check-out time. */
+    public function departureAt(): Carbon
+    {
+        if ($this->isHourly() && $this->hour_start) {
+            return $this->stayWindow()[1];
+        }
+
+        return Carbon::parse($this->checkOutDate()->format('Y-m-d') . ' ' . \App\Support\BookingRules::checkOutTime());
     }
 
     /** Effective check-in date (falls back to legacy booking_date). */
@@ -158,6 +394,7 @@ class Booking extends Model
             'modified_at'    => 'datetime',
             'total_amount'   => 'decimal:2',
             'nights_count'   => 'integer',
+            'hours_count'    => 'integer',
         ];
     }
 
@@ -202,7 +439,7 @@ class Booking extends Model
      */
     public function accommodationUnit()
     {
-        return $this->belongsTo(AccommodationUnit::class, 'accommodation_unit_id');
+        return $this->belongsTo(AccommodationUnit::class, 'accommodation_unit_id')->withTrashed();
     }
 
     /**
@@ -210,7 +447,7 @@ class Booking extends Model
      */
     public function originalAccommodationUnit()
     {
-        return $this->belongsTo(AccommodationUnit::class, 'original_accommodation_unit_id');
+        return $this->belongsTo(AccommodationUnit::class, 'original_accommodation_unit_id')->withTrashed();
     }
 
     public function adminApprovedBy()
@@ -310,7 +547,7 @@ class Booking extends Model
      * @param int|null $excludeBookingId
      * @return Booking|null
      */
-    public static function getConflictingBooking($unitId, $checkInDate, $checkOutDate, $excludeBookingId = null): ?self
+    public static function getConflictingBooking($unitId, $checkInDate, $checkOutDate, $excludeBookingId = null, ?string $hourStart = null, ?int $hours = null): ?self
     {
         $cin = \Carbon\Carbon::parse($checkInDate)->format('Y-m-d');
         $cout = \Carbon\Carbon::parse($checkOutDate)->format('Y-m-d');
@@ -339,7 +576,19 @@ class Booking extends Model
             $query->where('id', '!=', $excludeBookingId);
         }
 
-        return $query->with('user', 'accommodationUnit')->first();
+        if ($hourStart) {
+            $requestedStart = \Carbon\Carbon::parse($cin . ' ' . $hourStart);
+            $requestedEnd = $requestedStart->copy()->addHours(max(1, (int) $hours));
+        } else {
+            $requestedStart = \Carbon\Carbon::parse($cin)->startOfDay();
+            $requestedEnd = \Carbon\Carbon::parse($cout)->startOfDay();
+        }
+
+        return $query->with('user', 'accommodationUnit')->get()->first(function (self $existing) use ($requestedStart, $requestedEnd) {
+            [$start, $end] = $existing->stayWindow();
+
+            return $start->lt($requestedEnd) && $end->gt($requestedStart);
+        });
     }
 
     /**

@@ -281,16 +281,18 @@
 
     function formatGcbText(text) {
         if (!text) return '';
-        let escaped = String(text)
+        let raw = String(text).replace(/\r\n/g, '\n').trim();
+        if ((raw.match(/\*\*/g) || []).length % 2 === 1) raw += '**';
+        let escaped = raw
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;");
 
-        escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div class="flex items-start gap-1.5 my-0.5"><span class="text-sky-500 font-bold leading-tight">•</span><span>$1</span></div>');
+        escaped = escaped.replace(/^[•\-\*]\s+(.*)$/gm, '<div style="display:flex;align-items:flex-start;gap:6px;margin:2px 0;"><span style="color:#0ea5e9;font-weight:700;line-height:1.3;">•</span><span>$1</span></div>');
 
         return escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900">$1</strong>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
             .replace(/\n/g, '<br>');
     }
 

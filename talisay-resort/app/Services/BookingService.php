@@ -13,6 +13,9 @@ use App\Models\Booking;
 use App\Models\CapacitySchedule;
 use App\Models\NotificationModel;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
+use App\Support\BookingRules;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -43,9 +46,56 @@ class BookingService
     {
         /** @var AccommodationUnit $unit */
         $unit = $data['unit'];
-        [$checkIn, $checkOut, $nights] = Booking::normaliseStay($data['check_in'], $data['check_out'] ?? null);
         $guests = (int) $data['guests_count'];
         $status = $data['status'] ?? Booking::STATUS_PENDING;
+        $hourly = ($data['stay_type'] ?? 'night') === 'hour';
+        $hourStart = null;
+        $hours = null;
+        $fromGuest = ($data['booking_source'] ?? 'online') !== 'manual';
+
+        if ($hourly && $fromGuest && ! BookingRules::hourlyStaysEnabled()) {
+            throw new BookingConflictException('Hourly stays are not available right now. Please book by the night.');
+        }
+
+        if ($hourly) {
+            $hours = (int) ($data['hours_count'] ?? 0);
+            $hourStart = (string) ($data['hour_start'] ?? '');
+            if ($hours < 1 || $hours > 12) {
+                throw new BookingConflictException('Choose between 1 and 12 hours for an hourly stay.');
+            }
+            if (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $hourStart)) {
+                throw new BookingConflictException('Choose a start time for the hourly stay.');
+            }
+            $startAt = Carbon::parse(Carbon::parse($data['check_in'])->format('Y-m-d') . ' ' . $hourStart);
+            if ($startAt->lt(now())) {
+                throw new BookingConflictException('Choose a start time that has not already passed.');
+            }
+            $endAt = $startAt->copy()->addHours($hours);
+            $exclusive = $endAt->copy()->startOfDay();
+            if ($endAt->gt($exclusive)) {
+                $exclusive->addDay();
+            }
+            $checkIn = $startAt->format('Y-m-d');
+            $checkOut = $exclusive->format('Y-m-d');
+            $nights = 0;
+            $total = round($unit->hourlyRate() * $hours, 2);
+            $timeSlot = $startAt->format('g:i A') . ' – ' . $endAt->format('g:i A') . ' (' . $hours . ' ' . ($hours === 1 ? 'hour' : 'hours') . ')';
+        } else {
+            [$checkIn, $checkOut, $nights] = Booking::normaliseStay($data['check_in'], $data['check_out'] ?? null);
+            $minNights = BookingRules::minNights();
+            if ($fromGuest && $nights < $minNights) {
+                throw new BookingConflictException("Overnight stays need at least {$minNights} nights.");
+            }
+            $total = round((float) $unit->price_per_night * $nights, 2);
+            $timeSlot = $data['time_slot'] ?? BookingRules::defaultTimeSlot();
+        }
+
+        $addons = $this->activityAddons($data['activity_ids'] ?? []);
+        $total = round($total + $addons->sum(fn ($row) => (float) $row->price), 2);
+
+        if ($status === Booking::STATUS_CHECKED_IN && Carbon::parse($checkIn)->startOfDay()->gt(now()->startOfDay())) {
+            throw new BookingConflictException('A guest can only be checked in on the arrival day. Save this booking as paid or pending instead.');
+        }
 
         if (!$unit->is_available) {
             throw new BookingConflictException("{$unit->unit_number} is currently marked unavailable by management.");
@@ -55,14 +105,12 @@ class BookingService
             throw new BookingConflictException("Guests count exceeds the capacity limit of {$unit->max_occupancy} guests for {$unit->unit_number}.");
         }
 
-        $booking = DB::transaction(function () use ($unit, $checkIn, $checkOut, $nights, $guests, $status, $data) {
+        $booking = DB::transaction(function () use ($unit, $checkIn, $checkOut, $nights, $guests, $status, $data, $hourly, $hourStart, $hours, $total, $timeSlot, $addons) {
             // Serialise concurrent attempts on the same unit.
             AccommodationUnit::whereKey($unit->id)->lockForUpdate()->first();
 
-            $this->assertUnitAvailable($unit, $checkIn, $checkOut);
+            $this->assertUnitAvailable($unit, $checkIn, $checkOut, null, $hourly ? $hourStart : null, $hourly ? $hours : null);
             $this->assertDailyCapacity($checkIn, $checkOut, $guests);
-
-            $total = round((float) $unit->price_per_night * $nights, 2);
 
             $booking = Booking::create([
                 'reference_no'          => Booking::generateReferenceNo(),
@@ -76,29 +124,40 @@ class BookingService
                 'check_in_date'         => $checkIn,
                 'check_out_date'        => $checkOut,
                 'nights_count'          => $nights,
-                'time_slot'             => $data['time_slot'] ?? Booking::DEFAULT_TIME_SLOT,
+                'stay_type'             => $hourly ? 'hour' : 'night',
+                'hours_count'           => $hourly ? $hours : null,
+                'hour_start'            => $hourly ? $hourStart : null,
+                'time_slot'             => $timeSlot,
                 'guests_count'          => $guests,
                 'status'                => $status,
                 'total_amount'          => $total,
                 'special_requests'      => $data['special_requests'] ?? null,
             ]);
 
+            foreach ($addons as $addon) {
+                $booking->activities()->create([
+                    'resort_activity_id' => $addon->id,
+                    'title' => $addon->title,
+                    'price' => $addon->price ?? 0,
+                    'quantity' => 1,
+                ]);
+            }
+
             $method = $data['payment_method'];
-            $isCash = $method === 'cash';
+            $isCash = PaymentMethod::isCash($method);
             $paidUpFront = in_array($status, [Booking::STATUS_PAID, Booking::STATUS_CHECKED_IN], true);
+            [$plan, $due, $balance] = $this->payableAmounts($total, $method, $data);
 
             Payment::create([
                 'booking_id'         => $booking->id,
-                'amount'             => $total,
+                'amount'             => $due,
                 'gateway'            => $method,
                 'payment_channel'    => $method,
                 'transaction_id'     => $this->transactionId($data['booking_source'] ?? 'online', $isCash),
+                'card_last_four'     => PaymentMethod::isCard($method) ? ($data['card_last_four'] ?? null) : null,
                 'status'             => $paidUpFront ? 'success' : 'pending',
                 'is_cash_on_arrival' => $isCash,
-                'metadata'           => array_filter([
-                    'source'     => $data['booking_source'] ?? 'online',
-                    'created_by' => $data['created_by'] ?? null,
-                ]),
+                'metadata'           => $this->paymentMetadata($data, $method, $plan, $total, $balance),
             ]);
 
             CapacitySchedule::recalculateForBooking($booking);
@@ -133,6 +192,14 @@ class BookingService
             throw new InvalidBookingTransitionException("A {$from} reservation cannot be changed to {$to}.");
         }
 
+        if ($oldStatus === Booking::STATUS_CANCELLED && $booking->payment?->refundSent()) {
+            throw new InvalidBookingTransitionException('This booking cannot be reopened because its payment was already refunded to the guest. Create a new booking instead.');
+        }
+
+        if ($newStatus === Booking::STATUS_CHECKED_IN && $booking->checkInDate()->gt(now()->startOfDay())) {
+            throw new InvalidBookingTransitionException('This guest can check in from ' . $booking->checkInDate()->format('M j, Y') . '.');
+        }
+
         DB::transaction(function () use ($booking, $newStatus, $oldStatus, $context) {
             $attributes = ['status' => $newStatus];
 
@@ -160,10 +227,12 @@ class BookingService
 
             $payment = $booking->payment;
             if ($payment) {
-                if (in_array($newStatus, [Booking::STATUS_PAID, Booking::STATUS_CHECKED_IN], true) && $payment->status === 'pending') {
+                if ($oldStatus === Booking::STATUS_CANCELLED && $newStatus !== Booking::STATUS_CANCELLED) {
+                    $this->restorePaymentAfterReinstatement($payment);
+                } elseif (in_array($newStatus, [Booking::STATUS_PAID, Booking::STATUS_CHECKED_IN], true) && $payment->status === 'pending') {
                     $payment->update(['status' => 'success']);
-                } elseif ($newStatus === Booking::STATUS_CANCELLED && $payment->status === 'pending') {
-                    $payment->update(['status' => 'failed']);
+                } elseif ($newStatus === Booking::STATUS_CANCELLED) {
+                    $this->settleCancellationPayment($booking, $payment);
                 }
             }
 
@@ -194,6 +263,139 @@ class BookingService
     }
 
     /**
+     * What a cancellation would do to a payment that is already confirmed.
+     * 48 hours or more before the stay: full refund of the amount paid.
+     * 24 to 48 hours: the late-cancellation percent from System Settings.
+     * Under 24 hours: the same-day percent from System Settings.
+     * A payment that is still waiting for approval is not refunded.
+     *
+     * @return array{paid: float, percent: int, refund: float, kept: float, rule: string, message: string}
+     */
+    public function previewCancellation(Booking $booking): array
+    {
+        $payment = $booking->payment;
+        $paid = ($payment && $payment->status === 'success') ? round((float) $payment->amount, 2) : 0.0;
+        $start = $booking->stayWindow()[0];
+        $hoursUntil = ($start->getTimestamp() - now()->getTimestamp()) / 3600;
+
+        if (!$payment || $payment->status !== 'success' || $paid <= 0) {
+            return [
+                'paid' => 0.0,
+                'percent' => 0,
+                'refund' => 0.0,
+                'kept' => 0.0,
+                'rule' => 'unpaid',
+                'message' => 'No payment has been confirmed yet, so cancelling does not create a refund. The room or cottage is released for other guests.',
+            ];
+        }
+
+        if ($hoursUntil >= 48) {
+            $percent = 100;
+            $rule = 'full';
+        } elseif ($hoursUntil >= 24) {
+            $percent = max(0, min(100, (int) setting('late_cancellation_refund_percent', 50)));
+            $rule = 'partial';
+        } else {
+            $percent = max(0, min(100, (int) setting('same_day_cancellation_refund', 0)));
+            $rule = $percent > 0 ? 'partial' : 'none';
+        }
+
+        $refund = round($paid * $percent / 100, 2);
+        $kept = round($paid - $refund, 2);
+
+        if ($percent >= 100) {
+            $message = 'A full refund of ₱' . number_format($refund, 2) . ' will be recorded. The resort returns that amount to the guest.';
+        } elseif ($refund > 0) {
+            $message = 'A ' . $percent . '% refund of ₱' . number_format($refund, 2) . ' will be recorded. The resort keeps ₱' . number_format($kept, 2) . '.';
+        } else {
+            $message = 'The stay starts in under 24 hours, so the ₱' . number_format($paid, 2) . ' payment is not refunded.';
+        }
+
+        return compact('paid', 'percent', 'refund', 'kept', 'rule') + ['message' => $message];
+    }
+
+    public function describeCancellation(Booking $booking): string
+    {
+        $payment = $booking->payment;
+        $rule = $payment->metadata['refund_rule'] ?? null;
+
+        if (!$payment || $rule === 'unpaid' || $payment->status === 'failed') {
+            return 'No payment was confirmed, so nothing is refunded.';
+        }
+
+        $refund = round((float) ($payment->metadata['refund_amount'] ?? 0), 2);
+        $percent = (int) ($payment->metadata['refund_percent'] ?? 0);
+        $kept = round((float) ($payment->metadata['kept_amount'] ?? $payment->amount), 2);
+
+        if ($percent >= 100 && $refund > 0) {
+            return 'A full refund of ₱' . number_format($refund, 2) . ' is recorded for the resort to return.';
+        }
+
+        if ($refund > 0) {
+            return 'A ' . $percent . '% refund of ₱' . number_format($refund, 2) . ' is recorded. The resort keeps ₱' . number_format($kept, 2) . '.';
+        }
+
+        if (($payment->metadata['paid_amount'] ?? 0) > 0) {
+            return 'The payment is not refunded because the cancellation is within 24 hours of the stay.';
+        }
+
+        return 'The room or cottage is released for other guests.';
+    }
+
+    private function settleCancellationPayment(Booking $booking, Payment $payment): void
+    {
+        $preview = $this->previewCancellation($booking);
+        $metadata = $payment->metadata ?? [];
+        $metadata['payment_status_before_cancel'] = $payment->status;
+        $metadata['paid_amount'] = $preview['paid'] > 0 ? $preview['paid'] : round((float) $payment->amount, 2);
+        $metadata['refund_percent'] = $preview['percent'];
+        $metadata['refund_amount'] = $preview['refund'];
+        $metadata['kept_amount'] = $preview['kept'];
+        $metadata['refund_rule'] = $preview['rule'];
+        $metadata['refunded_at'] = now()->toIso8601String();
+
+        $changes = ['metadata' => $metadata];
+
+        if ($preview['rule'] === 'unpaid' && $payment->status === 'pending') {
+            $changes['status'] = 'failed';
+        } elseif ($preview['percent'] >= 100 && $preview['refund'] > 0) {
+            $changes['status'] = 'refunded';
+            $changes['amount'] = $preview['paid'];
+        } elseif ($preview['refund'] > 0) {
+            $changes['amount'] = $preview['kept'];
+        }
+
+        $payment->update($changes);
+    }
+
+    private function restorePaymentAfterReinstatement(Payment $payment): void
+    {
+        $metadata = $payment->metadata ?? [];
+        $previous = $metadata['payment_status_before_cancel'] ?? null;
+
+        if ($previous === null) {
+            return;
+        }
+
+        $paid = $metadata['paid_amount'] ?? $payment->amount;
+        unset(
+            $metadata['payment_status_before_cancel'],
+            $metadata['paid_amount'],
+            $metadata['refund_percent'],
+            $metadata['refund_amount'],
+            $metadata['kept_amount'],
+            $metadata['refund_rule'],
+            $metadata['refunded_at']
+        );
+
+        $payment->update([
+            'status' => $previous,
+            'amount' => $paid,
+            'metadata' => $metadata,
+        ]);
+    }
+
+    /**
      * Exclusive full-resort request. Inventory is reserved by the conflict
      * rules immediately; the daily visitor cap is only locked after approval.
      *
@@ -211,19 +413,18 @@ class BookingService
                 );
             }
 
-            $availableUnits = AccommodationUnit::available();
-            if (!$availableUnits->exists()) {
-                throw new BookingConflictException('No accommodation units are currently configured in the system.');
-            }
-
-            $total = round((float) $availableUnits->sum('price_per_night') * $nights, 2);
+            $addons = $this->activityAddons($data['activity_ids'] ?? []);
+            $total = round($this->exclusiveStayTotal($nights) + $addons->sum(fn ($row) => (float) $row->price), 2);
             $method = $data['payment_method'];
+            [$plan, $due, $balance] = $this->payableAmounts($total, $method, $data);
 
             $booking = Booking::create([
                 'reference_no'          => Booking::generateReferenceNo('TBRS'),
                 'booking_type'          => 'special_resort',
                 'booking_source'        => $data['booking_source'] ?? 'online',
-                'user_id'               => $data['user_id'],
+                'user_id'               => $data['user_id'] ?? null,
+                'guest_name_manual'     => $data['guest_name_manual'] ?? null,
+                'guest_contact_manual'  => $data['guest_contact_manual'] ?? null,
                 'accommodation_unit_id' => null,
                 'booking_date'          => $checkIn,
                 'check_in_date'         => $checkIn,
@@ -237,14 +438,25 @@ class BookingService
                 'special_requests'      => $data['special_requests'] ?? null,
             ]);
 
+            foreach ($addons as $addon) {
+                $booking->activities()->create([
+                    'resort_activity_id' => $addon->id,
+                    'title' => $addon->title,
+                    'price' => $addon->price ?? 0,
+                    'quantity' => 1,
+                ]);
+            }
+
             Payment::create([
                 'booking_id'         => $booking->id,
-                'amount'             => $total,
+                'amount'             => $due,
                 'gateway'            => $method,
                 'payment_channel'    => $method,
-                'transaction_id'     => $this->transactionId('online', $method === 'cash'),
+                'transaction_id'     => $this->transactionId('online', PaymentMethod::isCash($method)),
+                'card_last_four'     => PaymentMethod::isCard($method) ? ($data['card_last_four'] ?? null) : null,
                 'status'             => 'pending',
-                'is_cash_on_arrival' => $method === 'cash',
+                'is_cash_on_arrival' => PaymentMethod::isCash($method),
+                'metadata'           => $this->paymentMetadata($data, $method, $plan, $total, $balance),
             ]);
 
             return $booking;
@@ -253,6 +465,203 @@ class BookingService
         broadcast(new BookingCreated($booking))->toOthers();
 
         return $booking;
+    }
+
+    /**
+     * Change dates, guest count, or notes on an exclusive full-resort stay.
+     * Does not cancel the reservation.
+     */
+    public function updateSpecialResort(Booking $booking, array $data): Booking
+    {
+        if (! $booking->isSpecialResort()) {
+            throw new InvalidBookingTransitionException('This is not an exclusive full-resort booking.');
+        }
+
+        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_CHECKED_OUT, Booking::STATUS_COMPLETED], true)) {
+            throw new InvalidBookingTransitionException('This exclusive booking can no longer be edited.');
+        }
+
+        [$checkIn, $checkOut, $nights] = Booking::normaliseStay($data['check_in'], $data['check_out']);
+        $guests = max(1, min(200, (int) $data['guests_count']));
+
+        DB::transaction(function () use ($booking, $checkIn, $checkOut, $nights, $guests, $data) {
+            if (Booking::hasSpecialResortConflict($checkIn, $checkOut, $booking->id)) {
+                throw new BookingConflictException(
+                    "Those dates overlap another reservation. Choose other dates for this exclusive stay."
+                );
+            }
+
+            $total = $this->exclusiveStayTotal($nights);
+            $old = $booking->toArray();
+            $updates = [
+                'booking_date'       => $checkIn,
+                'check_in_date'      => $checkIn,
+                'check_out_date'     => $checkOut,
+                'nights_count'       => $nights,
+                'guests_count'       => $guests,
+                'total_amount'       => $total,
+                'special_requests'   => $data['special_requests'] ?? $booking->special_requests,
+                'modified_at'        => now(),
+                'modification_notes' => $data['modification_notes'] ?? 'Exclusive stay updated by staff.',
+            ];
+            if (array_key_exists('guest_name_manual', $data)) {
+                $updates['guest_name_manual'] = $data['guest_name_manual'] ?: $booking->guest_name_manual;
+            }
+            if (array_key_exists('guest_contact_manual', $data)) {
+                $updates['guest_contact_manual'] = $data['guest_contact_manual'] ?: $booking->guest_contact_manual;
+            }
+            $booking->update($updates);
+
+            if ($booking->payment) {
+                $meta = $booking->payment->metadata ?? [];
+                $plan = ($meta['payment_plan'] ?? 'full') === 'down' ? 'down' : 'full';
+                $due = $this->planDue($meta, $total);
+                $paid = (float) $booking->payment->amount;
+                $meta['payment_plan'] = $plan;
+                $meta['stay_total'] = $total;
+                $meta['balance'] = $booking->payment->status === 'success'
+                    ? round(max(0, $total - $paid), 2)
+                    : round($total - $due, 2);
+                $paymentData = ['metadata' => $meta];
+                if ($booking->payment->status === 'pending') {
+                    $paymentData['amount'] = $due;
+                }
+                $booking->payment->update($paymentData);
+            }
+
+            CapacitySchedule::recalculateForBooking($booking);
+            AuditLog::log('exclusive_booking_updated', $booking, $old, $booking->fresh()->toArray());
+        });
+
+        $this->broadcastCapacity($booking);
+        $fresh = $booking->fresh(['payment', 'user']);
+        broadcast(new BookingUpdated($fresh));
+        app(SupabaseSyncService::class)->pushBooking($fresh);
+
+        return $fresh;
+    }
+
+    /**
+     * Edit a regular reservation from the front desk: the dates of a nightly
+     * stay, the guest count, the notes, and a walk-in guest's details.
+     * The total is only recalculated when the dates change.
+     *
+     * @throws InvalidBookingTransitionException
+     * @throws BookingConflictException
+     */
+    public function updateRegular(Booking $booking, array $data): Booking
+    {
+        if ($booking->isSpecialResort()) {
+            throw new InvalidBookingTransitionException('Edit an exclusive booking from its own form.');
+        }
+
+        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_CHECKED_OUT, Booking::STATUS_COMPLETED], true)) {
+            throw new InvalidBookingTransitionException('This booking is closed and can no longer be edited.');
+        }
+
+        $unit = $booking->accommodationUnit;
+        $guests = max(1, (int) $data['guests_count']);
+        if ($unit && $guests > (int) $unit->max_occupancy) {
+            throw new BookingConflictException("{$unit->unit_number} holds up to {$unit->max_occupancy} guests.");
+        }
+
+        $oldIn = $booking->checkInDate()->format('Y-m-d');
+        $oldOut = $booking->checkOutDate()->format('Y-m-d');
+        $checkIn = $oldIn;
+        $checkOut = $oldOut;
+        $nights = (int) $booking->nights_count;
+        $datesChanged = false;
+
+        if (! $booking->isHourly() && ! empty($data['check_in']) && ! empty($data['check_out'])) {
+            [$newIn, $newOut, $newNights] = Booking::normaliseStay($data['check_in'], $data['check_out']);
+            if ($newIn !== $oldIn || $newOut !== $oldOut) {
+                if (! $unit) {
+                    throw new BookingConflictException('The room or cottage on this booking is no longer listed, so its dates cannot change.');
+                }
+                if ($booking->status === Booking::STATUS_CHECKED_IN && $newIn !== $oldIn) {
+                    throw new BookingConflictException('This guest has already checked in. Only the check-out date can change.');
+                }
+                if ($newIn !== $oldIn && Carbon::parse($newIn)->lt(Carbon::today())) {
+                    throw new BookingConflictException('Choose a check-in date that has not passed.');
+                }
+                [$checkIn, $checkOut, $nights] = [$newIn, $newOut, $newNights];
+                $datesChanged = true;
+            }
+        }
+
+        $oldDates = $booking->occupiedDates();
+
+        DB::transaction(function () use ($booking, $unit, $guests, $checkIn, $checkOut, $nights, $datesChanged, $oldDates, $data) {
+            if ($datesChanged) {
+                AccommodationUnit::whereKey($unit->id)->lockForUpdate()->first();
+                $this->assertUnitAvailable($unit, $checkIn, $checkOut, $booking->id);
+            }
+            if ($datesChanged || $guests > (int) $booking->guests_count) {
+                $this->assertDailyCapacity($checkIn, $checkOut, $guests, $booking->id);
+            }
+
+            $old = $booking->toArray();
+            $updates = [
+                'guests_count'       => $guests,
+                'special_requests'   => array_key_exists('special_requests', $data) ? $data['special_requests'] : $booking->special_requests,
+                'modified_at'        => now(),
+                'modification_notes' => $data['modification_notes'] ?? 'Booking updated by staff.',
+            ];
+
+            $total = (float) $booking->total_amount;
+            if ($datesChanged) {
+                $addons = (float) $booking->activities->sum(fn ($row) => (float) $row->price * max(1, (int) $row->quantity));
+                $total = round((float) $unit->price_per_night * $nights + $addons, 2);
+                $updates += [
+                    'booking_date'   => $checkIn,
+                    'check_in_date'  => $checkIn,
+                    'check_out_date' => $checkOut,
+                    'nights_count'   => $nights,
+                    'total_amount'   => $total,
+                ];
+            }
+
+            if (! $booking->user_id) {
+                if (! empty($data['guest_name_manual'])) {
+                    $updates['guest_name_manual'] = $data['guest_name_manual'];
+                }
+                if (! empty($data['guest_contact_manual'])) {
+                    $updates['guest_contact_manual'] = $data['guest_contact_manual'];
+                }
+            }
+
+            $booking->update($updates);
+
+            if ($datesChanged && $booking->payment) {
+                $meta = $booking->payment->metadata ?? [];
+                $plan = ($meta['payment_plan'] ?? 'full') === 'down' ? 'down' : 'full';
+                $due = $this->planDue($meta, $total);
+                $paid = (float) $booking->payment->amount;
+                $meta['payment_plan'] = $plan;
+                $meta['stay_total'] = $total;
+                $meta['balance'] = $booking->payment->status === 'success'
+                    ? round(max(0, $total - $paid), 2)
+                    : round($total - $due, 2);
+                $paymentData = ['metadata' => $meta];
+                if ($booking->payment->status === 'pending') {
+                    $paymentData['amount'] = $due;
+                }
+                $booking->payment->update($paymentData);
+            }
+
+            foreach (array_unique(array_merge($oldDates, $booking->occupiedDates())) as $date) {
+                CapacitySchedule::recalculateForDate($date);
+            }
+
+            AuditLog::log('booking_updated_by_staff', $booking, $old, $booking->fresh()->toArray());
+        });
+
+        $this->broadcastCapacity($booking);
+        $fresh = $booking->fresh(['payment', 'accommodationUnit', 'user']);
+        broadcast(new BookingUpdated($fresh));
+        app(SupabaseSyncService::class)->pushBooking($fresh);
+
+        return $fresh;
     }
 
     /**
@@ -300,7 +709,13 @@ class BookingService
             ]);
 
             if ($booking->payment) {
-                $paymentData = ['amount' => $newAmount];
+                $meta = $booking->payment->metadata ?? [];
+                $plan = ($meta['payment_plan'] ?? 'full') === 'down' ? 'down' : 'full';
+                $due = $this->planDue($meta, $newAmount);
+                $meta['payment_plan'] = $plan;
+                $meta['stay_total'] = $newAmount;
+                $meta['balance'] = round($newAmount - $due, 2);
+                $paymentData = ['amount' => $due, 'metadata' => $meta];
                 if ($priceDiff > 0 && $booking->payment->status === 'success') {
                     $paymentData['status'] = 'pending';
                 }
@@ -380,6 +795,83 @@ class BookingService
         return $booking->fresh();
     }
 
+    public function exclusiveNightlyRate(): float
+    {
+        $override = \App\Models\SystemSetting::get('exclusive_nightly_rate');
+        if ($override !== null && $override !== '' && (float) $override > 0) {
+            return round((float) $override, 2);
+        }
+
+        $sum = (float) AccommodationUnit::available()->sum('price_per_night');
+        if ($sum <= 0) {
+            $sum = (float) AccommodationUnit::query()->sum('price_per_night');
+        }
+
+        return round($sum, 2);
+    }
+
+    private function activityAddons(array $ids): \Illuminate\Support\Collection
+    {
+        $ids = collect($ids)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty() || ! \App\Models\ResortActivity::ready()) {
+            return collect();
+        }
+
+        return \App\Models\ResortActivity::query()
+            ->whereIn('id', $ids)
+            ->where('is_active', true)
+            ->where('is_bookable', true)
+            ->get();
+    }
+
+    private function exclusiveStayTotal(int $nights): float
+    {
+        $sum = $this->exclusiveNightlyRate();
+        if ($sum <= 0) {
+            throw new BookingConflictException('No accommodation units are currently configured in the system.');
+        }
+
+        return round($sum * max(1, $nights), 2);
+    }
+
+    /**
+     * @return array{0: string, 1: float, 2: float}
+     */
+    private function payableAmounts(float $total, string $method, array $data): array
+    {
+        $plan = 'full';
+        if (BookingRules::downPaymentEnabled() && PaymentMethod::allowsDownPayment($method) && ($data['payment_plan'] ?? 'full') === 'down') {
+            $plan = 'down';
+        }
+        $due = $plan === 'down' ? BookingRules::downPaymentDue($total) : $total;
+
+        return [$plan, $due, round($total - $due, 2)];
+    }
+
+    /** Amount due under the plan and percent saved on the payment when it was created. */
+    private function planDue(array $meta, float $total): float
+    {
+        if (($meta['payment_plan'] ?? 'full') !== 'down') {
+            return $total;
+        }
+
+        return BookingRules::downPaymentDue($total, (int) ($meta['down_payment_percent'] ?? 50));
+    }
+
+    private function paymentMetadata(array $data, string $method, string $plan, float $total, float $balance): array
+    {
+        return array_filter([
+            'source' => $data['booking_source'] ?? 'online',
+            'created_by' => $data['created_by'] ?? null,
+            'card_last_four' => PaymentMethod::isCard($method) ? ($data['card_last_four'] ?? null) : null,
+            'payment_plan' => $plan,
+            'down_payment_percent' => $plan === 'down' ? BookingRules::downPaymentPercent() : null,
+            'stay_total' => $total,
+            'balance' => $balance,
+            'gcash_method' => PaymentMethod::needsProof($method) ? (($data['gcash_method'] ?? 'receipt') === 'qr' ? 'qr' : 'receipt') : null,
+        ], fn ($value) => $value !== null && $value !== '');
+    }
+
     public function approvePayment(Payment $payment): Payment
     {
         if ($payment->status !== 'pending') {
@@ -413,14 +905,146 @@ class BookingService
         return $fresh;
     }
 
+    /**
+     * Decline a payment. A booking that was still waiting on this payment is cancelled
+     * so the room or cottage is released; a booking that is already paid or checked in is left alone.
+     */
     public function rejectPayment(Payment $payment): Payment
     {
-        $payment->update(['status' => 'failed']);
-        AuditLog::log('payment_rejected', $payment);
+        DB::transaction(function () use ($payment) {
+            $payment->update(['status' => 'failed']);
+            AuditLog::log('payment_rejected', $payment);
+
+            $booking = $payment->booking;
+            if ($booking && $booking->status === Booking::STATUS_PENDING) {
+                $this->cancel($booking, 'Payment declined by the resort.', 'booking_cancelled_payment_declined');
+            }
+        });
+
         $fresh = $payment->fresh(['booking']);
         if ($fresh->booking) {
             app(SupabaseSyncService::class)->pushBooking($fresh->booking);
         }
+
+        return $fresh;
+    }
+
+    /**
+     * Record money returned to the guest. Only for a declined payment the guest actually sent,
+     * or a payment on a cancelled booking. The resort sends the money itself (GCash, cash);
+     * this keeps the books and the guest in step.
+     *
+     * @throws InvalidBookingTransitionException
+     */
+    public function refundPayment(Payment $payment, float $amount, ?string $reference, ?string $note, ?\App\Models\User $by = null): Payment
+    {
+        $state = $payment->refundState();
+        if ($state === 'sent') {
+            throw new InvalidBookingTransitionException('A refund was already recorded for this payment.');
+        }
+        if (!in_array($state, ['due', 'available'], true)) {
+            throw new InvalidBookingTransitionException('Only a declined payment or a payment on a cancelled booking can be refunded. Cancel the booking first.');
+        }
+
+        $paid = $payment->paidAmount();
+        $amount = round($amount, 2);
+        if ($amount <= 0 || $amount > $paid) {
+            throw new InvalidBookingTransitionException('The refund must be more than ₱0 and no more than the ₱' . number_format($paid, 2) . ' the guest paid.');
+        }
+
+        DB::transaction(function () use ($payment, $amount, $paid, $reference, $note, $by) {
+            $old = ['status' => $payment->status, 'amount' => (float) $payment->amount];
+            $metadata = $payment->metadata ?? [];
+            $metadata['paid_amount'] = $paid;
+            $metadata['payment_status_before_refund'] = $payment->status;
+            $metadata['refund_amount'] = $amount;
+            $metadata['refund_percent'] = (int) round($amount / $paid * 100);
+            $metadata['kept_amount'] = round($paid - $amount, 2);
+            $metadata['refund_rule'] = $metadata['refund_rule'] ?? ($payment->status === 'failed' ? 'declined' : 'manual');
+            $metadata['refunded_at'] = now()->toIso8601String();
+            $metadata['refund_sent'] = [
+                'amount' => $amount,
+                'reference' => $reference ?: null,
+                'note' => $note ?: null,
+                'by' => $by?->name,
+                'by_id' => $by?->id,
+                'at' => now()->toIso8601String(),
+            ];
+
+            if ($payment->status === 'failed') {
+                $changes = ['status' => 'refunded', 'amount' => $amount];
+            } elseif ($amount >= $paid) {
+                $changes = ['status' => 'refunded', 'amount' => $paid];
+            } else {
+                $changes = ['status' => 'success', 'amount' => round($paid - $amount, 2)];
+            }
+
+            $payment->update($changes + ['metadata' => $metadata]);
+            AuditLog::log('payment_refunded', $payment, $old, $changes + ['refund' => $amount, 'reference' => $reference]);
+        });
+
+        $fresh = $payment->fresh(['booking']);
+        if ($fresh->booking) {
+            if ($fresh->booking->user_id) {
+                NotificationModel::notifyUser(
+                    $fresh->booking->user_id,
+                    'payment',
+                    'Refund sent',
+                    'The resort refunded ₱' . number_format($amount, 2) . " for booking {$fresh->booking->reference_no}"
+                        . ($reference ? " (reference {$reference})" : '') . '.',
+                    ['booking_id' => $fresh->booking_id, 'payment_id' => $fresh->id]
+                );
+            }
+            app(SupabaseSyncService::class)->pushBooking($fresh->booking);
+        }
+
+        return $fresh;
+    }
+
+    /**
+     * Record the rest of a down payment, paid later (usually at the resort).
+     * The amount is added to the payment and dated today, so revenue shows it on the day it came in.
+     *
+     * @throws InvalidBookingTransitionException
+     */
+    public function collectBalance(Payment $payment, float $amount, string $method, ?string $reference, ?\App\Models\User $by = null): Payment
+    {
+        $booking = $payment->booking;
+        if (!$booking || $payment->status !== 'success') {
+            throw new InvalidBookingTransitionException('Confirm the first payment before recording the balance.');
+        }
+        if ($booking->status === Booking::STATUS_CANCELLED) {
+            throw new InvalidBookingTransitionException('This booking is cancelled. Nothing more is owed.');
+        }
+
+        $due = $booking->balanceDue();
+        $amount = round($amount, 2);
+        if ($due <= 0) {
+            throw new InvalidBookingTransitionException('This booking is already fully paid.');
+        }
+        if ($amount <= 0 || $amount > $due) {
+            throw new InvalidBookingTransitionException('Enter an amount more than ₱0 and no more than the ₱' . number_format($due, 2) . ' still owed.');
+        }
+
+        DB::transaction(function () use ($payment, $amount, $method, $reference, $by) {
+            $old = ['amount' => (float) $payment->amount];
+            $metadata = $payment->metadata ?? [];
+            $metadata['balance_payments'] = array_merge($metadata['balance_payments'] ?? [], [[
+                'amount' => $amount,
+                'method' => $method,
+                'reference' => $reference ?: null,
+                'by' => $by?->name,
+                'by_id' => $by?->id,
+                'at' => now()->toIso8601String(),
+            ]]);
+            $metadata['balance'] = max(0, round((float) ($metadata['balance'] ?? 0) - $amount, 2));
+
+            $payment->update(['amount' => round((float) $payment->amount + $amount, 2), 'metadata' => $metadata]);
+            AuditLog::log('payment_balance_collected', $payment, $old, ['amount' => (float) $payment->amount, 'collected' => $amount, 'method' => $method, 'reference' => $reference]);
+        });
+
+        $fresh = $payment->fresh(['booking']);
+        app(SupabaseSyncService::class)->pushBooking($fresh->booking);
 
         return $fresh;
     }
@@ -448,6 +1072,10 @@ class BookingService
      */
     public function describeConflict(AccommodationUnit $unit, Booking $conflict): string
     {
+        if ($conflict->isHourly()) {
+            return "{$unit->unit_number} is already booked {$conflict->time_slot}.";
+        }
+
         $in  = $conflict->checkInDate()->format('M d, Y');
         $out = $conflict->checkOutDate()->format('M d, Y');
 
@@ -476,9 +1104,9 @@ class BookingService
 
     // ─── internals ───────────────────────────────────────────────────────────
 
-    protected function assertUnitAvailable(AccommodationUnit $unit, $checkIn, $checkOut, ?int $excludeId = null): void
+    protected function assertUnitAvailable(AccommodationUnit $unit, $checkIn, $checkOut, ?int $excludeId = null, ?string $hourStart = null, ?int $hours = null): void
     {
-        $conflict = Booking::getConflictingBooking($unit->id, $checkIn, $checkOut, $excludeId);
+        $conflict = Booking::getConflictingBooking($unit->id, $checkIn, $checkOut, $excludeId, $hourStart, $hours);
         if ($conflict) {
             throw new BookingConflictException($this->describeConflict($unit, $conflict), $conflict);
         }

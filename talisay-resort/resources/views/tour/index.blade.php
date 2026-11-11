@@ -4,81 +4,123 @@
 
 @section('content')
 
-{{-- Header --}}
-<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-    <div>
-        <div class="flex items-center gap-2 mb-1">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/80 text-sky-800 border border-sky-200">
-                <i class="bi bi-camera-video-fill text-[10px] text-sky-600"></i>
-                Virtual Experience
-            </span>
-        </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-1">
-            360° Virtual Tour Scenes
-        </h1>
-        <p class="text-sm text-slate-500 mb-0">
-            Upload and manage panoramic image scenes and video assets used in the interactive 360° virtual tour viewer.
-        </p>
-    </div>
+@php
+    $addOld = old('_form') === 'add_scene';
+    $editOld = old('_form') === 'edit_scene';
+    $typeLabel = fn ($asset) => $asset->type === 'video' ? 'Video' : ($asset->isPanorama() ? '360° photo' : 'Flat photo');
+@endphp
 
-    <div class="flex items-center gap-2">
-        <a href="{{ route('tour.viewer') }}" target="_blank" class="btn-secondary-clean text-xs">
-            <i class="bi bi-badge-vr text-sky-500"></i>
-            <span>Preview Virtual Tour</span>
+<div class="res-head">
+    <div>
+        <h1>{{ __('360° Virtual Tour') }}</h1>
+        <p>{{ __('Upload 360° photos and tour videos. Guests see the scenes marked as shown, in the order you set.') }}</p>
+    </div>
+    <div class="res-head-actions">
+        <a href="{{ route('tour.viewer') }}" target="_blank" rel="noopener" class="btn-secondary-clean">
+            <i class="bi bi-box-arrow-up-right"></i>
+            <span>{{ __('Preview tour') }}</span>
         </a>
-        <button class="btn-ocean text-xs" data-bs-toggle="modal" data-bs-target="#tourAssetModal">
-            <i class="bi bi-cloud-arrow-up-fill"></i>
-            <span>Upload Scene Asset</span>
+        <button type="button" class="btn-ocean" onclick="openAddTourModal()">
+            <i class="bi bi-plus-lg"></i>
+            <span>{{ __('Add scene') }}</span>
         </button>
     </div>
 </div>
 
-{{-- Assets Table Card --}}
+<div class="unit-stats">
+    <div>
+        <span>{{ __('Scenes') }}</span>
+        <strong>{{ $tourStats['total'] }}</strong>
+        <em>{{ __('In the tour list') }}</em>
+    </div>
+    <div>
+        <span>{{ __('Shown to guests') }}</span>
+        <strong class="{{ $tourStats['shown'] ? 'is-good' : '' }}">{{ $tourStats['shown'] }}</strong>
+        <em>{{ __('Visible in the tour') }}</em>
+    </div>
+    <div>
+        <span>{{ __('Hidden') }}</span>
+        <strong>{{ $tourStats['hidden'] }}</strong>
+        <em>{{ __('Not shown to guests') }}</em>
+    </div>
+    <div>
+        <span>{{ __('Photos') }}</span>
+        <strong class="{{ $tourStats['flat'] ? 'is-warn' : '' }}">{{ $tourStats['photos'] }}</strong>
+        <em>{{ $tourStats['flat'] ? $tourStats['flat'] . ' ' . __('shown') : __('All open in 360°') }}</em>
+    </div>
+    <div>
+        <span>{{ __('Videos') }}</span>
+        <strong>{{ $tourStats['videos'] }}</strong>
+        <em>{{ __('Play in Video tour') }}</em>
+    </div>
+</div>
+
 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-    <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-        <h3 class="font-bold text-sm text-slate-800 mb-0 flex items-center gap-2">
-            <i class="bi bi-collection-play text-sky-600"></i>
-            <span>Configured Tour Scenes ({{ $assets->total() }})</span>
-        </h3>
-        <span class="text-xs text-slate-400">Page {{ $assets->currentPage() }} of {{ $assets->lastPage() }}</span>
+    <div class="tour-list-head">
+        <div>
+            <h2>{{ __('Scenes') }}</h2>
+            <p>{{ __('Guests move through the scenes from the lowest order number to the highest.') }}</p>
+        </div>
+        <span class="unit-count">{{ $assets->total() }} {{ $assets->total() === 1 ? __('scene') : __('scenes') }}</span>
     </div>
 
     <div class="table-responsive">
-        <table class="table-clean">
+        <table class="table-clean unit-table tour-table">
             <thead>
                 <tr>
-                    <th>Scene Type</th>
-                    <th>Scene Title</th>
-                    <th>Media Type</th>
-                    <th>Order</th>
-                    <th>Actions</th>
+                    <th>{{ __('Order') }}</th>
+                    <th>{{ __('Scene') }}</th>
+                    <th>{{ __('Type') }}</th>
+                    <th>{{ __('Status') }}</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($assets as $asset)
-                <tr>
+                @php $isFlat = $asset->type === 'image' && ! $asset->isPanorama(); @endphp
+                <tr class="{{ $asset->is_active ? '' : 'tour-row-hidden' }}">
+                    <td><span class="tour-order">{{ $asset->sort_order }}</span></td>
                     <td>
-                        <div class="w-12 h-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center text-lg shadow-sm">
-                            <i class="bi bi-{{ $asset->type === 'video' ? 'play-circle-fill' : 'image-fill' }}"></i>
+                        <div class="unit-cell">
+                            <span class="tour-thumb">
+                                @if($asset->type === 'video' && $asset->mediaUrl())
+                                    <video src="{{ $asset->mediaUrl() }}#t=1" muted playsinline preload="metadata" aria-hidden="true"></video>
+                                    <i class="bi bi-play-fill tour-thumb-play"></i>
+                                @elseif($asset->mediaUrl())
+                                    <img src="{{ $asset->mediaUrl() }}" alt="" loading="lazy" onerror="this.outerHTML = '<i class=&quot;bi bi-image&quot;></i>'">
+                                @else
+                                    <i class="bi bi-image"></i>
+                                @endif
+                            </span>
+                            <div class="min-w-0">
+                                <div class="unit-name">{{ $asset->title }}</div>
+                                <div class="tour-desc">{{ $asset->description ?: 'No description' }}</div>
+                            </div>
                         </div>
                     </td>
                     <td>
-                        <div class="font-extrabold text-slate-900 text-xs">{{ $asset->title }}</div>
-                        <div class="text-[11px] text-slate-400">{{ $asset->panorama_path ?? 'Scene file' }}</div>
-                    </td>
-                    <td>
-                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                            {{ ucfirst($asset->type) }}
+                        <span class="tour-type {{ $asset->type === 'video' ? 'is-video' : ($isFlat ? 'is-flat' : 'is-pano') }}">
+                            <i class="bi bi-{{ $asset->type === 'video' ? 'play-circle' : ($isFlat ? 'image' : 'badge-vr') }}"></i>
+                            {{ __($typeLabel($asset)) }}
                         </span>
+                        <div class="res-note" title="{{ $asset->panorama_path }}">
+                            @if($isFlat)
+                                Not 2:1, so guests can't look around
+                            @else
+                                {{ \Illuminate\Support\Str::limit(basename((string) $asset->panorama_path), 28) }}
+                            @endif
+                        </div>
                     </td>
                     <td>
-                        <span class="font-mono text-xs font-bold text-slate-700">#{{ $asset->sort_order }}</span>
+                        @if($asset->is_active)
+                            <span class="res-status res-status-paid">{{ __('Shown') }}</span>
+                        @else
+                            <span class="res-status res-status-checked_out">{{ __('Hidden') }}</span>
+                        @endif
                     </td>
-                    <td>
-                        <div class="flex items-center gap-2">
-                            {{-- Edit button --}}
-                            <button type="button"
-                                    class="w-9 h-9 inline-flex items-center justify-center rounded-xl text-sky-500 bg-sky-50 hover:bg-sky-100 border border-sky-100 transition shadow-sm"
+                    <td class="text-end">
+                        <div class="unit-actions">
+                            <button type="button" class="res-icon-btn"
                                     data-id="{{ $asset->id }}"
                                     data-title="{{ $asset->title }}"
                                     data-description="{{ $asset->description }}"
@@ -87,17 +129,14 @@
                                     data-active="{{ $asset->is_active ? '1' : '0' }}"
                                     data-file="{{ basename($asset->panorama_path ?? '') }}"
                                     onclick="openEditTourModal(this)"
-                                    title="Edit Scene Asset">
-                                <i class="bi bi-pencil-fill text-sm"></i>
+                                    title="Edit scene" aria-label="Edit {{ $asset->title }}">
+                                <i class="bi bi-pencil"></i>
                             </button>
-                            {{-- Delete button --}}
-                            <form method="POST" action="{{ route('tour.manage.destroy', $asset) }}" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this scene asset?')">
+                            <form method="POST" action="{{ route('tour.manage.destroy', $asset) }}" class="m-0" onsubmit="return confirm('Delete this scene? Its file is removed too.')">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit"
-                                        class="w-9 h-9 inline-flex items-center justify-center rounded-xl text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-100 transition shadow-sm"
-                                        title="Delete Scene">
-                                    <i class="bi bi-trash-fill text-sm"></i>
+                                <button type="submit" class="res-icon-btn unit-delete" title="Delete scene" aria-label="Delete {{ $asset->title }}">
+                                    <i class="bi bi-trash"></i>
                                 </button>
                             </form>
                         </div>
@@ -106,8 +145,8 @@
                 @empty
                 <tr>
                     <td colspan="5" class="text-center py-12 text-slate-400">
-                        <i class="bi bi-camera-video text-3xl block mb-2 text-slate-300"></i>
-                        <p class="text-xs font-semibold mb-0">No 360-degree tour scenes uploaded yet.</p>
+                        <i class="bi bi-badge-vr text-3xl block mb-2 text-slate-300"></i>
+                        <p class="text-sm mb-0">No scenes yet. Add a 360° photo or a tour video to start the virtual tour.</p>
                     </td>
                 </tr>
                 @endforelse
@@ -116,146 +155,132 @@
     </div>
 
     @if($assets->hasPages())
-    <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+    <div class="p-4 border-t border-slate-100 flex justify-end">
         {{ $assets->links() }}
     </div>
     @endif
 </div>
 
-{{-- Upload Tour Asset Modal --}}
-<div class="modal fade" id="tourAssetModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
-                        <i class="bi bi-cloud-arrow-up-fill"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-extrabold text-base mb-0 tracking-tight">Upload 360° Scene Asset</h5>
-                        <p class="text-xs text-sky-200/70 mb-0 font-medium">Add high-resolution panorama or video tour scene</p>
-                    </div>
+{{-- Add scene --}}
+<div class="modal fade" id="tourAssetModal" tabindex="-1" aria-hidden="true" aria-labelledby="tourAssetModalTitle" @if($addOld && $errors->any()) data-reopen="1" @endif>
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content manual-modal">
+            <div class="manual-head">
+                <div>
+                    <h5 id="tourAssetModalTitle">Add scene</h5>
+                    <p>Upload a 360° photo or a tour video for guests to explore.</p>
                 </div>
-                <button type="button" class="text-white/70 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition" data-bs-dismiss="modal">
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
-
-            <form method="POST" action="{{ route('tour.manage.store') }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ route('tour.manage.store') }}" enctype="multipart/form-data" data-loading>
                 @csrf
-                <div class="modal-body p-6 bg-slate-50/50 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Scene Title</label>
-                        <input type="text" name="title" class="w-full form-control-clean text-xs" placeholder="Scene title" required>
+                <input type="hidden" name="_form" value="add_scene">
+                <div class="manual-body">
+                    @if($addOld && $errors->any())
+                    <div class="unit-modal-error">{{ $errors->first() }}</div>
+                    @endif
+                    <div class="manual-row">
+                        <label for="addTourTitle">Title</label>
+                        <input type="text" name="title" id="addTourTitle" class="form-control-clean w-100" placeholder="e.g. Beachfront cottages" value="{{ $addOld ? old('title') : '' }}" maxlength="255" required>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Description (Optional)</label>
-                        <textarea name="description" rows="2" class="w-full form-control-clean text-xs" placeholder="Brief description of this tour viewpoint..."></textarea>
+                    <div class="manual-row manual-row-top">
+                        <label for="addTourDescription">Description</label>
+                        <textarea name="description" id="addTourDescription" rows="2" class="form-control-clean w-100" placeholder="What guests see in this scene (optional)">{{ $addOld ? old('description') : '' }}</textarea>
                     </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Asset Type</label>
-                            <select name="type" class="w-full form-select-clean text-xs font-medium" required>
-                                <option value="image">360° Photo (Equirectangular)</option>
-                                <option value="video">360° Video</option>
+                    <div class="manual-row">
+                        <label for="addTourType">Type</label>
+                        <div class="manual-split">
+                            <select name="type" id="addTourType" class="form-select-clean w-100" data-file-input="addTourFile" data-file-hint="addTourFileHint" required>
+                                <option value="image" @selected($addOld && old('type') === 'image')>360° photo</option>
+                                <option value="video" @selected($addOld && old('type') === 'video')>Video</option>
                             </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Sort Order</label>
-                            <input type="number" name="sort_order" class="w-full form-control-clean text-xs font-mono" value="0" min="0" required>
+                            <div class="tour-order-field">
+                                <span>Order</span>
+                                <input type="number" name="sort_order" class="form-control-clean w-100" value="{{ $addOld ? old('sort_order') : ($tourStats['total'] + 1) }}" min="0" required aria-label="Order">
+                            </div>
                         </div>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Upload Panorama File (JPG / PNG)</label>
-                        <input type="file" name="panorama" class="w-full form-control-clean text-xs" accept="image/*,video/*" required>
-                        <span class="text-[10px] text-slate-400 mt-1 block">Equirectangular 2:1 panoramic format recommended (up to 10MB)</span>
+                    <div class="manual-row manual-row-top">
+                        <label for="addTourFile">File</label>
+                        <div>
+                            <input type="file" name="panorama" id="addTourFile" class="form-control-clean w-100" accept="image/jpeg,image/png,image/webp" required>
+                            <span class="manual-hint" id="addTourFileHint"></span>
+                        </div>
                     </div>
                 </div>
-
-                <div class="p-4 bg-white border-t border-slate-100 flex items-center justify-end gap-2">
-                    <button type="button" class="btn-secondary-clean text-xs px-4 py-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn-ocean text-xs px-5 py-2">Upload Asset</button>
+                <div class="manual-foot">
+                    <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-ocean"><i class="bi bi-cloud-arrow-up"></i> Upload scene</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-{{-- Edit Tour Asset Modal --}}
-<div class="modal fade" id="editTourAssetModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
-            <div class="p-5 bg-ocean-900 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-sky-300 text-lg">
-                        <i class="bi bi-pencil-square"></i>
-                    </div>
-                    <div>
-                        <h5 class="font-extrabold text-base mb-0 tracking-tight">Edit 360° Scene Asset</h5>
-                        <p class="text-xs text-sky-200/70 mb-0 font-medium">Update scene title, media file, order, or status</p>
-                    </div>
+{{-- Edit scene --}}
+<div class="modal fade" id="editTourAssetModal" tabindex="-1" aria-hidden="true" aria-labelledby="editTourAssetModalTitle">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content manual-modal">
+            <div class="manual-head">
+                <div>
+                    <h5 id="editTourAssetModalTitle">Edit scene</h5>
+                    <p>Change the details, replace the file, or hide the scene from guests.</p>
                 </div>
-                <button type="button" class="text-white/70 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition" data-bs-dismiss="modal">
+                <button type="button" class="manual-close" data-bs-dismiss="modal" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
-
-            <form id="editTourAssetForm" method="POST" action="" enctype="multipart/form-data">
+            <form id="editTourAssetForm" method="POST" action="" enctype="multipart/form-data" data-loading>
                 @csrf
                 @method('PUT')
-                <div class="modal-body p-6 bg-slate-50/50 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Scene Title <span class="text-rose-500">*</span></label>
-                        <input type="text" name="title" id="editTourTitle" class="w-full form-control-clean text-xs font-semibold" placeholder="Scene title" required>
+                <input type="hidden" name="_form" value="edit_scene">
+                <input type="hidden" name="_asset_id" id="editTourAssetId" value="">
+                <div class="manual-body">
+                    @if($editOld && $errors->any())
+                    <div class="unit-modal-error">{{ $errors->first() }}</div>
+                    @endif
+                    <div class="manual-row">
+                        <label for="editTourTitle">Title</label>
+                        <input type="text" name="title" id="editTourTitle" class="form-control-clean w-100" maxlength="255" required>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Description (Optional)</label>
-                        <textarea name="description" id="editTourDescription" rows="2" class="w-full form-control-clean text-xs" placeholder="Brief description of this tour viewpoint..."></textarea>
+                    <div class="manual-row manual-row-top">
+                        <label for="editTourDescription">Description</label>
+                        <textarea name="description" id="editTourDescription" rows="2" class="form-control-clean w-100" placeholder="What guests see in this scene (optional)"></textarea>
                     </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Asset Type <span class="text-rose-500">*</span></label>
-                            <select name="type" id="editTourType" class="w-full form-select-clean text-xs font-medium" required>
-                                <option value="image">360° Photo (Equirectangular)</option>
-                                <option value="video">360° Video</option>
+                    <div class="manual-row">
+                        <label for="editTourType">Type</label>
+                        <div class="manual-split">
+                            <select name="type" id="editTourType" class="form-select-clean w-100" data-file-input="editTourFile" data-file-hint="editTourFileHint" required>
+                                <option value="image">360° photo</option>
+                                <option value="video">Video</option>
                             </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Sort Order <span class="text-rose-500">*</span></label>
-                            <input type="number" name="sort_order" id="editTourOrder" class="w-full form-control-clean text-xs font-mono" min="0" required>
+                            <div class="tour-order-field">
+                                <span>Order</span>
+                                <input type="number" name="sort_order" id="editTourOrder" class="form-control-clean w-100" min="0" required aria-label="Order">
+                            </div>
                         </div>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Status</label>
-                        <select name="is_active" id="editTourActive" class="w-full form-select-clean text-xs font-medium">
-                            <option value="1">Active (Visible in Virtual Tour)</option>
-                            <option value="0">Inactive (Hidden from Guests)</option>
+                    <div class="manual-row">
+                        <label for="editTourActive">Status</label>
+                        <select name="is_active" id="editTourActive" class="form-select-clean w-100">
+                            <option value="1">{{ __('Shown to guests') }}</option>
+                            <option value="0">{{ __('Hidden from guests') }}</option>
                         </select>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Replace Panorama File (Optional)</label>
-                        <input type="file" name="panorama" class="w-full form-control-clean text-xs" accept="image/*,video/*">
-                        <div class="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <i class="bi bi-paperclip text-sky-600"></i>
-                            <span>Current file: <strong id="editTourCurrentFile" class="font-mono text-slate-700"></strong></span>
+                    <div class="manual-row manual-row-top">
+                        <label for="editTourFile">Replace file</label>
+                        <div>
+                            <div class="tour-current-file"><i class="bi bi-paperclip"></i> <span id="editTourCurrentFile"></span></div>
+                            <input type="file" name="panorama" id="editTourFile" class="form-control-clean w-100" accept="image/jpeg,image/png,image/webp">
+                            <span class="manual-hint" id="editTourFileHint"></span>
                         </div>
-                        <span class="text-[10px] text-slate-400 mt-0.5 block">Leave empty to keep the current file.</span>
                     </div>
                 </div>
-
-                <div class="p-4 bg-white border-t border-slate-100 flex items-center justify-end gap-2">
-                    <button type="button" class="btn-secondary-clean text-xs px-4 py-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn-ocean text-xs px-5 py-2 flex items-center gap-1.5">
-                        <i class="bi bi-check-circle-fill"></i>
-                        <span>Save Changes</span>
-                    </button>
+                <div class="manual-foot">
+                    <button type="button" class="btn-secondary-clean" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-ocean"><i class="bi bi-check-lg"></i> Save changes</button>
                 </div>
             </form>
         </div>
@@ -264,28 +289,67 @@
 
 @push('scripts')
 <script>
+const tourFileRules = {
+    image: {
+        accept: 'image/jpeg,image/png,image/webp',
+        hint: 'JPG, PNG, or WebP up to 50 MB. Use a 2:1 panorama (for example 4000 × 2000) so guests can look around; other sizes show as a flat photo.'
+    },
+    video: {
+        accept: 'video/mp4,video/webm,video/ogg',
+        hint: 'MP4, WebM, or OGV up to 50 MB. Videos play in the Video tour tab.'
+    }
+};
+
+function syncTourFileRules(select) {
+    const rule = tourFileRules[select.value] || tourFileRules.image;
+    const input = document.getElementById(select.dataset.fileInput);
+    const hint = document.getElementById(select.dataset.fileHint);
+    if (input) input.accept = rule.accept;
+    if (hint) hint.textContent = rule.hint;
+}
+
+document.querySelectorAll('[data-file-input]').forEach(function (select) {
+    syncTourFileRules(select);
+    select.addEventListener('change', function () { syncTourFileRules(select); });
+});
+
+function openAddTourModal() {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('tourAssetModal')).show();
+}
+
 function openEditTourModal(btn) {
     const id = btn.getAttribute('data-id');
-    const title = btn.getAttribute('data-title');
-    const description = btn.getAttribute('data-description') || '';
-    const type = btn.getAttribute('data-type');
-    const order = btn.getAttribute('data-order');
-    const active = btn.getAttribute('data-active');
-    const file = btn.getAttribute('data-file') || 'None';
-
-    const form = document.getElementById('editTourAssetForm');
-    form.action = `/tour-manage/${id}`;
-
-    document.getElementById('editTourTitle').value = title;
-    document.getElementById('editTourDescription').value = description;
-    document.getElementById('editTourType').value = type;
-    document.getElementById('editTourOrder').value = order;
-    document.getElementById('editTourActive').value = active;
-    document.getElementById('editTourCurrentFile').textContent = file;
-
-    const modal = new bootstrap.Modal(document.getElementById('editTourAssetModal'));
-    modal.show();
+    document.getElementById('editTourAssetForm').action = `/tour-manage/${id}`;
+    document.getElementById('editTourAssetId').value = id;
+    document.getElementById('editTourTitle').value = btn.getAttribute('data-title');
+    document.getElementById('editTourDescription').value = btn.getAttribute('data-description') || '';
+    document.getElementById('editTourType').value = btn.getAttribute('data-type');
+    document.getElementById('editTourOrder').value = btn.getAttribute('data-order');
+    document.getElementById('editTourActive').value = btn.getAttribute('data-active');
+    document.getElementById('editTourCurrentFile').textContent = btn.getAttribute('data-file') || 'None';
+    document.getElementById('editTourFile').value = '';
+    syncTourFileRules(document.getElementById('editTourType'));
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editTourAssetModal')).show();
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('tourAssetModal').dataset.reopen === '1') {
+        openAddTourModal();
+    }
+    @if($editOld && $errors->any())
+    const failedEdit = document.querySelector('[data-id="{{ (int) old('_asset_id') }}"]');
+    if (failedEdit) {
+        openEditTourModal(failedEdit);
+        const typed = {{ Js::from(collect(old())->only(['title', 'description', 'type', 'sort_order', 'is_active'])) }};
+        document.getElementById('editTourTitle').value = typed.title ?? '';
+        document.getElementById('editTourDescription').value = typed.description ?? '';
+        document.getElementById('editTourType').value = typed.type ?? 'image';
+        document.getElementById('editTourOrder').value = typed.sort_order ?? '';
+        document.getElementById('editTourActive').value = typed.is_active ?? '1';
+        syncTourFileRules(document.getElementById('editTourType'));
+    }
+    @endif
+});
 </script>
 @endpush
 

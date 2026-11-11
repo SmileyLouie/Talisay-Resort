@@ -2,41 +2,94 @@
 @extends('layouts.guest')
 
 {{-- Sets the browser tab title specifically for this registration page --}}
-@section('title', 'Sign Up - Talisay Beach Resort')
+@section('title', 'Create an account – Talisay Beach Resort')
 
 @push('styles')
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
 <style>
 /* ── Reset & Page Setup ───────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
 body {
-    background: #ffffff;
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #1c1e21;
+    background: #082f49;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    color: #0f172a;
     min-height: 100vh;
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;
 }
 
-/* ── Fullscreen Centered Container ────────────────────────────── */
+.auth-split-screen { display: flex; height: 100vh; width: 100%; overflow: hidden; }
+.auth-hero-panel {
+    position: relative; flex: 1.15; min-height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 30px 36px; z-index: 1;
+}
+.auth-hero-bg {
+    position: absolute; inset: 0;
+    background-image: url('/images/hero-landing.jpg');
+    background-size: cover; background-position: center 40%;
+    transform: scale(1.04); z-index: 0;
+}
+.auth-hero-overlay {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(to top, rgba(8, 47, 73, .94) 0%, rgba(8, 47, 73, .38) 50%, rgba(8, 47, 73, .78) 100%);
+}
+.auth-hero-top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; }
+.auth-back-btn, .auth-hero-brand-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.12); backdrop-filter: blur(12px);
+    color: #fff; font-size: 13px; font-weight: 600;
+    padding: 8px 16px; border-radius: 9999px; text-decoration: none;
+    border: 1px solid rgba(255,255,255,.25);
+}
+.auth-hero-brand-pill { padding: 6px 16px 6px 12px; }
+.auth-hero-logo-img { width: 26px; height: 26px; object-fit: contain; }
+.auth-hero-content { position: relative; z-index: 2; max-width: 620px; color: #fff; }
+.auth-hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22);
+    color: #e2e8f0; font-size: 12px; font-weight: 600; padding: 5px 14px;
+    border-radius: 9999px; margin-bottom: 12px;
+}
+.badge-dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; }
+.auth-hero-title { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(2rem, 3.2vw, 3rem); font-weight: 700; line-height: 1.15; margin-bottom: 10px; }
+.auth-hero-title span { color: #fde68a; }
+.auth-hero-subtitle { font-size: 14.5px; color: rgba(255,255,255,.78); line-height: 1.55; margin-bottom: 18px; max-width: 520px; }
+.auth-hero-features { display: flex; flex-wrap: wrap; gap: 8px; }
+.feature-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+    color: #e2e8f0; font-size: 11.5px; font-weight: 500; padding: 5px 12px; border-radius: 8px;
+}
+.feature-tag i { color: #f59e0b; }
+
 .fb-reg-wrapper {
-    min-height: 100vh;
+    flex: 0 0 42%;
+    min-width: 520px;
+    max-width: 640px;
+    height: 100vh;
     width: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     justify-content: flex-start;
-    padding: 24px 20px 48px 20px;
+    padding: 28px 40px 48px;
     background: #ffffff;
+    overflow-y: auto;
+    box-shadow: -12px 0 50px rgba(8, 47, 73, .25);
 }
 
 .fb-reg-card {
     width: 100%;
-    max-width: 580px;
+    max-width: none;
     margin: 0 auto;
 }
 
@@ -64,7 +117,7 @@ body {
 
 .fb-back-arrow:hover {
     background: #e4e6eb;
-    color: #0284c7;
+    color: #0c4a6e;
     transform: translateX(-2px);
 }
 
@@ -74,11 +127,11 @@ body {
     gap: 8px;
     font-size: 12.5px;
     font-weight: 700;
-    color: #0284c7;
-    background: #e0f2fe;
+    color: #0c4a6e;
+    background: #f0f7fb;
     padding: 6px 14px;
     border-radius: 9999px;
-    border: 1px solid #bae6fd;
+    border: 1px solid #d7e6f0;
 }
 
 .fb-brand-badge img {
@@ -124,11 +177,12 @@ body {
 }
 
 .fb-title {
-    font-size: 28px;
-    font-weight: 800;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 30px;
+    font-weight: 700;
     color: #0f172a;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     margin: 0 0 8px 0;
 }
 
@@ -187,7 +241,7 @@ body {
 }
 
 .fb-help-icon:hover {
-    color: #0284c7;
+    color: #0c4a6e;
 }
 
 /* ── Inputs & Selects ─────────────────────────────────────────── */
@@ -214,8 +268,8 @@ body {
 }
 
 .fb-input:focus {
-    border-color: #0284c7;
-    box-shadow: 0 0 0 4px rgba(0, 132, 180, 0.12);
+    border-color: #0c4a6e;
+    box-shadow: 0 0 0 4px rgba(12, 74, 110, 0.12);
 }
 
 .fb-select-wrap {
@@ -245,8 +299,8 @@ body {
 }
 
 .fb-select:focus {
-    border-color: #0284c7;
-    box-shadow: 0 0 0 4px rgba(0, 132, 180, 0.12);
+    border-color: #0c4a6e;
+    box-shadow: 0 0 0 4px rgba(12, 74, 110, 0.12);
 }
 
 .fb-select-arrow {
@@ -300,8 +354,8 @@ body {
 }
 
 .fb-gender-card.active {
-    border-color: #0284c7;
-    background: #f0f9ff;
+    border-color: #0c4a6e;
+    background: #f0f7fb;
 }
 
 .fb-gender-card input[type="radio"] {
@@ -317,7 +371,7 @@ body {
 }
 
 .fb-gender-card.active .fb-gender-text {
-    color: #0284c7;
+    color: #0c4a6e;
 }
 
 .fb-gender-circle {
@@ -330,14 +384,14 @@ body {
 }
 
 .fb-gender-card.active .fb-gender-circle {
-    border-color: #0284c7;
+    border-color: #0c4a6e;
 }
 
 .fb-gender-card.active .fb-gender-circle::after {
     content: '';
     position: absolute;
     inset: 3px;
-    background: #0284c7;
+    background: #0c4a6e;
     border-radius: 50%;
 }
 
@@ -350,6 +404,12 @@ body {
 
 .fb-input-with-eye .fb-input {
     padding-right: 48px;
+}
+
+/* Edge and Chrome add their own reveal control beside this button. */
+.fb-input-with-eye input::-ms-reveal,
+.fb-input-with-eye input::-ms-clear {
+    display: none;
 }
 
 .fb-eye-btn {
@@ -368,7 +428,7 @@ body {
 }
 
 .fb-eye-btn:hover {
-    color: #0284c7;
+    color: #0c4a6e;
 }
 
 /* ── Password Strength Bar ────────────────────────────────────── */
@@ -433,7 +493,7 @@ body {
 }
 
 .fb-disclaimer a {
-    color: #0284c7;
+    color: #0c4a6e;
     text-decoration: none;
     font-weight: 600;
 }
@@ -447,7 +507,7 @@ body {
     width: 100%;
     height: 52px;
     border-radius: 9999px;
-    background: #0284c7;
+    background: #f59e0b;
     border: none;
     color: #ffffff;
     font-size: 16px;
@@ -458,15 +518,15 @@ body {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    box-shadow: 0 4px 16px rgba(0, 132, 180, 0.25);
+    box-shadow: 0 10px 24px rgba(245, 158, 11, 0.35);
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     font-family: inherit;
     margin-top: 10px;
 }
 
 .fb-btn-submit:hover {
-    background: #00739e;
-    box-shadow: 0 6px 20px rgba(0, 132, 180, 0.35);
+    background: #d97706;
+    box-shadow: 0 14px 28px rgba(245, 158, 11, 0.4);
     transform: translateY(-1px);
     color: #ffffff;
 }
@@ -506,12 +566,21 @@ body {
 }
 
 .fb-btn-login:hover {
-    background: #f8fafc;
-    border-color: #0284c7;
-    color: #0284c7;
+    background: #0c4a6e;
+    border-color: #0c4a6e;
+    color: #ffffff;
 }
 
 /* ── Responsive adjustments ───────────────────────────────────── */
+@media (max-width: 960px) {
+    .auth-split-screen { flex-direction: column; }
+    .auth-hero-panel { min-height: 240px; flex: none; padding: 20px; }
+    .auth-hero-subtitle, .auth-hero-features { display: none; }
+    .auth-hero-title { font-size: 1.7rem; }
+    .fb-reg-wrapper { flex: none; min-width: 0; max-width: none; height: auto; padding: 24px 20px 48px; box-shadow: none; }
+    html, body { overflow: auto; height: auto; }
+    .auth-split-screen { height: auto; overflow: visible; }
+}
 @media (max-width: 600px) {
     .fb-reg-wrapper {
         padding: 16px 14px 36px 14px;
@@ -534,32 +603,24 @@ body {
 @endpush
 
 @section('content')
+<div class="auth-split-screen">
+    @include('auth.partials.auth-hero')
 <div class="fb-reg-wrapper">
     <div class="fb-reg-card">
-
-        {{-- Top Navigation: Back Button & Resort Badge --}}
-        <div class="fb-top-nav">
-            <a href="{{ route('home') }}" class="fb-back-arrow" title="Back to Home">
-                <i class="bi bi-chevron-left"></i>
-            </a>
-            <div class="fb-brand-badge">
-                <img src="{{ asset('images/logo.png') }}" alt="Talisay Beach Resort">
-                <span>Talisay Beach Resort</span>
-            </div>
-        </div>
 
         {{-- Header Section --}}
         <div class="fb-header">
             <div class="fb-brand-logo-row">
                 <img src="{{ asset('images/logo.png') }}" alt="Talisay Logo" class="fb-brand-logo">
                 <div>
-                    <div class="fb-brand-title">Talisay Beach Resort</div>
+                    <div class="fb-brand-title">{{ setting('resort_name', 'Talisay Beach Resort') }}</div>
                     <div class="fb-brand-subtitle">Smart Tourism System</div>
                 </div>
             </div>
-            <h1 class="fb-title">Get started on Talisay Beach Resort</h1>
-            <p class="fb-subtitle">An account lets you reserve cottages, track bookings, and explore 360° virtual tours easily and securely.</p>
+            <h1 class="fb-title">Create an account</h1>
+            <p class="fb-subtitle">Reserve rooms and cottages, keep your bookings on your phone, and take the 360° tour before you arrive.</p>
         </div>
+        @include('auth.partials.social-buttons', ['socialFrom' => 'register', 'socialDivider' => 'after'])
 
         {{-- Error Alerts --}}
         @if($errors->any())
@@ -582,6 +643,7 @@ body {
 
             {{-- Hidden consolidated name field synced via JS --}}
             <input type="hidden" name="name" id="hiddenFullName" value="{{ old('name') }}">
+            <input type="hidden" name="redirect" value="{{ old('redirect', request('redirect')) }}">
 
             {{-- 1. Name: First name & Last name side-by-side --}}
             <div class="fb-field-group">
@@ -774,17 +836,14 @@ body {
 
 
 
-            {{-- Explanatory notice & Terms --}}
             <p class="fb-disclaimer">
-                People who use our service may have uploaded your contact information to Talisay Beach Resort.
-                By clicking <strong>Submit</strong>, you agree to our
-                <a href="{{ route('home') }}#rules">Terms of Service</a> and
-                <a href="{{ route('home') }}#privacy">Privacy Policy</a>.
+                By creating an account you agree to the booking and cancellation rules of {{ setting('resort_name', 'Talisay Beach Resort') }}.
             </p>
 
             {{-- Submit Button --}}
             <button type="submit" class="fb-btn-submit" id="submitRegisterBtn">
-                <span>Submit</span>
+                <i class="bi bi-person-plus"></i>
+                <span>Create account</span>
             </button>
         </form>
 
@@ -797,6 +856,7 @@ body {
         </div>
 
     </div>
+</div>
 </div>
 @endsection
 
@@ -956,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', function () {
             syncFullName();
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Submitting...';
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Creating account...';
             }
         });
     }

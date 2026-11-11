@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'unit_number',
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
     'images',
     'tour_video_path',
     'price_per_night',
+    'price_per_hour',
     'is_available',
     'sort_order',
 ])]
@@ -30,7 +33,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AccommodationUnit extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected function casts(): array
     {
@@ -39,13 +42,43 @@ class AccommodationUnit extends Model
             'images'          => 'array',
             'is_available'    => 'boolean',
             'price_per_night' => 'decimal:2',
-            'floor_area_sqm'  => 'decimal:1',
+            'price_per_hour'  => 'decimal:2',
         ];
+    }
+
+    /**
+     * A blank floor area is stored as null. An empty string cannot be cast as a decimal
+     * and was crashing the rooms page after a unit was saved.
+     */
+    protected function floorAreaSqm(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value === null || $value === '') {
+                    return null;
+                }
+
+                return number_format((float) $value, 1, '.', '');
+            },
+            set: fn ($value) => ($value === null || $value === '') ? null : $value,
+        );
     }
 
     // ──────────────────────────────────────────────────────────
     // RELATIONSHIPS
     // ──────────────────────────────────────────────────────────
+
+    /**
+     * The hourly rate saved on the unit. Older units without one use one twelfth of the nightly rate.
+     */
+    public function hourlyRate(): float
+    {
+        if ($this->price_per_hour !== null && $this->price_per_hour !== '') {
+            return round((float) $this->price_per_hour, 2);
+        }
+
+        return round((float) $this->price_per_night / 12, 2);
+    }
 
     public function bookings()
     {
@@ -67,11 +100,12 @@ class AccommodationUnit extends Model
 
     public function getVariantLabelAttribute(): string
     {
-        return match($this->variant) {
-            'normal'  => 'Normal',
-            'premium' => 'Premium',
-            default   => ucfirst($this->variant),
-        };
+        return UnitVariant::labelFor($this->variant);
+    }
+
+    public function isDeluxeVariant(): bool
+    {
+        return UnitVariant::isDeluxe($this->variant);
     }
 
     public function getFirstImageAttribute(): ?string
@@ -101,8 +135,21 @@ class AccommodationUnit extends Model
         return $query->where('unit_type', 'cottage');
     }
 
+    public function scopeNormal($query)
+    {
+        $slugs = UnitVariant::ready()
+            ? UnitVariant::query()->where('is_deluxe', false)->pluck('slug')->all()
+            : ['normal'];
+
+        return $query->whereIn('variant', $slugs ?: ['normal']);
+    }
+
     public function scopePremium($query)
     {
-        return $query->where('variant', 'premium');
+        $slugs = UnitVariant::ready()
+            ? UnitVariant::query()->where('is_deluxe', true)->pluck('slug')->all()
+            : ['premium'];
+
+        return $query->whereIn('variant', $slugs ?: ['premium']);
     }
 }

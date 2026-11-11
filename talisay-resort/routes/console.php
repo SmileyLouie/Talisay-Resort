@@ -1,7 +1,6 @@
 <?php
 
-use App\Models\Booking;
-use App\Services\BookingService;
+use App\Services\AutomationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -10,29 +9,33 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('bookings:expire-unpaid {--hours=48}', function () {
-    $hours = (int) $this->option('hours');
-    $cutoff = now()->subHours(max(1, $hours));
-    $service = app(BookingService::class);
+Artisan::command('resort:automate {group=all : frequent, hourly, daily, or all}', function () {
+    $service = app(AutomationService::class);
+    $group = (string) $this->argument('group');
+    $groups = $group === 'all' ? ['frequent', 'hourly', 'daily'] : [$group];
 
-    $expired = Booking::where('status', Booking::STATUS_PENDING)
-        ->where('booking_type', 'regular')
-        ->where('created_at', '<', $cutoff)
-        ->whereDoesntHave('payment', function ($q) {
-            $q->where(function ($inner) {
-                $inner->where('status', 'success')->orWhereNotNull('proof_path');
-            });
-        })
-        ->get();
+    foreach ($groups as $name) {
+        if (! in_array($name, ['frequent', 'hourly', 'daily'], true)) {
+            $this->error("Unknown group {$name}. Use frequent, hourly, daily, or all.");
 
-    foreach ($expired as $booking) {
-        $service->cancel($booking, 'Automatically released after unpaid hold expired.', 'booking_expired_unpaid');
+            return 1;
+        }
+        foreach ($service->{'run' . ucfirst($name)}() as $job => $count) {
+            $this->line(str_pad(str_replace('_', ' ', $job), 22) . $count);
+        }
     }
 
-    $this->info("Released {$expired->count()} unpaid reservation(s).");
-})->purpose('Release rooms held by unpaid pending bookings');
+    return 0;
+})->purpose('Run the resort automation jobs (holds, no-shows, check-outs, reminders, cleanup)');
 
-Schedule::command('bookings:expire-unpaid')->hourly();
+Artisan::command('bookings:expire-unpaid', function () {
+    $released = app(AutomationService::class)->releaseUnpaidHolds();
+    $this->info("Released {$released} unpaid reservation(s).");
+})->purpose('Release rooms held by unpaid online bookings (uses the hold time in System Settings)');
+
+Schedule::command('resort:automate frequent')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('resort:automate hourly')->hourly()->withoutOverlapping(10);
+Schedule::command('resort:automate daily')->dailyAt('03:00')->withoutOverlapping(10);
 
 Artisan::command('integration:retry', function () {
     $done = app(\App\Services\SupabaseSyncService::class)->retryPending();

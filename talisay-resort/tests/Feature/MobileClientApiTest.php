@@ -36,6 +36,11 @@ class MobileClientApiTest extends TestCase
         $this->assertNotEmpty($token);
         $this->assertSame('tourist', User::where('email', 'ana.mobile@example.com')->value('role'));
 
+        $this->getJson('/api/mobile/site')
+            ->assertOk()
+            ->assertJsonPath('resort.name', 'Talisay Beach Resort')
+            ->assertJsonStructure(['about' => ['story', 'vision', 'mission'], 'gallery', 'activities', 'reviews', 'resort' => ['address', 'opens', 'closes']]);
+
         $this->getJson('/api/mobile/units')
             ->assertOk()
             ->assertJsonPath('units.0.unit_number', 'Cottage 01');

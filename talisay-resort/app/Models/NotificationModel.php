@@ -160,6 +160,14 @@ class NotificationModel extends Model
         }
     }
 
+    /** Notify Admin and Staff only when the matching Notifications setting is on. */
+    public static function notifyAdminsAndStaffIf(bool $enabled, string $type, string $title, string $message, ?array $data = null): void
+    {
+        if ($enabled) {
+            self::notifyAdminsAndStaff($type, $title, $message, $data);
+        }
+    }
+
     /**
      * Send an in-app notification to all Admin users only.
      */

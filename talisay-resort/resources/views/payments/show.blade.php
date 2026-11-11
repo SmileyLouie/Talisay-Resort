@@ -4,162 +4,352 @@
 
 @section('content')
 
-<div class="mb-6">
-    <a href="{{ route('payments.index') }}" class="btn-secondary-clean text-xs">
-        <i class="bi bi-arrow-left"></i>
-        <span>Back to Payments</span>
-    </a>
+@php
+    $booking = $payment->booking;
+    $meta = $payment->metadata ?? [];
+    $statusLabels = ['pending' => 'Pending', 'success' => 'Paid', 'failed' => 'Failed', 'refunded' => 'Refunded'];
+    $method = \App\Models\PaymentMethod::lookup($payment->gateway);
+    $methodName = $method->name ?? \Illuminate\Support\Str::headline((string) ($payment->gateway ?: 'Unknown'));
+    $methodIcon = $method->icon ?? 'bi-credit-card';
+    $receiptNo = $payment->guestReference();
+    $proof = $payment->proofUrl();
+    $canVerify = auth()->user()->isAdmin() || auth()->user()->hasPermission('payments', 'verify');
+    $plan = $meta['payment_plan'] ?? null;
+    $paidAmount = $payment->paidAmount();
+    $refundState = $payment->refundState();
+    $refundSent = $payment->refundSent();
+    $canRefund = auth()->user()->isAdmin() || auth()->user()->hasPermission('payments', 'refund');
+    $balanceParts = $payment->balancePayments();
+    $balanceCollected = round(collect($balanceParts)->sum('amount'), 2);
+    $balanceDue = $booking ? $booking->balanceDue() : 0;
+    $canCollect = $canVerify && $booking && $payment->status === 'success' && $booking->status !== \App\Models\Booking::STATUS_CANCELLED && $balanceDue > 0;
+
+    $stay = null;
+    if ($booking) {
+        if ($booking->isHourly() && $booking->hour_start) {
+            [$in, $out] = $booking->stayWindow();
+            $hours = max(1, (int) $booking->hours_count);
+            $stay = $in->format('M j, Y').' · '.$in->format('g:i A').' – '.$out->format('g:i A').' ('.$hours.' '.($hours === 1 ? 'hour' : 'hours').')';
+        } else {
+            $nights = max(1, (int) $booking->nights_count);
+            $stay = $booking->checkInDate()->format('M j, Y').' → '.$booking->checkOutDate()->format('M j, Y').' · '.$nights.' '.($nights === 1 ? 'night' : 'nights');
+        }
+    }
+    $guestName = $booking?->guest_name ?: ($booking?->user?->name ?? 'Guest');
+    $guestEmail = $booking?->user?->email;
+    $guestPhone = $booking?->guest_contact_manual ?: $booking?->user?->phone;
+    $initials = collect(preg_split('/\s+/', trim($guestName)))->filter()->take(2)->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))->implode('');
+@endphp
+
+<a href="{{ route('payments.index') }}" class="pay-back"><i class="bi bi-arrow-left"></i> Payments</a>
+
+<div class="res-head">
+    <div>
+        <h1 class="detail-title">
+            Payment for {{ $booking->reference_no ?? 'booking' }}
+            @if($refundState === 'due')
+            <span class="res-status pay-status-pending">Refund due</span>
+            @else
+            <span class="res-status pay-status-{{ $payment->status }}">{{ $statusLabels[$payment->status] ?? ucfirst($payment->status) }}</span>
+            @endif
+        </h1>
+        <p>{{ $methodName }} · logged {{ $payment->created_at->format('M j, Y \a\t g:i A') }}</p>
+    </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-    {{-- Payment Details Main Card --}}
-    <div class="lg:col-span-8 space-y-6">
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-                <div>
-                    <h2 class="text-lg font-extrabold text-slate-900 tracking-tight mb-0.5">Transaction Overview</h2>
-                    <p class="text-xs text-slate-400 mb-0">Record logged in the resort payment gateway</p>
-                </div>
-                @php
-                    $sc = [
-                        'success'  => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                        'pending'  => 'bg-amber-50 text-amber-700 border-amber-200',
-                        'failed'   => 'bg-rose-50 text-rose-700 border-rose-200',
-                        'refunded' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                    ];
-                @endphp
-                <span class="px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 {{ $sc[$payment->status] ?? 'bg-slate-100 text-slate-700' }}">
-                    <i class="bi bi-{{ $payment->status === 'success' ? 'check-circle-fill text-emerald-500' : ($payment->status === 'failed' ? 'x-circle-fill text-rose-500' : 'clock-fill text-amber-500') }}"></i>
-                    {{ ucfirst($payment->status) }}
-                </span>
+<div class="pay-detail">
+    <div class="pay-detail-main">
+        <section class="pay-card">
+            <div class="pay-amount-box">
+                <span>{{ $plan === 'down' && ! $balanceParts ? 'Down payment' : 'Amount' }}</span>
+                <strong>₱{{ number_format($paidAmount, 2) }}</strong>
+                @if($balanceParts)
+                    <em>
+                        Includes ₱{{ number_format($balanceCollected, 2) }} balance collected
+                        {{ \Carbon\Carbon::parse(end($balanceParts)['at'])->timezone(config('app.timezone'))->format('M j, Y') }}.
+                        {{ $balanceDue > 0 ? '₱'.number_format($balanceDue, 2).' is still owed.' : 'The stay is fully paid.' }}
+                    </em>
+                @elseif($plan === 'down')
+                    <em>{{ (int) ($meta['down_payment_percent'] ?? 50) }}% down payment. Balance of ₱{{ number_format((float) ($meta['balance'] ?? 0), 2) }} is paid at the resort.</em>
+                @elseif($plan === 'full')
+                    <em>Full payment{{ ($meta['gcash_method'] ?? null) === 'qr' ? ' · guest paid through the GCash QR' : '' }}</em>
+                @elseif(($meta['gcash_method'] ?? null) === 'qr')
+                    <em>Guest paid through the GCash QR</em>
+                @endif
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Transaction ID</span>
-                    <span class="font-mono text-xs font-extrabold text-slate-800">{{ $payment->transaction_id ?? 'N/A' }}</span>
-                </div>
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Amount Paid</span>
-                    <span class="text-xl font-extrabold text-emerald-600">₱{{ number_format($payment->amount, 2) }}</span>
-                </div>
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Gateway Method</span>
-                    <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <i class="bi bi-credit-card text-sky-600"></i>
-                        {{ ucfirst(str_replace('_', ' ', $payment->gateway ?? 'N/A')) }}
+            <div class="manual-row">
+                <label>Method</label>
+                <div class="detail-value">
+                    <span class="pay-method"><i class="bi {{ $methodIcon }}"></i> {{ $methodName }}</span>
+                    @if($method && \App\Models\PaymentMethod::needsProof($payment->gateway) && $method->receivingNumber() !== '')
+                    <span class="manual-hint">
+                        Paid to {{ $method->receivingName() !== '' ? $method->receivingName() : $method->name }}
+                        · {{ $method->receivingNumber() }}
                     </span>
-                </div>
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Timestamp</span>
-                    <span class="text-xs font-bold text-slate-800">{{ $payment->created_at->format('M d, Y • h:i A') }}</span>
+                    @endif
                 </div>
             </div>
-
-            {{-- Booking Details Group --}}
-            <div class="pt-4 border-t border-slate-100">
-                <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <i class="bi bi-calendar2-check text-sky-600"></i>
-                    <span>Linked Reservation</span>
-                </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                        <span class="text-slate-400 block mb-0.5">Booking Reference</span>
-                        <span class="font-mono font-extrabold text-sky-600 text-sm">{{ $payment->booking->reference_no ?? '—' }}</span>
-                    </div>
-                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                        <span class="text-slate-400 block mb-0.5">Room &amp; Cottage</span>
-                        <span class="font-bold text-slate-800">{{ $payment->booking->accommodationUnit->unit_number ?? 'Exclusive Full Resort' }}</span>
-                    </div>
-                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                        <span class="text-slate-400 block mb-0.5">Scheduled Date</span>
-                        <span class="font-semibold text-slate-800">
-                            {{ $payment->booking->booking_date ? \Carbon\Carbon::parse($payment->booking->booking_date)->format('M d, Y') : '—' }}
+            <div class="manual-row">
+                <label>Receipt no.</label>
+                <div class="detail-value">
+                    @if($receiptNo)
+                        <strong class="pay-receipt-no">{{ $receiptNo }}</strong>
+                    @else
+                        <span class="detail-muted">The guest has not entered one yet</span>
+                    @endif
+                </div>
+            </div>
+            <div class="manual-row">
+                <label>Logged</label>
+                <div class="detail-value">{{ $payment->created_at->format('M j, Y · g:i A') }}</div>
+            </div>
+            @if($refundState || isset($meta['refund_rule']))
+            <div class="manual-row manual-row-top">
+                <label>Refund</label>
+                <div class="detail-value">
+                    @if($refundState === 'sent')
+                        <strong class="detail-ok">₱{{ number_format($refundSent['amount'], 2) }} refunded</strong>
+                        <span class="manual-hint">
+                            {{ \Carbon\Carbon::parse($refundSent['at'])->timezone(config('app.timezone'))->format('M j, Y · g:i A') }}{{ $refundSent['by'] ? ' by '.$refundSent['by'] : '' }}{{ $refundSent['reference'] ? ' · ref '.$refundSent['reference'] : '' }}
+                            @if((float) ($meta['kept_amount'] ?? 0) > 0)
+                                · the resort keeps ₱{{ number_format((float) $meta['kept_amount'], 2) }}
+                            @endif
                         </span>
-                    </div>
-                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                        <span class="text-slate-400 block mb-0.5">Headcount</span>
-                        <span class="font-semibold text-slate-800">{{ $payment->booking->guests_count ?? '—' }} Guests</span>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Proof of Payment Image --}}
-            @if($payment->proof_path)
-            <div class="pt-6 border-t border-slate-100 mt-6">
-                <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <i class="bi bi-file-earmark-image text-emerald-600"></i>
-                    <span>Uploaded Proof of Payment</span>
-                </h3>
-                <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 inline-block">
-                    <img src="{{ Storage::url($payment->proof_path) }}"
-                         class="rounded-xl shadow-sm max-h-96 object-contain"
-                         alt="Proof of Payment">
+                        @if($refundSent['note'])<span class="manual-hint detail-notes">{{ $refundSent['note'] }}</span>@endif
+                    @elseif($refundState === 'due')
+                        <strong class="pay-refund-due">₱{{ number_format($payment->suggestedRefund(), 2) }} owed to the guest</strong>
+                        <span class="manual-hint">The booking was cancelled. The policy refunds {{ (int) ($meta['refund_percent'] ?? 0) }}% of the ₱{{ number_format($paidAmount, 2) }} paid. Record it here once you send the money.</span>
+                    @elseif($refundState === 'available' && $payment->status === 'failed')
+                        Declined. If the money did reach the resort, you can refund it to the guest.
+                    @elseif(($meta['refund_rule'] ?? '') === 'unpaid')
+                        Cancelled before the payment was confirmed. Nothing was refunded.
+                    @elseif(isset($meta['refund_rule']))
+                        Cancelled within 24 hours of the stay, so the policy keeps the payment.
+                        @if($refundState === 'available')<span class="manual-hint">You can still refund it if you decide to.</span>@endif
+                    @endif
                 </div>
             </div>
             @endif
-        </div>
-    </div>
+        </section>
 
-    {{-- Side Column Actions & Guest --}}
-    <div class="lg:col-span-4 space-y-6">
-
-        {{-- Verification Actions Card --}}
-        @if($payment->status === 'pending')
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
-            <h3 class="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
-                <i class="bi bi-shield-check text-amber-500"></i>
-                <span>Payment Verification</span>
-            </h3>
-            <p class="text-xs text-slate-400 mb-4">Review proof of payment and verify funds transfer before confirming.</p>
-
-            <form method="POST" action="{{ route('payments.approve', $payment) }}" class="mb-2"
-                  onsubmit="return confirm('Approve this payment and mark the booking as paid?')">
-                @csrf
-                <button type="submit" class="btn-ocean w-full justify-center text-xs py-2.5">
-                    <i class="bi bi-check2-circle text-base"></i>
-                    <span>Approve &amp; Confirm Booking</span>
-                </button>
-            </form>
-
-            <form method="POST" action="{{ route('payments.reject', $payment) }}"
-                  onsubmit="return confirm('Reject this payment? The booking will remain pending.')">
-                @csrf
-                <button type="submit" class="w-full btn btn-outline-danger btn-sm text-xs font-bold rounded-xl py-2">
-                    <i class="bi bi-x-circle me-1"></i> Decline Payment
-                </button>
-            </form>
-        </div>
-        @endif
-
-        {{-- Guest Profile Card --}}
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
-            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <i class="bi bi-person-circle text-sky-600"></i>
-                <span>Guest Information</span>
-            </h3>
-            @php $guest = $payment->booking?->user; @endphp
-            @if($guest)
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-sky-400 text-white font-black flex items-center justify-center text-base shadow-sm">
-                    {{ strtoupper(substr($guest->name, 0, 2)) }}
-                </div>
-                <div>
-                    <h4 class="font-bold text-slate-800 text-sm mb-0.5">{{ $guest->name }}</h4>
-                    <p class="text-xs text-slate-400 mb-0">{{ $guest->email }}</p>
+        <section class="pay-card">
+            <div class="detail-section">
+                <strong>Booking</strong>
+                <span>The reservation this payment is for.</span>
+            </div>
+            @if($booking)
+            <div class="manual-row">
+                <label>Reference</label>
+                <div class="detail-value">
+                    <a href="{{ route('bookings.index', ['search' => $booking->reference_no]) }}" class="pay-link">{{ $booking->reference_no }}</a>
+                    <span class="res-status res-status-{{ $booking->listStage() }} ms-1">{{ $booking->listStageLabel() }}</span>
                 </div>
             </div>
-            <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <i class="bi bi-telephone-fill text-slate-400 me-1.5"></i>
-                <span>{{ $guest->phone ?? 'No phone recorded' }}</span>
+            <div class="manual-row">
+                <label>{{ $booking->isSpecialResort() ? 'Booking' : 'Room' }}</label>
+                <div class="detail-value">
+                    @if($booking->isSpecialResort())
+                        Exclusive full-resort booking
+                    @else
+                        {{ $booking->accommodationUnit->unit_number ?? '—' }}
+                        @if($booking->accommodationUnit?->variant_label)
+                        <span class="detail-muted">· {{ $booking->accommodationUnit->variant_label }}</span>
+                        @endif
+                    @endif
+                </div>
+            </div>
+            <div class="manual-row">
+                <label>{{ $booking->isHourly() ? 'Date & time' : 'Stay' }}</label>
+                <div class="detail-value">{{ $stay }}</div>
+            </div>
+            <div class="manual-row">
+                <label>Guests</label>
+                <div class="detail-value">{{ $booking->guests_count }} {{ (int) $booking->guests_count === 1 ? 'guest' : 'guests' }}</div>
+            </div>
+            <div class="manual-total">
+                <span>Booking total</span>
+                <strong>₱{{ number_format((float) $booking->total_amount, 2) }}</strong>
             </div>
             @else
-            <p class="text-xs text-slate-400 mb-0">No registered guest record attached.</p>
+            <div class="manual-row"><div class="detail-value detail-muted">This payment is not linked to a booking.</div></div>
             @endif
-        </div>
+        </section>
 
+        <section class="pay-card">
+            <div class="detail-section">
+                <strong>Receipt</strong>
+                <span>The screenshot the guest uploaded.</span>
+            </div>
+            <div class="pay-proof-wrap">
+                @if($proof)
+                    <a href="{{ $proof }}" target="_blank" rel="noopener" class="pay-proof-frame">
+                        <img src="{{ $proof }}" alt="Payment receipt for {{ $booking->reference_no ?? 'this booking' }}">
+                    </a>
+                    <a href="{{ $proof }}" target="_blank" rel="noopener" class="pay-proof"><i class="bi bi-box-arrow-up-right"></i> Open full size</a>
+                @else
+                    <p class="detail-muted mb-0">
+                        No receipt was uploaded.
+                        @if(\App\Models\PaymentMethod::needsProof($payment->gateway) && $receiptNo)
+                            Check the receipt number above before approving.
+                        @endif
+                    </p>
+                @endif
+            </div>
+        </section>
     </div>
+
+    <aside class="pay-detail-side">
+        <section class="pay-card">
+            <div class="detail-section">
+                <strong>{{ $payment->status === 'pending' ? 'Review this payment' : 'Verification' }}</strong>
+                <span>
+                    @switch($payment->status)
+                        @case('pending') Match the amount and receipt number with your {{ $methodName }} records. @break
+                        @case('success') {{ $refundState === 'sent' ? 'This payment was approved, then partly refunded after the booking was cancelled.' : ($refundState === 'due' ? 'This payment was approved, but the booking was cancelled and part of it is owed back.' : 'This payment was approved.') }} @break
+                        @case('failed') This payment was declined or not completed. @break
+                        @case('refunded') {{ $refundState === 'sent' ? 'The money was returned to the guest.' : 'A full refund is owed to the guest.' }} @break
+                        @default Status: {{ ucfirst($payment->status) }}.
+                    @endswitch
+                </span>
+            </div>
+            @if($payment->status === 'pending')
+            <div class="pay-actions">
+                @if($canVerify)
+                <form method="POST" action="{{ route('payments.approve', $payment) }}"
+                      onsubmit="return confirm('Approve ₱{{ number_format($payment->amount, 2) }} and mark {{ $booking->reference_no ?? 'the booking' }} as paid?')">
+                    @csrf
+                    <button type="submit" class="btn-ocean w-100 justify-content-center">
+                        <i class="bi bi-check2-circle"></i>
+                        <span>Approve payment</span>
+                    </button>
+                </form>
+                <form method="POST" action="{{ route('payments.reject', $payment) }}"
+                      onsubmit="return confirm('Decline this payment? The booking stays pending.')">
+                    @csrf
+                    <button type="submit" class="btn-secondary-clean detail-danger w-100 justify-content-center">
+                        <i class="bi bi-x-circle"></i>
+                        <span>Decline</span>
+                    </button>
+                </form>
+                <span class="manual-hint m-0">Approving confirms the booking and notifies the guest.</span>
+                @else
+                <p class="detail-muted mb-0">You can view this payment. Someone with payment verification access has to approve it.</p>
+                @endif
+            </div>
+            @endif
+        </section>
+
+        @if($canCollect)
+        <section class="pay-card" id="balance">
+            <div class="detail-section">
+                <strong>Record balance payment</strong>
+                <span>The guest still owes ₱{{ number_format($balanceDue, 2) }} of the ₱{{ number_format((float) $booking->total_amount, 2) }} stay. Record it here when they pay, usually at check-in.</span>
+            </div>
+            <form method="POST" action="{{ route('payments.collect-balance', $payment) }}" class="pay-actions"
+                  onsubmit="return confirm('Record ₱' + Number(this.balance_amount.value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }) + ' paid by the guest?')">
+                @csrf
+                @if($errors->has('balance_amount') || $errors->has('balance_method'))
+                <div class="unit-modal-error m-0">{{ $errors->first('balance_amount') ?: $errors->first('balance_method') }}</div>
+                @endif
+                <div class="pay-field">
+                    <label for="balanceAmount">Amount received</label>
+                    <span class="unit-affix">
+                        <span>₱</span>
+                        <input type="number" id="balanceAmount" name="balance_amount" class="form-control-clean" step="0.01" min="0.01" max="{{ $balanceDue }}"
+                               value="{{ old('balance_amount', number_format($balanceDue, 2, '.', '')) }}" required>
+                        <em>of ₱{{ number_format($balanceDue, 2) }}</em>
+                    </span>
+                </div>
+                <div class="pay-field">
+                    <label for="balanceMethod">Paid with</label>
+                    <select id="balanceMethod" name="balance_method" class="form-control-clean" required>
+                        @foreach(\App\Models\PaymentMethod::labels() as $code => $label)
+                        <option value="{{ $code }}" {{ old('balance_method', \App\Models\PaymentMethod::isCash($code) ? $code : null) === $code ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <label class="pay-field">
+                    <span>Reference <small>(optional)</small></span>
+                    <input type="text" name="balance_reference" class="form-control-clean" maxlength="100" value="{{ old('balance_reference') }}" placeholder="Receipt or GCash reference">
+                </label>
+                <button type="submit" class="btn-ocean w-100 justify-content-center">
+                    <i class="bi bi-cash-coin"></i>
+                    <span>Record payment</span>
+                </button>
+            </form>
+        </section>
+        @endif
+
+        @if(in_array($refundState, ['due', 'available'], true) && $canRefund)
+        <section class="pay-card" id="refund">
+            <div class="detail-section">
+                <strong>Refund the guest</strong>
+                <span>
+                    @if($payment->status === 'failed')
+                        Use this only if the guest's money actually reached the resort.
+                    @else
+                        The booking was cancelled after the guest paid.
+                    @endif
+                    Send the money first through {{ $methodName }} or cash, then record it here.
+                </span>
+            </div>
+            <form method="POST" action="{{ route('payments.refund', $payment) }}" class="pay-actions"
+                  onsubmit="return confirm('Record a refund of ₱' + Number(this.refund_amount.value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }) + ' to the guest? This cannot be undone.')">
+                @csrf
+                @if($errors->has('refund_amount'))
+                <div class="unit-modal-error m-0">{{ $errors->first('refund_amount') }}</div>
+                @endif
+                <div class="pay-field">
+                    <label for="refundAmount">Amount</label>
+                    <span class="unit-affix">
+                        <span>₱</span>
+                        <input type="number" id="refundAmount" name="refund_amount" class="form-control-clean" step="0.01" min="0.01" max="{{ $paidAmount }}"
+                               value="{{ old('refund_amount', number_format($payment->suggestedRefund() ?: $paidAmount, 2, '.', '')) }}" required>
+                        <em>of ₱{{ number_format($paidAmount, 2) }}</em>
+                    </span>
+                </div>
+                <label class="pay-field">
+                    <span>Refund reference <small>(optional)</small></span>
+                    <input type="text" name="refund_reference" class="form-control-clean" maxlength="100" value="{{ old('refund_reference') }}" placeholder="GCash reference of the refund">
+                </label>
+                <label class="pay-field">
+                    <span>Note <small>(optional)</small></span>
+                    <textarea name="refund_note" rows="2" class="form-control-clean" maxlength="500" placeholder="e.g. Room was unavailable">{{ old('refund_note') }}</textarea>
+                </label>
+                <button type="submit" class="btn-ocean w-100 justify-content-center">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    <span>Record refund</span>
+                </button>
+                <span class="manual-hint m-0">The guest gets a notification with the amount and reference.</span>
+            </form>
+        </section>
+        @endif
+
+        <section class="pay-card">
+            <div class="detail-section">
+                <strong>Guest</strong>
+                <span>{{ $booking?->user ? 'Registered account' : 'Walk-in guest' }}</span>
+            </div>
+            <div class="pay-guest">
+                <div class="pay-avatar">{{ $initials ?: 'G' }}</div>
+                <div class="min-w-0">
+                    <div class="pay-guest-name">{{ $guestName }}</div>
+                    @if($guestEmail)<div class="res-note text-truncate">{{ $guestEmail }}</div>@endif
+                </div>
+            </div>
+            <div class="manual-row">
+                <label>Phone</label>
+                <div class="detail-value">
+                    @if($guestPhone)
+                        <a href="tel:{{ preg_replace('/[^0-9+]/', '', $guestPhone) }}" class="pay-link">{{ $guestPhone }}</a>
+                    @else
+                        <span class="detail-muted">Not recorded</span>
+                    @endif
+                </div>
+            </div>
+        </section>
+    </aside>
 </div>
 
 @endsection

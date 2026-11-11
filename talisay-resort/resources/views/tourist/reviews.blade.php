@@ -67,7 +67,7 @@
                 @if($review->is_comment_blocked)
                 <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 italic flex items-start gap-2 mb-3">
                     <i class="bi bi-slash-circle-fill text-rose-500 flex-shrink-0 mt-0.5"></i>
-                    <span>This comment was hidden by the moderator due to inappropriate language. Your star rating ({{ $review->rating }}/5 stars) remains permanently recorded.</span>
+                    <span>This comment was hidden automatically because it contains offensive language. Your star rating ({{ $review->rating }}/5 stars) is still recorded.</span>
                 </div>
                 @else
                 <p class="text-sm text-slate-700 mb-3 leading-relaxed">
@@ -97,7 +97,7 @@
 
         <div class="bg-sky-50 border border-sky-200 rounded-xl p-2.5 text-xs text-sky-800 flex items-start gap-2">
             <i class="bi bi-info-circle-fill text-sky-600 flex-shrink-0 mt-0.5"></i>
-            <span>Your review and star rating are published automatically. Please keep written comments respectful and free of offensive language.</span>
+            <span>Your star rating is published right away. Comments with offensive words, in any language, are hidden automatically.</span>
         </div>
 
         <form action="{{ route('tourist.reviews.store') }}" method="POST" class="space-y-4">

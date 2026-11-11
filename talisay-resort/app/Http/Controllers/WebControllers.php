@@ -21,6 +21,9 @@ use App\Models\ChatbotConfig;
 use App\Models\ChatbotIntent;
 use App\Models\ChatbotLog;
 use App\Models\AccommodationUnit;
+use App\Models\GalleryPhoto;
+use App\Models\PaymentMethod;
+use App\Support\PortalSites;
 use App\Models\Payment;
 use App\Models\Review;
 use App\Models\SystemSetting;
@@ -37,87 +40,216 @@ use Illuminate\Support\Facades\Storage;
 
 class WebControllers extends Controller
 {
+    /** @var array<string, \Illuminate\Support\Collection> */
+    private array $dashboardStays = [];
+
     // ─── Dashboard Logic ──────────────────────────────────────
     public function dashboardIndex()
     {
-        $today = now()->format('Y-m-d');
-        $todaysBookings = Booking::whereDate('booking_date', $today)->count();
-        $capacity = CapacitySchedule::getCapacityForDate($today);
+        $today = now()->toDateString();
+        $stayDate = 'date(coalesce(check_in_date, booking_date))';
+
         $totalUnits = AccommodationUnit::count();
-        $activeUnits = AccommodationUnit::available()->count();
-        $roomCount = AccommodationUnit::rooms()->count();
-        $cottageCount = AccommodationUnit::cottages()->count();
-        $monthStart = now()->startOfMonth();
-        $monthlyRevenue = Payment::where('status', 'success')
-            ->where('created_at', '>=', $monthStart)
-            ->sum('amount');
+        $done = [Booking::STATUS_CHECKED_OUT, Booking::STATUS_COMPLETED];
 
-        $recentBookings = Booking::with(['user', 'accommodationUnit'])
-            ->orderBy('created_at', 'desc')
-            ->take(10)->get();
+        // Today: who comes in, who leaves, who is here, what came in.
+        $recentStays = Booking::query()
+            ->where('status', '!=', Booking::STATUS_CANCELLED)
+            ->whereRaw("$stayDate between ? and ?", [now()->subDays(60)->toDateString(), $today])
+            ->get();
+        $arrivals = $recentStays->filter(fn (Booking $b) => $b->arrivalAt()->isToday());
+        $departures = $recentStays->filter(fn (Booking $b) => $b->departureAt()->isToday());
+        $todayStats = [
+            'arrivals' => $arrivals->count(),
+            'arrived' => $arrivals->filter(fn (Booking $b) => in_array($b->status, [Booking::STATUS_CHECKED_IN, ...$done], true))->count(),
+            'departures' => $departures->count(),
+            'departed' => $departures->filter(fn (Booking $b) => in_array($b->status, $done, true))->count(),
+        ];
+        $inHouse = Booking::query()->where('status', Booking::STATUS_CHECKED_IN)->get(['id', 'guests_count']);
+        $todayStats['in_house'] = $inHouse->count();
+        $todayStats['in_house_guests'] = (int) $inHouse->sum('guests_count');
+        $todayStats['new'] = Booking::query()->whereDate('created_at', $today)->count();
+        $pendingCount = Booking::query()->where('status', Booking::STATUS_PENDING)->count();
+        $resortCapacity = \App\Models\CapacitySchedule::visitorCap();
 
-        $occupancyData = CapacitySchedule::whereBetween('date', [now()->subDays(6), now()])
-            ->orderBy('date')->get()
-            ->map(fn($c) => [
-                'date' => $c->date->format('M d'),
-                'utilization' => $c->getUtilizationPercent(),
+        $refundBase = Payment::query()->whereHas('booking');
+        $refundsDue = (clone $refundBase)
+            ->with('booking')
+            ->whereIn('status', ['success', 'refunded'])
+            ->whereHas('booking', fn ($booking) => $booking->where('status', Booking::STATUS_CANCELLED))
+            ->get()
+            ->filter(fn (Payment $payment) => $payment->refundState() === 'due');
+        $refundDueCount = $refundsDue->count();
+        $refundDueTotal = round($refundsDue->sum(fn (Payment $payment) => $payment->suggestedRefund()), 2);
+        $refundsSent = (clone $refundBase)
+            ->whereNotNull('metadata')
+            ->get(['id', 'metadata'])
+            ->filter(fn (Payment $payment) => $payment->refundSent());
+        $refundSentCount = $refundsSent->count();
+        $refundSentTotal = round($refundsSent->sum(fn (Payment $payment) => (float) $payment->refundSent()['amount']), 2);
+
+        $receipts = Payment::receiptsBetween(now()->subMonths(5)->startOfMonth(), now());
+        $revenueIn = fn ($from, $to) => round($receipts->filter(fn ($row) => $row[0]->between($from, $to))->sum(fn ($row) => $row[1]), 2);
+        $monthlyRevenue = $revenueIn(now()->startOfMonth(), now());
+        $lastMonthRevenue = $revenueIn(now()->subMonthNoOverflow()->startOfMonth(), now()->subMonthNoOverflow()->endOfMonth());
+
+        $toVerify = Payment::query()
+            ->where('status', 'pending')
+            ->where('is_cash_on_arrival', false)
+            ->whereHas('booking', fn ($b) => $b->where('status', '!=', Booking::STATUS_CANCELLED))
+            ->get(['id', 'amount']);
+        $toVerifyCount = $toVerify->count();
+        $toVerifyTotal = round((float) $toVerify->sum('amount'), 2);
+
+        $owing = Booking::query()
+            ->with('payment')
+            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_CHECKED_IN, Booking::STATUS_CHECKED_OUT, Booking::STATUS_COMPLETED])
+            ->get()
+            ->filter(fn (Booking $b) => $b->balanceDue() > 0);
+        $balanceDueCount = $owing->count();
+        $balanceDueTotal = round($owing->sum(fn (Booking $b) => $b->balanceDue()), 2);
+
+        $recentBookings = Booking::with(['user', 'accommodationUnit', 'payment'])
+            ->orderByDesc('created_at')
+            ->take(8)
+            ->get();
+        $paymentMethodNames = PaymentMethod::labels();
+        $paymentMethodIcons = PaymentMethod::ready()
+            ? PaymentMethod::query()->pluck('icon', 'code')
+            : collect();
+
+        $occupancyData = collect(range(0, 6))->map(function (int $ahead) use ($totalUnits) {
+            $day = now()->addDays($ahead);
+
+            return [
+                'date' => $ahead === 0 ? 'Today' : $day->format('D M d'),
+                'utilization' => $totalUnits > 0
+                    ? round($this->unitsOccupiedOn($day->toDateString(), $totalUnits) / $totalUnits * 100, 1)
+                    : 0,
+            ];
+        });
+
+        $revenueTrends = collect(range(5, 0))->map(function (int $ago) use ($revenueIn) {
+            $month = now()->startOfMonth()->subMonthsNoOverflow($ago);
+
+            return [
+                'month' => $month->format('M Y'),
+                'total' => $revenueIn($month->copy()->startOfMonth(), $month->copy()->endOfMonth()),
+            ];
+        });
+
+        $unitChart = AccommodationUnit::withCount([
+            'bookings as upcoming_count' => fn ($q) => $q->whereIn('status', [Booking::STATUS_PENDING, Booking::STATUS_PAID]),
+            'bookings as stayed_count' => fn ($q) => $q->whereIn('status', [Booking::STATUS_CHECKED_IN, Booking::STATUS_CHECKED_OUT, Booking::STATUS_COMPLETED]),
+            'bookings as cancelled_count' => fn ($q) => $q->where('status', Booking::STATUS_CANCELLED),
+        ])->get()
+            ->sort(fn ($a, $b) => ($a->unit_type === 'cottage') <=> ($b->unit_type === 'cottage') ?: strnatcasecmp($a->unit_number, $b->unit_number))
+            ->values()
+            ->map(fn ($unit) => [
+                'label' => $unit->unit_number,
+                'type' => $unit->unit_type === 'cottage' ? 'cottage' : 'room',
+                'variant' => \App\Models\UnitVariant::labelFor($unit->variant),
+                'url' => route($unit->unit_type === 'cottage' ? 'accommodations.cottages' : 'accommodations.index', ['unit' => $unit->id], false),
+                'upcoming' => (int) $unit->upcoming_count,
+                'stayed' => (int) $unit->stayed_count,
+                'cancelled' => (int) $unit->cancelled_count,
             ]);
 
-        $upcomingReservations = Booking::with(['user', 'accommodationUnit'])
-            ->where('booking_date', '>=', $today)
-            ->whereIn('status', ['paid', 'pending', 'checked_in'])
-            ->orderBy('booking_date')
-            ->take(8)->get();
-
-        $recentReviews = Review::with(['user', 'booking.accommodationUnit'])
-            ->orderBy('created_at', 'desc')
-            ->take(5)->get();
-
-        $driver = DB::getDriverName();
-        $select = $driver === 'sqlite'
-            ? "strftime('%Y-%m', created_at) as month, SUM(amount) as total"
-            : "DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total";
-
-        $revenueTrends = Payment::where('status', 'success')
-            ->where('created_at', '>=', now()->subMonths(5)->startOfMonth())
-            ->selectRaw($select)
-            ->groupBy('month')
-            ->orderBy('month')
-            ->get();
-
-        $popularAccommodations = AccommodationUnit::withCount(['bookings' => fn($q) =>
-            $q->whereIn('status', ['paid', 'checked_in', 'completed'])
-        ])->orderBy('bookings_count', 'desc')->take(5)->get();
-
-        $approvedReviews = Review::approved()->get();
-        $sentimentData = [
-            'positive' => $approvedReviews->where('rating', '>=', 4)->count(),
-            'neutral'  => $approvedReviews->where('rating', 3)->count(),
-            'negative' => $approvedReviews->where('rating', '<=', 2)->count(),
-        ];
-
-        $quickStats = [
-            'totalBookings'     => Booking::count(),
-            'pendingBookings'   => Booking::where('status', 'pending')->count(),
-            'checkedInGuests'   => Booking::where('status', 'checked_in')->sum('guests_count'),
-            'totalRevenue'      => Payment::where('status', 'success')->sum('amount'),
-            'totalUsers'        => User::count(),
-            'activeUnits'       => $activeUnits,
-            'totalUnits'        => $totalUnits,
-            'pendingReviews'    => Review::where('is_approved', false)->count(),
-        ];
+        $ratingDist = Review::query()
+            ->where('is_approved', true)
+            ->selectRaw('rating, COUNT(*) as total')
+            ->groupBy('rating')
+            ->pluck('total', 'rating');
+        $sentimentData = [];
+        foreach ([5, 4, 3, 2, 1] as $stars) {
+            $sentimentData[$stars] = (int) ($ratingDist[$stars] ?? 0);
+        }
+        $reviewCount = array_sum($sentimentData);
 
         return view('dashboard.index', compact(
-            'todaysBookings', 'capacity', 'totalUnits', 'activeUnits',
-            'roomCount', 'cottageCount',
-            'monthlyRevenue', 'recentBookings', 'occupancyData',
-            'upcomingReservations',
-            'recentReviews', 'quickStats', 'revenueTrends',
-            'popularAccommodations', 'sentimentData'
+            'todayStats', 'pendingCount', 'resortCapacity',
+            'refundDueCount', 'refundDueTotal', 'refundSentCount', 'refundSentTotal',
+            'monthlyRevenue', 'lastMonthRevenue', 'toVerifyCount', 'toVerifyTotal',
+            'balanceDueCount', 'balanceDueTotal',
+            'recentBookings', 'paymentMethodNames', 'paymentMethodIcons',
+            'occupancyData', 'revenueTrends', 'unitChart', 'sentimentData',
+            'reviewCount'
         ));
     }
 
+    private function occupyingQuery(string $date)
+    {
+        return Booking::query()
+            ->where('status', '!=', Booking::STATUS_CANCELLED)
+            ->where(function ($stay) use ($date) {
+                $stay->occupyingDate($date)
+                    ->orWhere(function ($hourly) use ($date) {
+                        $hourly->where('stay_type', 'hour')
+                            ->whereRaw('date(coalesce(check_in_date, booking_date)) = ?', [$date]);
+                    });
+            });
+    }
+
+    private function staysOn(string $date)
+    {
+        if (! array_key_exists($date, $this->dashboardStays)) {
+            $this->dashboardStays[$date] = $this->occupyingQuery($date)->get([
+                'booking_type',
+                'admin_approval_status',
+                'accommodation_unit_id',
+                'guests_count',
+            ]);
+        }
+
+        return $this->dashboardStays[$date];
+    }
+
+    private function unitsOccupiedOn(string $date, int $totalUnits): int
+    {
+        if ($totalUnits < 1) {
+            return 0;
+        }
+
+        $stays = $this->staysOn($date);
+        $exclusive = $stays->contains(fn ($booking) =>
+            $booking->booking_type === 'special_resort' && $booking->admin_approval_status === 'approved'
+        );
+
+        if ($exclusive) {
+            return $totalUnits;
+        }
+
+        return $stays->pluck('accommodation_unit_id')->filter()->unique()->count();
+    }
+
     // ─── Authentication Logic ─────────────────────────────────
+
+    /**
+     * A guest who clicked Book is sent back to that page after they sign in.
+     * Only same-site booking paths are accepted.
+     */
+    protected function safeBookingReturn(?string $target): ?string
+    {
+        $target = trim((string) $target);
+        if ($target === '' || !str_starts_with($target, '/') || str_starts_with($target, '//') || str_contains($target, '\\')) {
+            return null;
+        }
+
+        $parts = parse_url($target);
+        if (!$parts || isset($parts['host']) || isset($parts['scheme'])) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '';
+        $allowed = $path === '/booking'
+            || $path === '/booking/exclusive'
+            || $path === '/rooms'
+            || $path === '/cottages'
+            || str_starts_with($path, '/stay/');
+
+        return $allowed ? $target : null;
+    }
+
     public function showLogin()
     {
         return view('auth.login');
@@ -131,52 +263,68 @@ class WebControllers extends Controller
             'portal'   => 'nullable|in:admin,client',
         ]);
 
-        // Explicit admin portal is administrator-only. Explicit client portal is
-        // for guests and staff. A request with no portal (generic login) accepts any role.
+        // Port 8000 is the client site. Port 8001 is the admin and staff site.
+        // Other ports (automated tests) still honor the portal field.
+        $site = PortalSites::current($request);
+        if ($site === 'staff') {
+            $request->merge(['portal' => 'admin']);
+        } elseif ($site === 'client') {
+            $request->merge(['portal' => 'client']);
+        }
+
+        // The admin portal is for administrators and staff. The client portal is
+        // for guests only. A request with no portal (generic login) accepts any role.
         $portal     = in_array($request->input('portal'), ['admin', 'client'], true)
             ? $request->input('portal')
             : null;
         $loginInput = trim($request->input('email'));
-        $failed     = fn () => back()
-            ->withErrors(['email' => 'The provided credentials do not match our records.'])
-            ->onlyInput('email', 'portal');
+        $reject = fn (string $message) => back()
+            ->withErrors(['email' => $message])
+            ->onlyInput('email', 'portal', 'redirect');
 
         // Staff may sign in with their Staff ID; everyone else with e-mail.
         $user = User::where(function ($q) use ($loginInput) {
-            $q->where('email', $loginInput)->orWhere('staff_id', $loginInput);
+            $q->where('email', mb_strtolower($loginInput))
+                ->orWhereRaw('upper(staff_id) = ?', [mb_strtoupper($loginInput)]);
         })->first();
 
-        if (!$user) {
-            return $failed();
+        // One message for both cases so the page never reveals which accounts exist.
+        if (!$user || !Hash::check($request->input('password'), $user->password)) {
+            return $reject('Invalid email or password. Please try again.');
         }
 
         $allowedOnPortal = match ($portal) {
-            'admin'  => $user->isAdmin(),
-            'client' => $user->isStaff() || $user->isTourist(),
+            'admin'  => $user->isAdmin() || $user->isStaff(),
+            'client' => $user->isTourist(),
             default  => true,
         };
 
         if (!$allowedOnPortal) {
-            // Deliberately indistinguishable from a wrong password.
-            return $failed();
+            $message = match (true) {
+                $portal === 'client' && ($user->isAdmin() || $user->isStaff()) => 'This account signs in on the Admin & Staff site: '.PortalSites::staffBase().'/login',
+                $portal === 'admin' && $user->isTourist() => 'This account signs in on the Client site: '.PortalSites::clientBase().'/login',
+                default => 'This account cannot sign in on this page.',
+            };
+
+            return $reject($message);
         }
 
         if (!Auth::attempt(['email' => $user->email, 'password' => $request->input('password')], $request->boolean('remember'))) {
-            return $failed();
+            return $reject('Invalid email or password. Please try again.');
         }
 
         if ($user->isStaff() && in_array($user->account_status, ['inactive', 'suspended'], true)) {
             Auth::logout();
             return back()
                 ->withErrors(['email' => 'Your staff account is currently ' . $user->account_status . '. Please contact the resort administrator.'])
-                ->onlyInput('email', 'portal');
+                ->onlyInput('email', 'portal', 'redirect');
         }
 
         if (!$user->is_active) {
             Auth::logout();
             return back()
                 ->withErrors(['email' => 'Your account has been deactivated. Please contact support.'])
-                ->onlyInput('email', 'portal');
+                ->onlyInput('email', 'portal', 'redirect');
         }
 
         $request->session()->regenerate();
@@ -185,7 +333,12 @@ class WebControllers extends Controller
         if ($user->isAdmin()) return redirect()->intended(route('admin.dashboard'));
         if ($user->isStaff()) return redirect()->intended(route('staff.dashboard'));
 
-        return redirect()->intended(route('tourist.dashboard'));
+        $next = $this->safeBookingReturn($request->input('redirect'));
+        if ($next) {
+            return redirect()->to($next);
+        }
+
+        return redirect()->intended(route('home'));
     }
 
     public function logout(Request $request)
@@ -203,7 +356,15 @@ class WebControllers extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // Redirect admin/staff back to the admin portal login page
+        // Redirect each role back to its own site. Tests do not use these ports.
+        if (PortalSites::current($request) !== null) {
+            if ($isAdminOrStaff) {
+                return redirect()->away(PortalSites::staffUrl('/login'));
+            }
+
+            return redirect()->away(PortalSites::clientUrl('/'));
+        }
+
         if ($isAdminOrStaff) {
             return redirect()->route('login', ['portal' => 'admin']);
         }
@@ -228,8 +389,8 @@ class WebControllers extends Controller
 
         $request->validate([
             'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255|unique:users',
-            'phone'    => 'nullable|string|max:20',
+            'email'    => ['required', 'string', 'email', 'max:255', User::uniqueActiveColumn('email')],
+            'phone'    => ['nullable', 'string', 'max:20', new \App\Rules\PhoneNumber],
             'password' => 'required|string|min:8|confirmed',
             'avatar'   => 'nullable|image|max:2048',
         ]);
@@ -251,7 +412,9 @@ class WebControllers extends Controller
         Auth::login($user);
         AuditLog::log('user_registered', $user);
 
-        return redirect()->route('tourist.dashboard')->with('success', 'Welcome to Talisay Beach Resort!');
+        $next = $this->safeBookingReturn($request->input('redirect'));
+
+        return redirect()->to($next ?: route('home'))->with('success', 'Welcome to Talisay Beach Resort!');
     }
 
     public function showForgotPassword()
@@ -263,11 +426,10 @@ class WebControllers extends Controller
     {
         $request->validate(['email' => 'required|email']);
 
-        $status = Password::sendResetLink($request->only('email'));
+        Password::sendResetLink($request->only('email'));
 
-        return $status === Password::RESET_LINK_SENT
-            ? back()->with('status', __($status))
-            : back()->withErrors(['email' => __($status)]);
+        // Same reply whether or not the email has an account, so the page never reveals which accounts exist.
+        return back()->with('status', 'If an account uses that email, a password reset link has been sent to it.');
     }
 
     public function showResetPassword(Request $request, string $token)
@@ -301,7 +463,12 @@ class WebControllers extends Controller
         $query = Booking::with(['user', 'accommodationUnit', 'payment']);
 
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $stage = (string) $request->status;
+            if (in_array($stage, ['pending', 'waiting', 'check_in', 'check_out', 'no_show', 'cancelled'], true)) {
+                $query->listStage($stage);
+            } else {
+                $query->where('status', $stage);
+            }
         }
 
         if ($request->filled('search')) {
@@ -314,68 +481,199 @@ class WebControllers extends Controller
             });
         }
 
-        $bookings = $query->orderBy('booking_date', 'desc')->paginate(15);
+        if ($request->query('type') === 'exclusive') {
+            $query->where('booking_type', 'special_resort');
+        } elseif ($request->query('type') === 'hourly') {
+            $query->where('stay_type', 'hour')->where('booking_type', '!=', 'special_resort');
+        } elseif ($request->query('type') === 'nightly') {
+            $query->where('booking_type', '!=', 'special_resort')
+                ->where(function ($q) {
+                    $q->whereNull('stay_type')->orWhere('stay_type', '!=', 'hour');
+                });
+        }
+
+        $bookings = $query->orderBy('booking_date', 'desc')->paginate(15)->withQueryString();
         $tourists = User::where('role', 'tourist')->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email', 'phone']);
         $accommodationUnits = AccommodationUnit::where('is_available', true)->orderBy('unit_number')->get();
+        $exclusiveNightlyRate = app(BookingService::class)->exclusiveNightlyRate();
 
-        return view('bookings.index', compact('bookings', 'tourists', 'accommodationUnits'));
+        return view('bookings.index', compact('bookings', 'tourists', 'accommodationUnits', 'exclusiveNightlyRate'));
+    }
+
+    private function walkInGuestRules(): array
+    {
+        return [
+            'first_name'  => 'exclude_unless:guest_type,walk_in|required|string|max:60',
+            'middle_name' => 'exclude_unless:guest_type,walk_in|nullable|string|max:60',
+            'last_name'   => 'exclude_unless:guest_type,walk_in|required|string|max:60',
+            'guest_phone' => ['exclude_unless:guest_type,walk_in', 'nullable', 'required_without:guest_email', 'regex:/^[0-9+()\-\s]{7,20}$/'],
+            'guest_email' => 'exclude_unless:guest_type,walk_in|nullable|required_without:guest_phone|email|max:120',
+        ];
+    }
+
+    private function walkInGuestMessages(): array
+    {
+        return [
+            'guest_phone.required_without' => 'Enter a contact number or an email address.',
+            'guest_email.required_without' => 'Enter a contact number or an email address.',
+            'guest_phone.regex'            => 'Enter a valid contact number.',
+        ];
+    }
+
+    /** @return array{0: string, 1: string} full name and contact for a walk-in guest */
+    private function walkInGuestDetails(Request $request): array
+    {
+        $join = fn (array $parts, string $glue) => collect($parts)
+            ->map(fn ($part) => trim((string) $part))->filter()->implode($glue);
+
+        return [
+            $join([$request->first_name, $request->middle_name, $request->last_name], ' '),
+            $join([$request->guest_phone, $request->guest_email], ' · '),
+        ];
+    }
+
+    /**
+     * Units that cannot be booked for the requested stay, keyed by unit id with a short reason.
+     */
+    public function manualUnitAvailability(Request $request)
+    {
+        $data = $request->validate([
+            'date'       => 'required|date',
+            'check_out'  => 'nullable|date',
+            'stay_type'  => 'nullable|in:night,hour',
+            'hour_start' => 'nullable|date_format:H:i',
+            'hours'      => 'nullable|integer|min:1|max:12',
+        ]);
+
+        $hourly = ($data['stay_type'] ?? 'night') === 'hour' && !empty($data['hour_start']);
+        $hours = $hourly ? (int) ($data['hours'] ?? 1) : null;
+
+        if ($hourly) {
+            $startAt = \Carbon\Carbon::parse(\Carbon\Carbon::parse($data['date'])->format('Y-m-d') . ' ' . $data['hour_start']);
+            $endAt = $startAt->copy()->addHours($hours);
+            $checkOutDay = $endAt->copy()->startOfDay();
+            if ($endAt->gt($checkOutDay)) {
+                $checkOutDay->addDay();
+            }
+            [$checkIn, $checkOut] = [$startAt->format('Y-m-d'), $checkOutDay->format('Y-m-d')];
+        } else {
+            [$checkIn, $checkOut] = Booking::normaliseStay($data['date'], $data['check_out'] ?? null);
+        }
+
+        $unavailable = [];
+        foreach (AccommodationUnit::where('is_available', true)->get(['id']) as $unit) {
+            $conflict = Booking::getConflictingBooking($unit->id, $checkIn, $checkOut, null, $hourly ? $data['hour_start'] : null, $hours);
+            if ($conflict) {
+                $unavailable[$unit->id] = $conflict->booking_type === 'special_resort'
+                    ? 'Exclusive booking'
+                    : ($conflict->isHourly() && $conflict->time_slot
+                        ? 'Booked ' . trim(preg_replace('/\s*\(.*\)$/', '', $conflict->time_slot))
+                        : 'Booked');
+            }
+        }
+
+        return response()->json(['unavailable' => (object) $unavailable]);
     }
 
     public function manualBookingStore(Request $request)
     {
         $request->validate([
             'guest_type'            => 'required|in:registered,walk_in',
-            'user_id'               => 'required_if:guest_type,registered|nullable|exists:users,id',
-            'guest_name'            => 'required_if:guest_type,walk_in|nullable|string|max:150',
-            'guest_contact'         => 'required_if:guest_type,walk_in|nullable|string|max:100',
-            'accommodation_unit_id' => 'required|exists:accommodation_units,id',
+            'user_id'               => 'bail|required_if:guest_type,registered|nullable|integer|exists:users,id',
+            ...$this->walkInGuestRules(),
+            'accommodation_unit_id'   => 'bail|required_without:accommodation_unit_ids|nullable|integer|exists:accommodation_units,id',
+            'accommodation_unit_ids'  => 'required_without:accommodation_unit_id|array|min:1|max:20',
+            'accommodation_unit_ids.*'=> 'bail|integer|distinct|exists:accommodation_units,id',
             'booking_date'          => 'required|date',
+            'stay_type'             => 'nullable|in:night,hour',
             'check_out_date'        => 'nullable|date|after:booking_date',
-            'guests_count'          => 'required|integer|min:1|max:50',
-            'payment_method'        => 'required|in:cash,gcash,card,paypal',
+            'hour_start'            => 'required_if:stay_type,hour|nullable|date_format:H:i',
+            'hours_count'           => 'required_if:stay_type,hour|nullable|integer|min:1|max:12',
+            'guests_count'          => 'required|integer|min:1|max:200',
+            'payment_method'        => PaymentMethod::methodRule(),
             'initial_status'        => 'required|in:pending,paid,checked_in',
-            'special_requests'      => 'nullable|string|max:500',
+            'special_requests'      => 'nullable|string|max:1000',
+            'activity_ids'          => 'nullable|array|max:12',
+            'activity_ids.*'        => 'bail|integer|exists:resort_activities,id',
+        ], $this->walkInGuestMessages() + [
+            'accommodation_unit_ids.required_without' => 'Choose at least one room or cottage.',
+            'accommodation_unit_ids.*.distinct'       => 'The same room or cottage was chosen twice.',
         ]);
 
-        $unit = AccommodationUnit::findOrFail($request->accommodation_unit_id);
+        $unitIds = collect($request->input('accommodation_unit_ids', []))
+            ->whenEmpty(fn ($ids) => $ids->push($request->accommodation_unit_id))
+            ->map(fn ($id) => (int) $id)->unique()->values();
+        $units = AccommodationUnit::whereIn('id', $unitIds)->get()->sortBy(fn ($u) => $unitIds->search($u->id))->values();
+
+        $guestTotal = (int) $request->guests_count;
+        $capacityTotal = (int) $units->sum('max_occupancy');
+        if ($guestTotal < $units->count()) {
+            return back()->with('error', 'Enter at least one guest for each room or cottage.')->withInput();
+        }
+        if ($guestTotal > $capacityTotal) {
+            return back()->with('error', "The selected rooms and cottages hold up to {$capacityTotal} guests in total.")->withInput();
+        }
+
+        // One guest per unit first, then fill each unit up to its capacity.
+        $remaining = $guestTotal - $units->count();
+        $guestSplit = $units->map(function ($unit) use (&$remaining) {
+            $extra = min($remaining, max(0, (int) $unit->max_occupancy - 1));
+            $remaining -= $extra;
+            return 1 + $extra;
+        });
+
         $isRegistered = $request->guest_type === 'registered';
+        $hourly = $request->input('stay_type') === 'hour';
+        [$walkInName, $walkInContact] = $this->walkInGuestDetails($request);
 
         try {
-            $booking = app(BookingService::class)->createRegular([
+            $bookings = DB::transaction(fn () => $units->map(fn ($unit, $i) => app(BookingService::class)->createRegular([
                 'unit'                => $unit,
                 'check_in'            => $request->booking_date,
-                'check_out'           => $request->check_out_date,
-                'guests_count'        => $request->guests_count,
+                'check_out'           => $hourly ? null : $request->check_out_date,
+                'stay_type'           => $hourly ? 'hour' : 'night',
+                'hour_start'          => $hourly ? $request->hour_start : null,
+                'hours_count'         => $hourly ? (int) $request->hours_count : null,
+                'guests_count'        => $guestSplit[$i],
                 'user_id'             => $isRegistered ? $request->user_id : null,
-                'guest_name_manual'   => $isRegistered ? null : $request->guest_name,
-                'guest_contact_manual'=> $isRegistered ? null : $request->guest_contact,
+                'guest_name_manual'   => $isRegistered ? null : $walkInName,
+                'guest_contact_manual'=> $isRegistered ? null : $walkInContact,
                 'special_requests'    => $request->special_requests,
+                'activity_ids'        => $i === 0 ? $request->input('activity_ids', []) : [],
                 'status'              => $request->initial_status,
                 'booking_source'      => 'manual',
                 'payment_method'      => $request->payment_method,
                 'created_by'          => Auth::id(),
-            ]);
+            ])));
         } catch (BookingConflictException $e) {
             return back()->with('error', $e->getMessage())->withInput();
         }
 
-        AuditLog::log('manual_booking_created', $booking, null, [
-            'created_by' => Auth::id(),
-            'guest_type' => $request->guest_type,
-            'booking'    => $booking->toArray(),
-        ]);
+        foreach ($bookings as $i => $booking) {
+            AuditLog::log('manual_booking_created', $booking, null, [
+                'created_by' => Auth::id(),
+                'guest_type' => $request->guest_type,
+                'booking'    => $booking->toArray(),
+            ]);
 
-        if ($booking->user_id) {
-            \App\Models\NotificationModel::notifyUser(
-                $booking->user_id,
-                'booking',
-                'Reservation Created by Front Desk',
-                "A reservation for {$unit->unit_number} ({$booking->reference_no}) was created for you by our resort staff.",
-                ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
-            );
+            if ($booking->user_id) {
+                \App\Models\NotificationModel::notifyUser(
+                    $booking->user_id,
+                    'booking',
+                    'Reservation Created by Front Desk',
+                    "A reservation for {$units[$i]->unit_number} ({$booking->reference_no}) was created for you by our resort staff.",
+                    ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
+                );
+            }
         }
 
-        return redirect()->route('bookings.index')->with('success', "Manual booking {$booking->reference_no} created successfully for {$booking->guest_name}.");
+        $first = $bookings->first();
+        $message = $bookings->count() === 1
+            ? "Manual booking {$first->reference_no} created successfully for {$first->guest_name}."
+            : "{$bookings->count()} manual bookings created for {$first->guest_name}: "
+                . $bookings->map(fn ($b, $i) => "{$units[$i]->unit_number} ({$b->reference_no})")->implode(', ') . '.';
+
+        return redirect()->route('bookings.index')->with('success', $message);
     }
 
     public function updateBookingStatus(Request $request, Booking $booking)
@@ -395,9 +693,15 @@ class WebControllers extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        app(BookingService::class)->notifyGuestOfStatus($booking->fresh());
+        $booking = $booking->fresh();
+        app(BookingService::class)->notifyGuestOfStatus($booking);
 
-        return back()->with('success', 'Booking status updated successfully.');
+        $message = 'Booking status updated successfully.';
+        if ($booking->status === Booking::STATUS_CANCELLED) {
+            $message .= ' ' . app(BookingService::class)->describeCancellation($booking);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function approveSpecialResortBooking(Request $request, Booking $booking)
@@ -423,7 +727,10 @@ class WebControllers extends Controller
 
     public function rejectSpecialResortBooking(Request $request, Booking $booking)
     {
-        $reason = $request->input('reason', 'Special resort booking request was declined by management.');
+        $request->validate(['reason' => 'nullable|string|max:255']);
+        $reason = $request->filled('reason')
+            ? trim($request->input('reason'))
+            : 'Special resort booking request was declined by management.';
 
         try {
             $booking = app(BookingService::class)->rejectSpecial($booking, Auth::id(), $reason);
@@ -444,12 +751,199 @@ class WebControllers extends Controller
         return back()->with('success', "Special booking {$booking->reference_no} has been rejected.");
     }
 
+    public function storeExclusiveBooking(Request $request)
+    {
+        $request->validate([
+            'guest_type'     => 'required|in:registered,walk_in',
+            'user_id'        => 'bail|required_if:guest_type,registered|nullable|integer|exists:users,id',
+            ...$this->walkInGuestRules(),
+            'check_in'       => 'required|date',
+            'check_out'      => 'required|date|after:check_in',
+            'guests_count'   => 'required|integer|min:1|max:'.\App\Models\CapacitySchedule::visitorCap(),
+            'payment_method' => PaymentMethod::methodRule(),
+            'initial_status' => 'required|in:pending,paid,checked_in',
+            'occasion'       => ['required', 'string', 'max:120', function ($attribute, $value, $fail) {
+                if (! in_array($value, Booking::occasions(), true)) {
+                    $fail('Choose an occasion from the list.');
+                }
+            }],
+            'activity_ids'   => 'nullable|array|max:12',
+            'activity_ids.*' => 'bail|integer|exists:resort_activities,id',
+            'special_requests' => 'nullable|string|max:1000',
+        ], $this->walkInGuestMessages());
+
+        $isRegistered = $request->guest_type === 'registered';
+        [$walkInName, $walkInContact] = $this->walkInGuestDetails($request);
+        $details = trim((string) $request->special_requests);
+        $notes = 'Occasion: ' . $request->occasion . ($details !== '' ? "\n\n" . $details : '');
+
+        try {
+            $booking = app(BookingService::class)->createSpecialResort([
+                'check_in'            => $request->check_in,
+                'check_out'           => $request->check_out,
+                'guests_count'        => $request->guests_count,
+                'user_id'             => $isRegistered ? $request->user_id : null,
+                'guest_name_manual'   => $isRegistered ? null : $walkInName,
+                'guest_contact_manual'=> $isRegistered ? null : $walkInContact,
+                'special_requests'    => $notes,
+                'activity_ids'        => $request->input('activity_ids', []),
+                'payment_method'      => $request->payment_method,
+                'booking_source'      => 'manual',
+                'created_by'          => Auth::id(),
+            ]);
+
+            if ($request->initial_status !== 'pending') {
+                $booking = app(BookingService::class)->approveSpecial($booking, Auth::id());
+                if ($request->initial_status === 'checked_in') {
+                    $booking = app(BookingService::class)->changeStatus($booking, Booking::STATUS_CHECKED_IN);
+                }
+            }
+        } catch (BookingConflictException|InvalidBookingTransitionException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        AuditLog::log('exclusive_booking_created', $booking, null, [
+            'created_by' => Auth::id(),
+            'booking'    => $booking->toArray(),
+        ]);
+
+        if ($booking->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $booking->user_id,
+                'booking',
+                'Exclusive Stay Created',
+                "An exclusive full-resort stay ({$booking->reference_no}) was created for you by the resort.",
+                ['booking_id' => $booking->id, 'reference_no' => $booking->reference_no]
+            );
+        }
+
+        return redirect()->route('bookings.index', ['type' => 'exclusive'])
+            ->with('success', "Exclusive booking {$booking->reference_no} saved for {$booking->guest_name}.");
+    }
+
+    public function updateExclusiveBooking(Request $request, Booking $booking)
+    {
+        $request->validate([
+            'check_in'          => 'required|date',
+            'check_out'         => 'required|date|after:check_in',
+            'guests_count'      => 'required|integer|min:1|max:'.\App\Models\CapacitySchedule::visitorCap(),
+            'special_requests'  => 'nullable|string|max:1000',
+            'guest_name'        => 'nullable|string|max:150',
+            'guest_contact'     => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $booking = app(BookingService::class)->updateSpecialResort($booking, [
+                'check_in'            => $request->check_in,
+                'check_out'           => $request->check_out,
+                'guests_count'        => $request->guests_count,
+                'special_requests'    => $request->special_requests,
+                'guest_name_manual'   => $request->guest_name,
+                'guest_contact_manual'=> $request->guest_contact,
+                'modification_notes'  => 'Exclusive stay updated by '.Auth::user()->name.'.',
+            ]);
+        } catch (BookingConflictException|InvalidBookingTransitionException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        if ($booking->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $booking->user_id,
+                'booking',
+                'Exclusive Stay Updated',
+                "Your exclusive stay {$booking->reference_no} was updated to ".$booking->checkInDate()->format('M d').' – '.$booking->checkOutDate()->format('M d, Y').'.',
+                ['booking_id' => $booking->id]
+            );
+        }
+
+        return redirect()->route('bookings.index', ['type' => 'exclusive'])
+            ->with('success', "Exclusive booking {$booking->reference_no} was updated. New total is ₱".number_format((float) $booking->total_amount, 2).'.');
+    }
+
+    public function updateRegularBooking(Request $request, Booking $booking)
+    {
+        $request->validate([
+            'check_in'         => 'nullable|date',
+            'check_out'        => 'nullable|required_with:check_in|date|after:check_in',
+            'guests_count'     => 'required|integer|min:1|max:200',
+            'special_requests' => 'nullable|string|max:1000',
+            'guest_name'       => 'nullable|string|max:150',
+            'guest_contact'    => 'nullable|string|max:100',
+        ], [
+            'check_out.after' => 'Check-out must be after check-in.',
+        ]);
+
+        $oldTotal = (float) $booking->total_amount;
+
+        try {
+            $booking = app(BookingService::class)->updateRegular($booking, [
+                'check_in'             => $request->check_in,
+                'check_out'            => $request->check_out,
+                'guests_count'         => $request->guests_count,
+                'special_requests'     => $request->special_requests,
+                'guest_name_manual'    => $request->guest_name,
+                'guest_contact_manual' => $request->guest_contact,
+                'modification_notes'   => 'Booking updated by '.Auth::user()->name.'.',
+            ]);
+        } catch (BookingConflictException|InvalidBookingTransitionException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if ($booking->user_id) {
+            \App\Models\NotificationModel::notifyUser(
+                $booking->user_id,
+                'booking',
+                'Reservation Updated',
+                "Your reservation {$booking->reference_no} was updated by the resort.",
+                ['booking_id' => $booking->id]
+            );
+        }
+
+        $message = "Booking {$booking->reference_no} was updated.";
+        if (round((float) $booking->total_amount, 2) !== round($oldTotal, 2)) {
+            $message .= ' New total is ₱'.number_format((float) $booking->total_amount, 2).'.';
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function destroyBooking(Booking $booking)
+    {
+        if ($booking->status !== Booking::STATUS_CANCELLED) {
+            return back()->with('error', 'Cancel this booking first. Only a cancelled booking can be removed.');
+        }
+
+        if ($booking->payment && $booking->payment->status === 'success') {
+            return back()->with('error', 'This booking still holds a confirmed payment. Settle the refund on the Payments page before removing it.');
+        }
+
+        if ($booking->payment && in_array($booking->payment->refundState(), ['due', 'available'], true)) {
+            return back()->with('error', 'The guest sent money for this booking. Record the refund on the Payments page before removing it.');
+        }
+
+        $reference = $booking->reference_no;
+        AuditLog::log('booking_removed', $booking, $booking->toArray(), null);
+        $booking->delete();
+
+        return back()->with('success', "Booking {$reference} was removed from the list.");
+    }
+
     // ─── Payment Logic ────────────────────────────────────────
     public function paymentsIndex(Request $request)
     {
-        $query = Payment::with(['booking.user', 'booking.accommodationUnit']);
+        // Payments whose booking was deleted are left out everywhere on this page.
+        $base = fn () => Payment::query()->whereHas('booking');
 
-        if ($request->filled('status')) {
+        $query = $base()->with(['booking.user', 'booking.accommodationUnit']);
+        $refundsDue = $base()->with('booking')
+            ->whereIn('status', ['success', 'refunded'])
+            ->whereHas('booking', fn ($bq) => $bq->where('status', Booking::STATUS_CANCELLED))
+            ->get()
+            ->filter(fn (Payment $payment) => $payment->refundState() === 'due');
+
+        if ($request->status === 'refund_due') {
+            $query->whereKey($refundsDue->modelKeys());
+        } elseif ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
@@ -467,11 +961,28 @@ class WebControllers extends Controller
 
         $payments = $query->orderBy('created_at', 'desc')->paginate(15);
 
-        $totalSuccess = Payment::where('status', 'success')->sum('amount');
-        $totalPending = Payment::where('status', 'pending')->sum('amount');
-        $pendingCount = Payment::where('status', 'pending')->count();
+        $totalSuccess = round((float) $base()->where('status', 'success')->sum('amount'), 2);
+        $statusCounts = $base()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $gatewayCounts = $base()->selectRaw('gateway, count(*) as total')->groupBy('gateway')->pluck('total', 'gateway');
+        $paymentMethods = PaymentMethod::catalog();
 
-        return view('payments.index', compact('payments', 'totalSuccess', 'totalPending', 'pendingCount'));
+        $pending = $base()->where('status', 'pending')->get(['id', 'amount', 'proof_path', 'transaction_id']);
+        $toReview = $pending->filter(fn (Payment $payment) => $payment->proof_path || $payment->guestReference());
+        $totalPending = round((float) $toReview->sum('amount'), 2);
+        $pendingCount = $toReview->count();
+        $awaitingReceiptCount = $pending->count() - $pendingCount;
+
+        $refundDueCount = $refundsDue->count();
+        $refundDueTotal = round($refundsDue->sum(fn (Payment $payment) => $payment->suggestedRefund()), 2);
+
+        $refundsSent = $base()->whereNotNull('metadata')->get(['id', 'metadata'])->filter(fn (Payment $payment) => $payment->refundSent());
+        $refundSentCount = $refundsSent->count();
+        $refundSentTotal = round($refundsSent->sum(fn (Payment $payment) => (float) $payment->refundSent()['amount']), 2);
+
+        return view('payments.index', compact(
+            'payments', 'totalSuccess', 'totalPending', 'pendingCount', 'awaitingReceiptCount', 'statusCounts', 'gatewayCounts', 'paymentMethods',
+            'refundDueCount', 'refundDueTotal', 'refundSentCount', 'refundSentTotal'
+        ));
     }
 
     public function paymentShow(Payment $payment)
@@ -504,18 +1015,82 @@ class WebControllers extends Controller
     public function rejectPayment(Payment $payment)
     {
         $payment = app(BookingService::class)->rejectPayment($payment);
+        $booking = $payment->booking;
+        $cancelled = $booking?->status === Booking::STATUS_CANCELLED;
 
-        if ($payment->booking?->user_id) {
+        if ($booking?->user_id) {
             \App\Models\NotificationModel::notifyUser(
-                $payment->booking->user_id,
+                $booking->user_id,
                 'payment',
-                'Payment Proof Verification Issue',
-                "Your payment proof for booking {$payment->booking->reference_no} could not be verified. Please re-upload a clear receipt or contact the front desk.",
+                $cancelled ? 'Payment declined, booking cancelled' : 'Payment Proof Verification Issue',
+                $cancelled
+                    ? "Your payment for booking {$booking->reference_no} could not be verified, so the booking was cancelled. If you already sent money, the resort will contact you about a refund. You can book again anytime."
+                    : "Your payment proof for booking {$booking->reference_no} could not be verified. Please re-upload a clear receipt or contact the front desk.",
                 ['booking_id' => $payment->booking_id, 'payment_id' => $payment->id]
             );
         }
 
-        return back()->with('success', 'Payment rejected.');
+        return back()->with('success', $cancelled
+            ? "Payment declined. Booking {$booking->reference_no} was cancelled and its room or cottage is free again."
+            : 'Payment declined.');
+    }
+
+    public function refundPayment(Request $request, Payment $payment)
+    {
+        $data = $request->validate([
+            'refund_amount' => 'required|numeric|min:0.01',
+            'refund_reference' => 'nullable|string|max:100',
+            'refund_note' => 'nullable|string|max:500',
+        ], [
+            'refund_amount.required' => 'Enter how much you refunded.',
+            'refund_amount.min' => 'The refund must be more than ₱0.',
+        ]);
+
+        try {
+            $payment = app(BookingService::class)->refundPayment(
+                $payment,
+                (float) $data['refund_amount'],
+                $data['refund_reference'] ?? null,
+                $data['refund_note'] ?? null,
+                $request->user()
+            );
+        } catch (InvalidBookingTransitionException $e) {
+            return back()->withErrors(['refund_amount' => $e->getMessage()])->withInput();
+        }
+
+        $sent = $payment->refundSent();
+
+        return back()->with('success', 'Refund of ₱' . number_format($sent['amount'], 2) . ' recorded for ' . ($payment->booking->reference_no ?? 'this payment') . '.');
+    }
+
+    public function collectBalance(Request $request, Payment $payment)
+    {
+        $data = $request->validate([
+            'balance_amount' => 'required|numeric|min:0.01',
+            'balance_method' => ['required', 'string', \Illuminate\Validation\Rule::in(array_keys(PaymentMethod::labels()))],
+            'balance_reference' => 'nullable|string|max:100',
+        ], [
+            'balance_amount.required' => 'Enter how much the guest paid.',
+            'balance_amount.min' => 'The amount must be more than ₱0.',
+            'balance_method.in' => 'Choose how the guest paid.',
+        ]);
+
+        try {
+            $payment = app(BookingService::class)->collectBalance(
+                $payment->loadMissing('booking'),
+                (float) $data['balance_amount'],
+                $data['balance_method'],
+                $data['balance_reference'] ?? null,
+                $request->user()
+            );
+        } catch (InvalidBookingTransitionException $e) {
+            return back()->withErrors(['balance_amount' => $e->getMessage()])->withInput();
+        }
+
+        $left = $payment->booking->balanceDue();
+
+        return back()->with('success', '₱' . number_format((float) $data['balance_amount'], 2) . ' recorded for ' . $payment->booking->reference_no . '.'
+            . ($left > 0 ? ' ₱' . number_format($left, 2) . ' is still owed.' : ' The stay is now fully paid.'));
     }
 
 
@@ -543,7 +1118,7 @@ class WebControllers extends Controller
 
         $today          = now()->format('Y-m-d');
         $cap            = CapacitySchedule::getCapacityForDate($today);
-        $maxCap         = $cap ? $cap->max_capacity : (int) SystemSetting::get('daily_visitor_cap', 100);
+        $maxCap         = CapacitySchedule::visitorCap();
         $currCap        = $cap ? $cap->current_count : 0;
         $remainingSlots = max(0, $maxCap - $currCap);
 
@@ -590,6 +1165,13 @@ class WebControllers extends Controller
     {
         ChatbotLog::truncate();
         return redirect()->route('chatbot.index')->with('success', 'Chatbot conversation logs cleared successfully.');
+    }
+
+    public function chatbotDeleteLog(ChatbotLog $log)
+    {
+        $log->delete();
+
+        return redirect()->route('chatbot.index')->with('success', 'That chat was deleted.');
     }
 
     public function chatbotStore(Request $request)
@@ -646,14 +1228,30 @@ class WebControllers extends Controller
     // ─── Tour Logic ───────────────────────────────────────────
     public function tourIndex()
     {
-        $assets = TourAsset::orderBy('sort_order')->paginate(20);
-        return view('tour.index', compact('assets'));
+        $assets = TourAsset::orderBy('sort_order')->orderBy('id')->paginate(20);
+        $all = TourAsset::all();
+        $tourStats = [
+            'total'  => $all->count(),
+            'shown'  => $all->where('is_active', true)->count(),
+            'hidden' => $all->where('is_active', false)->count(),
+            'photos' => $all->where('type', 'image')->count(),
+            'flat'   => $all->where('type', 'image')->reject->isPanorama()->count(),
+            'videos' => $all->where('type', 'video')->count(),
+        ];
+
+        return view('tour.index', compact('assets', 'tourStats'));
     }
 
     public function tourViewer()
     {
         $assets = TourAsset::active()->get();
-        return view('tour.viewer', compact('assets'));
+
+        return view('tour.viewer', [
+            'assets' => $assets,
+            'navActive' => 'tour',
+            'navSolid' => true,
+            'resortInfo' => $this->clientResortInfo(),
+        ]);
     }
 
     public function tourStore(Request $request)
@@ -766,6 +1364,8 @@ class WebControllers extends Controller
     // ─── Review Logic ─────────────────────────────────────────
     public function reviewsIndex(Request $request)
     {
+        Review::sweepOpenComments();
+
         $query = Review::with(['user', 'booking.accommodationUnit']);
 
         if ($request->filled('comment_status')) {
@@ -781,29 +1381,49 @@ class WebControllers extends Controller
             }
         }
 
-        if ($request->filled('rating')) {
-            $query->where('rating', $request->rating);
+        if ($request->rating === 'low') {
+            $query->where('rating', '<=', 2);
+        } elseif ($request->filled('rating')) {
+            $query->where('rating', (int) $request->rating);
+        }
+
+        if ($request->filled('search')) {
+            $term = '%' . trim((string) $request->search) . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('comment', 'like', $term)
+                  ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $term))
+                  ->orWhereHas('booking', fn ($b) => $b->where('reference_no', 'like', $term)->orWhere('guest_name', 'like', $term));
+            });
         }
 
         $totalReviews          = Review::count();
         $activeCommentsCount   = Review::where('is_comment_blocked', false)->count();
         $blockedCommentsCount  = Review::where('is_comment_blocked', true)->count();
         $averageRating         = Review::avg('rating') ? round(Review::avg('rating'), 1) : 0.0;
+        $ratingCounts          = Review::selectRaw('rating, count(*) as total')->groupBy('rating')->pluck('total', 'rating');
+        $lowRatingCount        = Review::where('rating', '<=', 2)->count();
+        $thisMonthCount        = Review::where('created_at', '>=', now()->startOfMonth())->count();
 
-        $reviews = $query->orderBy('created_at', 'desc')->paginate(15);
+        $reviews = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
 
         return view('reviews.index', compact(
             'reviews',
             'totalReviews',
             'activeCommentsCount',
             'blockedCommentsCount',
-            'averageRating'
+            'averageRating',
+            'ratingCounts',
+            'lowRatingCount',
+            'thisMonthCount'
         ));
     }
 
     public function blockCommentReview(Request $request, Review $review)
     {
-        $reason = $request->input('reason', 'Inappropriate language / bad words');
+        $request->validate(['reason' => 'nullable|string|max:255']);
+        $reason = $request->filled('reason')
+            ? trim($request->input('reason'))
+            : 'Inappropriate language / bad words';
 
         $review->update([
             'is_comment_blocked' => true,
@@ -833,7 +1453,7 @@ class WebControllers extends Controller
     {
         $review->update([
             'is_comment_blocked' => false,
-            'block_reason'       => null,
+            'block_reason'       => 'Shown again by staff',
             'comment_blocked_at' => null,
         ]);
 
@@ -876,158 +1496,567 @@ class WebControllers extends Controller
     }
 
     // ─── Report Logic ─────────────────────────────────────────
-    public function reportsIndex()
+    public function reportsIndex(Request $request)
     {
-        $driver = DB::getDriverName();
-        $select = $driver === 'sqlite'
-            ? "strftime('%Y-%m', created_at) as month, SUM(amount) as total"
-            : "DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total";
+        $window = $this->reportDateWindow($request);
+        extract($window, EXTR_SKIP);
 
-        $monthlyRevenue = Payment::where('status', 'success')
-            ->selectRaw($select)
-            ->groupBy('month')
-            ->orderBy('month')
-            ->get();
+        $receipts = $this->reportReceipts($from, $to, $dateType);
+        $totalRevenue = round($receipts->sum(fn ($row) => $row[1]), 2);
+        $monthlyRevenue = $this->reportRevenueSeries($receipts, $group, $from, $to);
+        $revenueHasData = (float) collect($monthlyRevenue)->sum('total') > 0;
 
-        // Expand to 90 days and include future dates so seeded capacity data shows
-        $dailyOccupancy = collect(
-            CapacitySchedule::whereBetween('date', [now()->subDays(89), now()->addDays(30)])
-                ->orderBy('date')
-                ->get()
-                ->map(fn($c) => [
-                    'date'        => $c->date->format('M d'),
-                    'utilization' => $c->getUtilizationPercent(),
-                ])
-                ->values()
-                ->toArray()
-        );
+        $stayStatuses = ['paid', 'checked_in', 'checked_out', 'completed'];
+        $popularFilter = function ($q) use ($stayStatuses, $from, $to, $dateType) {
+            $q->whereIn('status', $stayStatuses);
+            $this->applyReportBookingDates($q, $from, $to, $dateType === 'payment' ? 'booking' : $dateType);
+        };
+        $popularBase = fn (string $type) => AccommodationUnit::query()
+            ->where('unit_type', $type)
+            ->withCount(['bookings' => $popularFilter])
+            ->get()
+            ->sort(fn ($a, $b) => strnatcasecmp($a->unit_number, $b->unit_number))
+            ->values()
+            ->map(fn ($unit) => [
+                'label' => $unit->unit_number,
+                'variant' => \App\Models\UnitVariant::labelFor($unit->variant),
+                'url' => route($type === 'cottage' ? 'accommodations.cottages' : 'accommodations.index', ['unit' => $unit->id], false),
+                'total' => (int) $unit->bookings_count,
+            ]);
 
-        $popularAccommodations = AccommodationUnit::withCount(['bookings' => fn($q) =>
-            $q->whereIn('status', ['paid', 'checked_in', 'completed'])
-        ])->orderBy('bookings_count', 'desc')->take(7)->get();
+        $popularRooms = $popularBase('room');
+        $popularCottages = $popularBase('cottage');
 
-        $ratingDist = Review::selectRaw('rating, COUNT(*) as count')
+        $ratingDist = Review::query()
+            ->when($from && $to, fn ($q) => $q->whereBetween('created_at', [$from, $to]))
+            ->selectRaw('rating, COUNT(*) as count')
             ->groupBy('rating')
             ->pluck('count', 'rating');
 
-        $totalRevenue   = Payment::where('status', 'success')->sum('amount');
-        $pendingAmount  = Payment::where('status', 'pending')->sum('amount');
-        $refundedAmount = Payment::where('status', 'refunded')->sum('amount');
-        $totalBookings  = Booking::count();
-        $avgRating      = round(Review::where('is_approved', true)->avg('rating') ?? 0, 1);
+        $pendingQuery = Payment::query()->where('status', 'pending');
+        $failedQuery = Payment::query()->where('status', 'failed');
+        $this->applyReportPaymentDates($pendingQuery, $from, $to, $dateType);
+        $this->applyReportPaymentDates($failedQuery, $from, $to, $dateType);
+
+        $bookingQuery = Booking::query()->with(['user', 'accommodationUnit', 'payment']);
+        $this->applyReportBookingDates($bookingQuery, $from, $to, $dateType === 'payment' ? 'booking' : $dateType);
+
+        $pendingAmount = (clone $pendingQuery)->sum('amount');
+        $failedAmount = (clone $failedQuery)->sum('amount');
+        $refundedAmount = $this->reportRefundedTotal($from, $to, $dateType);
+        $totalBookings = (clone $bookingQuery)->count();
+        $avgRating = round(
+            Review::query()
+                ->where('is_approved', true)
+                ->when($from && $to, fn ($q) => $q->whereBetween('created_at', [$from, $to]))
+                ->avg('rating') ?? 0,
+            1
+        );
+
+        $salesPayments = Payment::query()
+            ->whereKey($receipts->pluck(2)->unique()->all())
+            ->with(['booking.user', 'booking.accommodationUnit'])
+            ->orderByDesc(DB::raw('coalesce(paid_at, created_at)'))
+            ->limit(100)
+            ->get();
+
+        $paymentDetails = Payment::query()
+            ->with(['booking.user', 'booking.accommodationUnit'])
+            ->whereIn('status', ['pending', 'failed', 'refunded', 'success']);
+        $this->applyReportPaymentDates($paymentDetails, $from, $to, $dateType);
+        $paymentDetails = $paymentDetails->latest()->limit(120)->get();
+
+        $reservationRows = (clone $bookingQuery)->latest()->limit(100)->get();
+
+        $cancelledBookings = (clone $bookingQuery)->where('status', Booking::STATUS_CANCELLED)->get();
+        $cancelledAmount = (float) $cancelledBookings->sum('total_amount');
+        $cancelledCount = $cancelledBookings->count();
+        $lossAmount = round((float) $refundedAmount, 2);
+        $stayStats = $this->reportStayStats((clone $bookingQuery)->get(), $cancelledCount);
+
+        $bookingStatusCounts = (clone $bookingQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $paymentStatusCounts = Payment::query();
+        $this->applyReportPaymentDates($paymentStatusCounts, $from, $to, $dateType);
+        $paymentStatusCounts = $paymentStatusCounts
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
 
         return view('reports.index', compact(
-            'monthlyRevenue', 'dailyOccupancy', 'popularAccommodations',
-            'ratingDist', 'totalRevenue', 'pendingAmount',
-            'refundedAmount', 'totalBookings', 'avgRating'
+            'monthlyRevenue', 'popularRooms', 'popularCottages',
+            'ratingDist', 'totalRevenue', 'pendingAmount', 'failedAmount',
+            'refundedAmount', 'totalBookings', 'avgRating',
+            'period', 'dateType', 'dateFrom', 'dateTo',
+            'revenueChoice', 'revenueRange', 'revenueChartTitle', 'dateTypeLabel', 'revenueHasData',
+            'salesPayments', 'paymentDetails', 'reservationRows',
+            'cancelledAmount', 'cancelledCount', 'lossAmount', 'stayStats',
+            'bookingStatusCounts', 'paymentStatusCounts'
         ));
+    }
+
+    /**
+     * Money received in the report window, one row per receipt: [date, amount, payment id].
+     * By payment date, each part counts on the day it was confirmed; by booking or arrival
+     * date, everything received for the matching bookings counts.
+     */
+    protected function reportReceipts($from, $to, string $dateType)
+    {
+        $payments = Payment::query()->where('status', 'success');
+        if ($dateType !== 'payment') {
+            $this->applyReportPaymentDates($payments, $from, $to, $dateType);
+        }
+
+        $rows = $payments->get()->flatMap(fn (Payment $payment) => collect($payment->receipts())
+            ->map(fn (array $row) => [$row[0], $row[1], $payment->id]));
+
+        if ($dateType === 'payment' && $from && $to) {
+            $rows = $rows->filter(fn (array $row) => $row[0]->between($from, $to));
+        }
+
+        return $rows->values();
+    }
+
+    /** Cancellation rate, average stay length and average rate per night for the bookings in the window. */
+    protected function reportStayStats($bookings, int $cancelledCount): array
+    {
+        $kept = $bookings->where('status', '!=', Booking::STATUS_CANCELLED);
+        $nightly = $kept->reject(fn (Booking $b) => $b->isHourly());
+        $hourly = $kept->filter(fn (Booking $b) => $b->isHourly());
+        $nights = (int) $nightly->sum(fn (Booking $b) => max(1, (int) $b->nights_count));
+
+        return [
+            'cancel_rate' => $bookings->count() > 0 ? round($cancelledCount / $bookings->count() * 100, 1) : 0,
+            'avg_nights' => $nightly->count() > 0 ? round($nights / $nightly->count(), 1) : 0,
+            'avg_hours' => $hourly->count() > 0 ? round($hourly->avg(fn (Booking $b) => (int) $b->hours_count), 1) : 0,
+            'nightly_count' => $nightly->count(),
+            'hourly_count' => $hourly->count(),
+            'avg_rate' => $nights > 0 ? round((float) $nightly->sum('total_amount') / $nights, 2) : 0,
+        ];
+    }
+
+    /**
+     * Hotel/PMS-style report window: presets + custom from/to + date type.
+     *
+     * @return array{
+     *   period:string,dateType:string,dateTypeLabel:string,dateFrom:?string,dateTo:?string,
+     *   from:\Carbon\Carbon|null,to:\Carbon\Carbon|null,group:string,
+     *   revenueChoice:string,revenueRange:string,revenueChartTitle:string
+     * }
+     */
+    protected function reportDateWindow(Request $request): array
+    {
+        $allowed = ['today', 'yesterday', 'week', 'last_week', 'month', 'last_month', 'six_months', 'year', 'all', 'custom'];
+        $period = (string) $request->input('period', 'six_months');
+        if (! in_array($period, $allowed, true)) {
+            $period = 'six_months';
+        }
+
+        $dateType = (string) $request->input('date_type', 'payment');
+        if (! in_array($dateType, ['payment', 'booking', 'arrival'], true)) {
+            $dateType = 'payment';
+        }
+
+        $now = now();
+        $from = null;
+        $to = null;
+        $group = 'day';
+
+        if ($period === 'custom' || ($request->filled('date_from') && $request->filled('date_to') && ! in_array($period, ['today', 'yesterday', 'week', 'last_week', 'month', 'last_month', 'six_months', 'year', 'all'], true))) {
+            $period = 'custom';
+            $from = \Carbon\Carbon::parse($request->input('date_from', $now->toDateString()))->startOfDay();
+            $to = \Carbon\Carbon::parse($request->input('date_to', $now->toDateString()))->endOfDay();
+            if ($from->gt($to)) {
+                [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+            }
+            $group = $from->diffInDays($to) > 62 ? 'month' : 'day';
+        } else {
+            [$from, $to, $group] = match ($period) {
+                'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay(), 'day'],
+                'yesterday' => [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay(), 'day'],
+                'week' => [$now->copy()->startOfWeek(), $now->copy()->endOfWeek(), 'day'],
+                'last_week' => [$now->copy()->subWeek()->startOfWeek(), $now->copy()->subWeek()->endOfWeek(), 'day'],
+                'month' => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth(), 'day'],
+                'last_month' => [$now->copy()->subMonthNoOverflow()->startOfMonth(), $now->copy()->subMonthNoOverflow()->endOfMonth(), 'day'],
+                'six_months' => [$now->copy()->subMonths(5)->startOfMonth(), $now->copy()->endOfMonth(), 'month'],
+                'year' => [$now->copy()->startOfYear(), $now->copy()->endOfYear(), 'month'],
+                default => [null, null, 'month'],
+            };
+        }
+
+        $dateTypeLabel = match ($dateType) {
+            'booking' => 'Booking date',
+            'arrival' => 'Arrival (check-in) date',
+            default => 'Payment date',
+        };
+
+        $revenueChoice = match ($period) {
+            'today' => 'Today',
+            'yesterday' => 'Yesterday',
+            'week' => 'This week',
+            'last_week' => 'Last week',
+            'month' => 'This month',
+            'last_month' => 'Last month',
+            'six_months' => 'Last 6 months',
+            'year' => 'This year',
+            'custom' => 'Custom range',
+            default => 'All time',
+        };
+
+        $revenueRange = $from && $to
+            ? ($from->isSameDay($to)
+                ? $from->format('M j, Y')
+                : $from->format('M j, Y').' – '.$to->format('M j, Y'))
+            : 'All recorded activity';
+
+        $revenueChartTitle = match ($period) {
+            'today', 'yesterday' => 'Daily revenue',
+            'week', 'last_week' => 'Weekly revenue',
+            'month', 'last_month' => 'Monthly revenue',
+            'six_months' => 'Revenue',
+            'year' => 'Yearly revenue',
+            'custom' => 'Revenue for selected dates',
+            default => 'Revenue over time',
+        };
+
+        return [
+            'period' => $period,
+            'dateType' => $dateType,
+            'dateTypeLabel' => $dateTypeLabel,
+            'dateFrom' => $from?->toDateString(),
+            'dateTo' => $to?->toDateString(),
+            'from' => $from,
+            'to' => $to,
+            'group' => $group,
+            'revenueChoice' => $revenueChoice,
+            'revenueRange' => $revenueRange,
+            'revenueChartTitle' => $revenueChartTitle,
+        ];
+    }
+
+    /** @deprecated Keep for older callers that still pass a period string. */
+    protected function reportRevenueWindow(string $period): array
+    {
+        $request = request()->merge(['period' => $period]);
+        $w = $this->reportDateWindow($request);
+
+        return [$w['period'], $w['from'], $w['to'], $w['group'], $w['revenueChoice'], $w['revenueRange'], $w['revenueChartTitle']];
+    }
+
+    protected function applyReportPaymentDates($query, $from, $to, string $dateType): void
+    {
+        if (! $from || ! $to) {
+            return;
+        }
+
+        if ($dateType === 'payment') {
+            $table = $query->getModel()->getTable();
+            $query->whereRaw("coalesce({$table}.paid_at, {$table}.created_at) between ? and ?", [$from->toDateTimeString(), $to->toDateTimeString()]);
+
+            return;
+        }
+
+        $query->whereHas('booking', function ($q) use ($from, $to, $dateType) {
+            $this->applyReportBookingDates($q, $from, $to, $dateType);
+        });
+    }
+
+    protected function applyReportBookingDates($query, $from, $to, string $dateType): void
+    {
+        if (! $from || ! $to) {
+            return;
+        }
+
+        $table = $query->getModel()->getTable();
+
+        if ($dateType === 'arrival') {
+            $query->whereDate($table.'.check_in_date', '>=', $from->toDateString())
+                ->whereDate($table.'.check_in_date', '<=', $to->toDateString());
+
+            return;
+        }
+
+        // booking date (and payment→booking fallback)
+        $query->whereBetween($table.'.created_at', [$from, $to]);
+    }
+
+    protected function reportRefundedTotal($from, $to, string $dateType): float
+    {
+        $full = Payment::query()->where('status', 'refunded');
+        $this->applyReportPaymentDates($full, $from, $to, $dateType);
+        $fullTotal = (float) $full->sum('amount');
+
+        $partialQuery = Payment::query()->where('status', 'success');
+        $this->applyReportPaymentDates($partialQuery, $from, $to, $dateType);
+        $partial = (float) $partialQuery->get()
+            ->sum(fn (Payment $payment) => (float) ($payment->metadata['refund_amount'] ?? 0));
+
+        return round($fullTotal + $partial, 2);
+    }
+
+    /** @param \Illuminate\Support\Collection $receipts rows of [date, amount, ...] from reportReceipts() */
+    protected function reportRevenueSeries($receipts, string $group, $from, $to)
+    {
+        $format = $group === 'day' ? 'Y-m-d' : 'Y-m';
+        $rows = $receipts
+            ->groupBy(fn (array $row) => $row[0]->format($format))
+            ->map(fn ($bucket) => round($bucket->sum(fn (array $row) => $row[1]), 2))
+            ->sortKeys();
+        $points = [];
+
+        if ($group === 'day' && $from && $to) {
+            for ($cursor = $from->copy()->startOfDay(); $cursor->lte($to); $cursor->addDay()) {
+                $key = $cursor->format('Y-m-d');
+                $points[] = (object) ['month' => $cursor->format('M j'), 'total' => (float) ($rows[$key] ?? 0)];
+            }
+        } elseif ($from && $to) {
+            for ($cursor = $from->copy()->startOfMonth(); $cursor->lte($to); $cursor->addMonth()) {
+                $key = $cursor->format('Y-m');
+                $points[] = (object) ['month' => $cursor->format('M Y'), 'total' => (float) ($rows[$key] ?? 0)];
+            }
+        } else {
+            foreach ($rows as $key => $total) {
+                $label = strlen((string) $key) === 7
+                    ? \Carbon\Carbon::createFromFormat('Y-m', $key)->format('M Y')
+                    : (string) $key;
+                $points[] = (object) ['month' => $label, 'total' => (float) $total];
+            }
+        }
+
+        return collect($points);
     }
 
     public function exportPdf(Request $request)
     {
-        $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
-        $dateTo   = $request->date_to ?? now()->format('Y-m-d');
+        $section = $this->reportExportSection($request);
+        $bundle = $this->reportExportBundle($request);
 
-        $paymentQuery   = Payment::successful()->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59']);
-        $totalRevenue   = $paymentQuery->clone()->sum('amount');
-        $driver         = DB::getDriverName();
-        $select         = $driver === 'sqlite'
-            ? "strftime('%Y-%m', created_at) as month, SUM(amount) as total"
-            : "DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total";
+        if ($section !== 'full') {
+            $pdf = Pdf::loadView('pdf.report-section', array_merge($bundle, [
+                'section' => $section,
+                'sectionTitle' => $this->reportSectionTitle($section),
+            ]));
 
-        $monthlyRevenue = $paymentQuery->clone()
-            ->selectRaw($select)
-            ->groupBy('month')
-            ->orderBy('month')
-            ->get();
+            return $pdf->download('talisay-'.$section.'-report.pdf');
+        }
 
-        $pendingAmount  = Payment::where('status', 'pending')->sum('amount');
-        $refundedAmount = Payment::where('status', 'refunded')->sum('amount');
-
-        $dailyOccupancy = CapacitySchedule::whereBetween('date', [$dateFrom, $dateTo])
-            ->orderBy('date')
-            ->get()
-            ->map(fn($c) => [
-                'date'          => $c->date->format('Y-m-d'),
-                'current_count' => $c->current_count,
-                'max_capacity'  => $c->max_capacity,
-                'utilization'   => $c->getUtilizationPercent(),
-            ]);
-
-        $averageOccupancy = round($dailyOccupancy->avg('utilization'), 1);
-        $popularAccommodations = AccommodationUnit::withCount(['bookings' => function ($q) {
-            $q->whereIn('status', ['paid', 'checked_in', 'completed']);
-        }])->orderBy('bookings_count', 'desc')->take(10)->get();
-
-        $reviewsQuery  = Review::approved();
-        $averageRating = round($reviewsQuery->avg('rating') ?? 0, 1);
-        $totalReviews  = $reviewsQuery->count();
-
-        $pdf = Pdf::loadView('pdf.report', compact(
-            'totalRevenue', 'pendingAmount', 'refundedAmount', 'monthlyRevenue',
-            'dailyOccupancy', 'averageOccupancy', 'popularAccommodations', 'averageRating', 'totalReviews'
-        ));
+        $pdf = Pdf::loadView('pdf.report', $bundle);
 
         return $pdf->download('talisay-resort-analytics-report.pdf');
     }
 
-    public function exportExcel(Request $request)
+    protected function reportExportSection(Request $request): string
     {
-        $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
-        $dateTo   = $request->date_to ?? now()->format('Y-m-d');
+        $section = (string) $request->input('section', 'full');
 
-        $totalRevenue   = Payment::successful()->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59'])->sum('amount');
-        $pendingAmount  = Payment::where('status', 'pending')->sum('amount');
-        $refundedAmount = Payment::where('status', 'refunded')->sum('amount');
+        return in_array($section, ['full', 'sales', 'bookings', 'payments'], true) ? $section : 'full';
+    }
+
+    protected function reportSectionTitle(string $section): string
+    {
+        return match ($section) {
+            'sales' => 'Sales Report',
+            'bookings' => 'Reservations Report',
+            'payments' => 'Payments & Losses Report',
+            default => 'Full Analytics Report',
+        };
+    }
+
+    protected function reportExportBundle(Request $request): array
+    {
+        $window = $this->reportDateWindow($request);
+        $from = $window['from'];
+        $to = $window['to'];
+        $group = $window['group'];
+        $dateType = $window['dateType'];
+        $period = $window['period'];
+        $revenueRange = $window['revenueRange'];
+        $dateFrom = $window['dateFrom'] ?? now()->subDays(30)->toDateString();
+        $dateTo = $window['dateTo'] ?? now()->toDateString();
+
+        $receipts = $this->reportReceipts($from, $to, $dateType);
+        $totalRevenue = round($receipts->sum(fn ($row) => $row[1]), 2);
+        $monthlyRevenue = $this->reportRevenueSeries($receipts, $group, $from, $to);
+
+        $pendingQuery = Payment::query()->where('status', 'pending');
+        $failedQuery = Payment::query()->where('status', 'failed');
+        $this->applyReportPaymentDates($pendingQuery, $from, $to, $dateType);
+        $this->applyReportPaymentDates($failedQuery, $from, $to, $dateType);
+        $pendingAmount = (clone $pendingQuery)->sum('amount');
+        $failedAmount = (clone $failedQuery)->sum('amount');
+        $refundedAmount = $this->reportRefundedTotal($from, $to, $dateType);
 
         $dailyOccupancy = CapacitySchedule::whereBetween('date', [$dateFrom, $dateTo])
-            ->orderBy('date')->get();
+            ->orderBy('date')
+            ->get()
+            ->map(function ($c) {
+                $max = CapacitySchedule::visitorCap();
 
-        $popularAccommodations = AccommodationUnit::withCount(['bookings' => function ($q) {
-            $q->whereIn('status', ['paid', 'checked_in', 'completed']);
-        }])->orderBy('bookings_count', 'desc')->get();
+                return [
+                    'date' => $c->date->format('Y-m-d'),
+                    'current_count' => $c->current_count,
+                    'max_capacity' => $max,
+                    'utilization' => $max > 0 ? round(min(100, $c->current_count / $max * 100), 1) : 0,
+                ];
+            });
+
+        $averageOccupancy = round($dailyOccupancy->avg('utilization') ?? 0, 1);
+        $stayStatuses = ['paid', 'checked_in', 'checked_out', 'completed'];
+        $popularAccommodations = AccommodationUnit::withCount(['bookings' => function ($q) use ($stayStatuses, $from, $to, $dateType) {
+            $q->whereIn('status', $stayStatuses);
+            $this->applyReportBookingDates($q, $from, $to, $dateType === 'payment' ? 'booking' : $dateType);
+        }])->orderByDesc('bookings_count')->take(10)->get();
+
+        $reviewsQuery = Review::approved()
+            ->when($from && $to, fn ($q) => $q->whereBetween('created_at', [$from, $to]));
+        $averageRating = round($reviewsQuery->avg('rating') ?? 0, 1);
+        $totalReviews = (clone $reviewsQuery)->count();
+
+        $salesPayments = Payment::query()
+            ->whereKey($receipts->pluck(2)->unique()->all())
+            ->with(['booking.user', 'booking.accommodationUnit'])
+            ->orderByDesc(DB::raw('coalesce(paid_at, created_at)'))
+            ->limit(200)
+            ->get();
+
+        $paymentDetails = Payment::query()
+            ->with(['booking.user', 'booking.accommodationUnit']);
+        $this->applyReportPaymentDates($paymentDetails, $from, $to, $dateType);
+        $paymentDetails = $paymentDetails->latest()->limit(200)->get();
+
+        $reservationRows = Booking::query()
+            ->with(['user', 'accommodationUnit', 'payment']);
+        $this->applyReportBookingDates($reservationRows, $from, $to, $dateType === 'payment' ? 'booking' : $dateType);
+        $reservationRows = $reservationRows->latest()->limit(200)->get();
+
+        $cancelledAmount = (float) $reservationRows->where('status', Booking::STATUS_CANCELLED)->sum('total_amount');
+        $cancelledCount = $reservationRows->where('status', Booking::STATUS_CANCELLED)->count();
+        $lossAmount = round((float) $refundedAmount, 2);
+        $stayStats = $this->reportStayStats($reservationRows, $cancelledCount);
+
+        return array_merge($window, compact(
+            'totalRevenue', 'pendingAmount', 'failedAmount', 'refundedAmount', 'monthlyRevenue',
+            'dailyOccupancy', 'averageOccupancy', 'popularAccommodations', 'averageRating', 'totalReviews',
+            'salesPayments', 'paymentDetails', 'reservationRows',
+            'cancelledAmount', 'cancelledCount', 'lossAmount', 'stayStats', 'revenueRange', 'period'
+        ));
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $section = $this->reportExportSection($request);
+        $bundle = $this->reportExportBundle($request);
+        $filename = $section === 'full'
+            ? 'talisay-analytics-report.csv'
+            : 'talisay-'.$section.'-report.csv';
 
         $headers = [
-            'Content-Type'        => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="talisay-analytics-report.csv"',
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ];
 
-        return response()->stream(function () use ($totalRevenue, $pendingAmount, $refundedAmount, $dailyOccupancy, $popularAccommodations) {
+        return response()->stream(function () use ($section, $bundle) {
             $file = fopen('php://output', 'w');
+            $title = $this->reportSectionTitle($section);
 
-            fputcsv($file, ['Talisay Beach Resort Analytics Report']);
+            fputcsv($file, ['Talisay Beach Resort — '.$title]);
+            fputcsv($file, ['Period', $bundle['revenueRange'] ?? '']);
             fputcsv($file, ['Generated On', now()->format('Y-m-d H:i:s')]);
             fputcsv($file, []);
 
-            fputcsv($file, ['Financial Performance Indicators']);
-            fputcsv($file, ['Indicator', 'Value (PHP)']);
-            fputcsv($file, ['Gross Revenue', $totalRevenue]);
-            fputcsv($file, ['Pending Balances', $pendingAmount]);
-            fputcsv($file, ['Refunded Losses', $refundedAmount]);
-            fputcsv($file, []);
-
-            fputcsv($file, ['Resort Occupancy Logs']);
-            fputcsv($file, ['Date', 'Booked Count', 'Cap Slots Limit', 'Utilization Rate (%)']);
-            foreach ($dailyOccupancy as $day) {
-                fputcsv($file, [
-                    $day->date->format('Y-m-d'),
-                    $day->current_count,
-                    $day->max_capacity,
-                    $day->getUtilizationPercent()
-                ]);
+            if ($section === 'full' || $section === 'sales') {
+                fputcsv($file, ['Sales Summary']);
+                fputcsv($file, ['Revenue received', $bundle['totalRevenue']]);
+                fputcsv($file, []);
+                fputcsv($file, ['Sales Report (confirmed payments)']);
+                fputcsv($file, ['Paid on', 'Reference', 'Guest', 'Unit', 'Method', 'Amount (PHP)', 'Status']);
+                foreach ($bundle['salesPayments'] as $payment) {
+                    fputcsv($file, [
+                        optional($payment->paid_at ?? $payment->created_at)->format('Y-m-d H:i'),
+                        $payment->booking?->reference_no ?? '—',
+                        $payment->booking?->user?->name ?? 'Guest',
+                        $payment->booking?->accommodationUnit?->unit_number ?? '—',
+                        $payment->gateway ?: ($payment->payment_channel ?: '—'),
+                        $payment->amount,
+                        $payment->status,
+                    ]);
+                }
+                fputcsv($file, []);
             }
-            fputcsv($file, []);
 
-            fputcsv($file, ['Popular Rooms and Cottages']);
-            fputcsv($file, ['Unit Number', 'Type', 'Nightly Rate', 'Max Occupancy', 'Confirmed Bookings']);
-            foreach ($popularAccommodations as $unit) {
-                fputcsv($file, [
-                    $unit->unit_number,
-                    $unit->type_label . ' (' . $unit->variant_label . ')',
-                    $unit->price_per_night,
-                    $unit->max_occupancy,
-                    $unit->bookings_count
-                ]);
+            if ($section === 'full' || $section === 'bookings') {
+                fputcsv($file, ['Reservations Report']);
+                fputcsv($file, ['Date', 'Reference', 'Guest', 'Unit', 'Check-in', 'Check-out', 'Guests', 'Total (PHP)', 'Status']);
+                foreach ($bundle['reservationRows'] as $booking) {
+                    fputcsv($file, [
+                        optional($booking->created_at)->format('Y-m-d H:i'),
+                        $booking->reference_no,
+                        $booking->user?->name ?? 'Guest',
+                        $booking->accommodationUnit?->unit_number ?? ($booking->booking_type === 'special_resort' ? 'Exclusive resort' : '—'),
+                        optional($booking->check_in_date)->format('Y-m-d'),
+                        optional($booking->check_out_date)->format('Y-m-d'),
+                        $booking->guests_count,
+                        $booking->total_amount,
+                        $booking->status,
+                    ]);
+                }
+                fputcsv($file, []);
+            }
+
+            if ($section === 'full' || $section === 'payments') {
+                fputcsv($file, ['Payments & Losses']);
+                fputcsv($file, ['Pending', $bundle['pendingAmount']]);
+                fputcsv($file, ['Failed (never received)', $bundle['failedAmount']]);
+                fputcsv($file, ['Refunded to guests', $bundle['refundedAmount']]);
+                fputcsv($file, ['Cancelled booking value', $bundle['cancelledAmount']]);
+                fputcsv($file, ['Cancellation rate (%)', $bundle['stayStats']['cancel_rate']]);
+                fputcsv($file, ['Average nights per stay', $bundle['stayStats']['avg_nights']]);
+                fputcsv($file, ['Average rate per night (PHP)', $bundle['stayStats']['avg_rate']]);
+                fputcsv($file, []);
+                fputcsv($file, ['Payment Details']);
+                fputcsv($file, ['Date', 'Reference', 'Guest', 'Method', 'Amount (PHP)', 'Status', 'Refund note']);
+                foreach ($bundle['paymentDetails'] as $payment) {
+                    $refund = $payment->refundSent();
+                    fputcsv($file, [
+                        optional($payment->created_at)->format('Y-m-d H:i'),
+                        $payment->booking?->reference_no ?? '—',
+                        $payment->booking?->user?->name ?? 'Guest',
+                        $payment->gateway ?: ($payment->payment_channel ?: '—'),
+                        $payment->amount,
+                        $payment->status,
+                        $refund['note'] ?? ($payment->metadata['refund_amount'] ?? ''),
+                    ]);
+                }
+                fputcsv($file, []);
+            }
+
+            if ($section === 'full') {
+                fputcsv($file, ['Resort Occupancy Logs']);
+                fputcsv($file, ['Date', 'Booked Count', 'Cap Slots Limit', 'Utilization Rate (%)']);
+                foreach ($bundle['dailyOccupancy'] as $day) {
+                    fputcsv($file, [
+                        $day['date'],
+                        $day['current_count'],
+                        $day['max_capacity'],
+                        $day['utilization'],
+                    ]);
+                }
+                fputcsv($file, []);
+
+                fputcsv($file, ['Popular Rooms and Cottages']);
+                fputcsv($file, ['Unit Number', 'Type', 'Nightly Rate', 'Max Occupancy', 'Confirmed Bookings']);
+                foreach ($bundle['popularAccommodations'] as $unit) {
+                    fputcsv($file, [
+                        $unit->unit_number,
+                        $unit->type_label.' ('.$unit->variant_label.')',
+                        $unit->price_per_night,
+                        $unit->max_occupancy,
+                        $unit->bookings_count,
+                    ]);
+                }
             }
 
             fclose($file);
@@ -1038,25 +2067,25 @@ class WebControllers extends Controller
     public function usersIndex(Request $request)
     {
         // The user list lives inside System Settings > User Accounts tab
-        return redirect()->route('settings.index', array_merge(['tab' => 'users'], $request->only(['search', 'role', 'status', 'page'])));
+        return redirect()->route('maintenance.section', array_merge(['section' => 'accounts'], $request->only(['search', 'role', 'status', 'page'])));
     }
 
     public function userCreate()
     {
-        return redirect()->route('settings.index', ['tab' => 'users', 'action' => 'create']);
+        return redirect()->route('maintenance.section', ['section' => 'accounts', 'action' => 'create']);
     }
 
     public function userShow(User $user)
     {
-        return redirect()->route('settings.index', ['tab' => 'users']);
+        return redirect()->route('maintenance.section', 'accounts');
     }
 
     public function userStore(Request $request)
     {
         $request->validate([
             'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255|unique:users',
-            'phone'    => 'nullable|string|max:20',
+            'email'    => ['required', 'string', 'email', 'max:255', User::uniqueActiveColumn('email')],
+            'phone'    => ['nullable', 'string', 'max:20', new \App\Rules\PhoneNumber],
             'password' => 'required|string|min:8|confirmed',
             'role'     => 'required|in:admin,staff,tourist',
         ]);
@@ -1074,25 +2103,52 @@ class WebControllers extends Controller
             'password'  => Hash::make($request->password),
             'role'      => $request->role,
             'is_active' => true,
-        ]);
+        ] + ($request->role === 'staff' ? [
+            'staff_id'       => User::nextStaffId(),
+            'account_status' => 'active',
+            'duty_status'    => 'available',
+        ] : []));
 
         AuditLog::log('user_created', $newUser, null, ['role' => $newUser->role, 'created_by' => auth()->id()]);
 
-        return redirect()->route('users.index')
-            ->with('success', "Account for \"{$newUser->name}\" created successfully.");
+        $message = "Account for \"{$newUser->name}\" created successfully.";
+        if ($newUser->role === 'staff') {
+            $message .= ' Set the job and permissions in Staff Role Management.';
+        }
+
+        return redirect()->route('maintenance.section', 'accounts')->with('success', $message);
+    }
+
+    /** Keep a staff member's account status in step with the active switch. */
+    private function syncStaffAccountStatus(User $user): void
+    {
+        if ($user->role !== 'staff') {
+            return;
+        }
+
+        $current = (string) $user->account_status;
+        if ($user->is_active && ! in_array($current, ['active', 'on_leave'], true)) {
+            $user->account_status = 'active';
+        } elseif (! $user->is_active && in_array($current, ['', 'active', 'on_leave'], true)) {
+            $user->account_status = 'suspended';
+        }
+
+        if ($user->isDirty('account_status')) {
+            $user->save();
+        }
     }
 
     public function userEdit(User $user)
     {
-        return redirect()->route('settings.index', ['tab' => 'users']);
+        return redirect()->route('maintenance.section', 'accounts');
     }
 
     public function userUpdate(Request $request, User $user)
     {
         $request->validate([
             'name'      => 'required|string|max:255',
-            'email'     => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'phone'     => 'nullable|string|max:20',
+            'email'     => ['required', 'string', 'email', 'max:255', User::uniqueActiveColumn('email', $user->id)],
+            'phone'     => ['nullable', 'string', 'max:20', new \App\Rules\PhoneNumber],
             'role'      => 'required|in:admin,staff,tourist',
             'is_active' => 'nullable|boolean',
             'password'  => 'nullable|string|min:8|confirmed',
@@ -1101,6 +2157,18 @@ class WebControllers extends Controller
         if ($user->id === auth()->id() && !$request->boolean('is_active', false)) {
             return back()->withInput()->withErrors([
                 'is_active' => 'You cannot deactivate your own administrative account.',
+            ]);
+        }
+
+        if ($user->role === 'admin' && $request->role !== 'admin') {
+            return back()->withInput()->withErrors([
+                'role' => 'The administrator account must stay an administrator.',
+            ]);
+        }
+
+        if ($request->role === 'admin' && $user->role !== 'admin' && User::where('role', 'admin')->exists()) {
+            return back()->withInput()->withErrors([
+                'role' => 'Only one primary administrator account is allowed.',
             ]);
         }
 
@@ -1117,7 +2185,12 @@ class WebControllers extends Controller
             $updateData['password'] = Hash::make($request->password);
         }
 
+        if ($updateData['role'] === 'staff' && ! $user->staff_id) {
+            $updateData['staff_id'] = User::nextStaffId();
+        }
+
         $user->update($updateData);
+        $this->syncStaffAccountStatus($user);
 
         AuditLog::log('user_updated', $user, null, [
             'user_id'    => $user->id,
@@ -1125,34 +2198,47 @@ class WebControllers extends Controller
             'updated_by' => auth()->id(),
         ]);
 
-        return redirect()->route('users.index')
+        return redirect()->route('maintenance.section', 'accounts')
             ->with('success', "Account for \"{$user->name}\" updated successfully.");
     }
 
     public function userDestroy(User $user)
     {
+        $returnTo = request('return_to') === 'staff'
+            ? redirect()->route('tasks.staff')
+            : redirect()->route('maintenance.section', 'accounts');
+
         if ($user->id === auth()->id()) {
-            return redirect()->route('settings.index', ['tab' => 'users'])
-                ->with('error', 'You cannot delete your own account.');
+            return $returnTo->with('error', 'You cannot delete your own account.');
+        }
+
+        if ($user->role === 'admin') {
+            return $returnTo->with('error', 'The administrator account cannot be deleted.');
         }
 
         $userName = $user->name;
-        AuditLog::log('user_deleted', $user, null, ['user_id' => $user->id, 'deleted_by' => auth()->id()]);
-        $user->delete();
+        try {
+            AuditLog::log('user_deleted', $user, null, ['user_id' => $user->id, 'deleted_by' => auth()->id()]);
+            $user->eraseFromDatabase();
+        } catch (\Throwable $e) {
+            report($e);
 
-        return redirect()->route('users.index')
-            ->with('success', "Account for \"{$userName}\" has been removed.");
+            return $returnTo->with('error', "Account for \"{$userName}\" could not be removed. Try again.");
+        }
+
+        return $returnTo->with('success', "Account for \"{$userName}\" was deleted from the database.");
     }
 
     public function userToggleStatus(User $user)
     {
         if ($user->id === auth()->id()) {
-            return redirect()->route('settings.index', ['tab' => 'users'])
+            return redirect()->route('maintenance.section', 'accounts')
                 ->with('error', 'You cannot suspend your own account.');
         }
 
         $user->is_active = !$user->is_active;
         $user->save();
+        $this->syncStaffAccountStatus($user);
 
         AuditLog::log('user_status_updated', $user, null, [
             'user_id'   => $user->id,
@@ -1160,7 +2246,7 @@ class WebControllers extends Controller
         ]);
 
         $statusStr = $user->is_active ? 'activated' : 'suspended';
-        return redirect()->route('settings.index', ['tab' => 'users'])
+        return redirect()->route('maintenance.section', 'accounts')
             ->with('success', "Account for \"{$user->name}\" has been {$statusStr}.");
     }
 
@@ -1176,14 +2262,45 @@ class WebControllers extends Controller
 
         AuditLog::log('user_password_reset', $user, null, ['user_id' => $user->id, 'reset_by' => auth()->id()]);
 
-        return redirect()->route('settings.index', ['tab' => 'users'])
+        return redirect()->route('maintenance.section', 'accounts')
             ->with('success', "Password for \"{$user->name}\" has been reset successfully.");
     }
 
     // ─── Profile Logic ────────────────────────────────────────
     public function profileShow()
     {
+        $user = auth()->user();
+        if ($user && $user->isTourist()) {
+            return view('profile.client', [
+                'resortInfo' => $this->clientResortInfo(),
+            ]);
+        }
+
         return view('profile.show');
+    }
+
+    /** Contact details the public client layout needs in the nav, footer, and chatbot. */
+    protected function clientResortInfo(): array
+    {
+        $clock = function (?string $value, string $fallback): string {
+            try {
+                return \Carbon\Carbon::createFromFormat('H:i', (string) $value)->format('g:i A');
+            } catch (\Throwable) {
+                return $fallback;
+            }
+        };
+
+        return [
+            'name'        => setting('resort_name', 'Talisay Beach Resort'),
+            'email'       => setting('contact_email', 'info@talisayresort.com'),
+            'phone'       => setting('contact_phone', ''),
+            'address'     => setting('resort_address', 'Barangay Maslug, Baybay City, Leyte'),
+            'opens'       => $clock(setting('opening_time', '06:00'), '6:00 AM'),
+            'closes'      => $clock(setting('closing_time', '22:00'), '10:00 PM'),
+            'late_refund' => (int) setting('late_cancellation_refund_percent', 50),
+            'same_day'    => (int) setting('same_day_cancellation_refund', 0),
+            'gcash_name'  => setting('gcash_name', 'Talisay Beach Resort'),
+        ];
     }
 
     public function profileUpdate(Request $request)
@@ -1192,8 +2309,8 @@ class WebControllers extends Controller
 
         $request->validate([
             'name'   => 'required|string|max:255',
-            'email'  => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'phone'  => 'nullable|string|max:20',
+            'email'  => ['required', 'string', 'email', 'max:255', User::uniqueActiveColumn('email', $user->id)],
+            'phone'  => ['nullable', 'string', 'max:20', new \App\Rules\PhoneNumber],
             'avatar' => 'nullable|image|max:2048',
         ]);
 
@@ -1228,7 +2345,7 @@ class WebControllers extends Controller
         $user = $request->user();
 
         $request->validate([
-            'current_password' => 'required|current_password',
+            'current_password' => 'bail|required|string|current_password',
             'password'         => 'required|string|min:8|confirmed',
         ]);
 
@@ -1243,6 +2360,11 @@ class WebControllers extends Controller
 
     // ─── Settings Logic ───────────────────────────────────────
     public function settingsIndex(?Request $request = null)
+    {
+        return view('settings.index', $this->settingsViewData($request));
+    }
+
+    public function settingsViewData(?Request $request = null): array
     {
         $request = $request ?? request();
         $settings = SystemSetting::all()->pluck('value', 'key');
@@ -1280,7 +2402,9 @@ class WebControllers extends Controller
         $aiService = app(ChatbotAIService::class);
         $aiProviders = $aiService->getProviders();
 
-        return view('settings.index', compact(
+        $galleryPhotos = GalleryPhoto::query()->orderBy('sort_order')->orderBy('id')->get();
+
+        return compact(
             'settings',
             'users',
             'totalUsers',
@@ -1290,15 +2414,14 @@ class WebControllers extends Controller
             'activeCount',
             'inactiveCount',
             'chatbotConfig',
-            'aiProviders'
-        ));
+            'aiProviders',
+            'galleryPhotos'
+        );
     }
 
     public function settingsUpdate(Request $request)
     {
-        $request->validate([
-            'settings' => 'required|array',
-        ]);
+        $request->validate(SystemSetting::validationRules(), SystemSetting::validationMessages());
 
         $secretKeys = ['stripe_secret', 'stripe_webhook_secret'];
         $saved      = [];
@@ -1310,13 +2433,22 @@ class WebControllers extends Controller
             if (in_array($key, $secretKeys, true) && (trim((string) $value) === '' || str_contains((string) $value, '•'))) {
                 continue;
             }
+            if ($key === 'ui_locale' && ! \App\Support\UiLocales::allows((string) $value)) {
+                continue;
+            }
             SystemSetting::set($key, $value);
             $saved[$key] = in_array($key, $secretKeys, true) ? '[redacted]' : $value;
         }
 
+        if (array_key_exists('daily_visitor_cap', $saved)) {
+            \App\Models\CapacitySchedule::query()->update([
+                'max_capacity' => \App\Models\CapacitySchedule::visitorCap(),
+            ]);
+        }
+
         AuditLog::log('settings_updated', null, null, $saved);
 
-        return back()->with('success', 'Settings updated successfully.');
+        return back()->with('success', __('Settings updated successfully.'));
     }
 
     public function settingsUpdateChatbot(Request $request)
@@ -1351,6 +2483,8 @@ class WebControllers extends Controller
             'fallback_message'  => $request->fallback_message,
         ];
 
+        \App\Models\SystemSetting::set('ai_hide_contacts', $request->boolean('hide_contacts') ? '1' : '0');
+
         // API Key logic:
         if ($request->boolean('remove_api_key')) {
             $data['api_key'] = null;
@@ -1381,7 +2515,7 @@ class WebControllers extends Controller
             'is_enabled' => $config->is_enabled,
         ]);
 
-        return redirect()->route('settings.index', ['tab' => 'chatbot'])->with('success', 'AI Chatbot settings updated successfully.');
+        return redirect()->route('maintenance.section', 'assistant')->with('success', 'AI Chatbot settings updated successfully.');
     }
 
     public function settingsTestAiConnection(Request $request)

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\MobileClientController;
+use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\Api\MobileIntegrationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
@@ -33,7 +34,13 @@ Route::prefix('chatbot')->middleware(['web', 'throttle:chatbot'])->group(functio
 Route::prefix('mobile')->middleware('throttle:30,1')->group(function () {
     Route::post('/register', [MobileClientController::class, 'register']);
     Route::post('/login', [MobileClientController::class, 'login']);
+    Route::post('/auth/{provider}/start', [SocialAuthController::class, 'mobileStart'])
+        ->where('provider', 'google|facebook');
+    Route::get('/auth/social/{attempt}', [SocialAuthController::class, 'mobileStatus'])
+        ->whereUuid('attempt');
+    Route::get('/site', [MobileClientController::class, 'site']);
     Route::get('/units', [MobileClientController::class, 'units']);
+    Route::get('/payment-info', [MobileClientController::class, 'paymentInfo']);
     Route::get('/units/{unit}/availability', [MobileClientController::class, 'stay']);
     Route::post('/chat', [ChatbotController::class, 'message'])->middleware('auth:sanctum');
 });
@@ -54,8 +61,11 @@ Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
     // Bookings — every action is authorised by BookingPolicy
     Route::get('/my-bookings', [BookingController::class, 'myBookings']);
     Route::post('/bookings', [BookingController::class, 'store']);
+    Route::post('/bookings/special-resort', [BookingController::class, 'storeSpecial']);
+    Route::post('/bookings/{booking}/modify', [BookingController::class, 'modify']);
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::patch('/bookings/{booking}/status', [BookingController::class, 'update']);
+    Route::get('/bookings/{booking}/cancellation-preview', [BookingController::class, 'previewCancel']);
     Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
     Route::get('/bookings/{booking}/receipt', [PaymentController::class, 'receipt']);
 

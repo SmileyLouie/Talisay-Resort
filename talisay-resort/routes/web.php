@@ -14,7 +14,11 @@ use App\Http\Controllers\WebProfileController;
 use App\Http\Controllers\WebSettingsController;
 use App\Http\Controllers\WebTouristPortalController;
 use App\Http\Controllers\WebAccommodationController;
+use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\WebStaffManagementController;
+use App\Http\Controllers\PublicPagesController;
+use App\Http\Controllers\WebFileMaintenanceController;
+use App\Http\Controllers\WebActivityController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,27 +26,30 @@ use App\Http\Controllers\WebStaffManagementController;
 |--------------------------------------------------------------------------
 */
 
-// ── Landing / Welcome Page ──────────────────────────────────────────────
-Route::get('/', function () {
-    // Already logged-in users go straight to their dashboard
-    if (auth()->check()) {
-        $user = auth()->user();
-        if (method_exists($user, 'isAdmin') && $user->isAdmin())   return redirect()->route('admin.dashboard');
-        if (method_exists($user, 'isStaff') && $user->isStaff())   return redirect()->route('staff.dashboard');
-        if (method_exists($user, 'isTourist') && $user->isTourist()) return redirect()->route('tourist.dashboard');
-        // Fallback by role string
-        return match($user->role) {
-            'tourist' => redirect()->route('tourist.dashboard'),
-            default   => redirect()->route('dashboard'),
-        };
-    }
-    return view('landing');
-})->name('home');
+// ── Public guest pages (no login needed) ────────────────────────────────
+Route::get('/', [PublicPagesController::class, 'home'])->name('home');
+Route::get('/about', [PublicPagesController::class, 'about'])->name('public.about');
+Route::get('/rooms', [PublicPagesController::class, 'rooms'])->name('public.rooms');
+Route::get('/cottages', [PublicPagesController::class, 'cottages'])->name('public.cottages');
+Route::get('/activities', [PublicPagesController::class, 'activities'])->name('public.activities');
+Route::get('/booking', [PublicPagesController::class, 'booking'])->name('public.booking');
+Route::get('/booking/exclusive', [PublicPagesController::class, 'exclusive'])->name('public.booking.exclusive');
+Route::get('/stay/{unit}', [PublicPagesController::class, 'unit'])->name('public.unit');
+Route::get('/guest-reviews', [PublicPagesController::class, 'reviews'])->name('public.reviews');
+Route::get('/contact', [PublicPagesController::class, 'contact'])->name('public.contact');
 
 // Authentication Routes
 Route::get('/login', [WebAuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:login')->name('login.post');
 Route::get('/register', [WebAuthController::class, 'showRegister'])->name('register');
+Route::get('/auth/{provider}', [SocialAuthController::class, 'redirect'])
+    ->where('provider', 'google|facebook')
+    ->middleware('throttle:20,1')
+    ->name('auth.social.redirect');
+Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])
+    ->where('provider', 'google|facebook')
+    ->middleware('throttle:20,1')
+    ->name('auth.social.callback');
 Route::post('/register', [WebAuthController::class, 'register'])->middleware('throttle:register')->name('register.post');
 Route::get('/forgot-password', [WebAuthController::class, 'showForgotPassword'])->name('password.request');
 Route::post('/forgot-password', [WebAuthController::class, 'sendResetLink'])->middleware('throttle:5,1')->name('password.email');
@@ -57,6 +64,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
     // Profile
+    Route::get('/booking/resume', function (\Illuminate\Http\Request $request) {
+        return redirect()->route('public.booking', $request->query());
+    })->name('public.booking.resume');
+
     Route::get('/profile', [WebProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [WebProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [WebProfileController::class, 'updatePassword'])->name('profile.password');
@@ -81,13 +92,22 @@ Route::middleware('auth')->group(function () {
         // Bookings
         Route::get('/bookings', [WebBookingController::class, 'index'])->middleware('permission:bookings,view')->name('bookings.index');
         Route::post('/bookings/manual', [WebBookingController::class, 'manualStore'])->middleware('permission:bookings,create')->name('bookings.manual-store');
+        Route::get('/bookings/unit-availability', [WebBookingController::class, 'unitAvailability'])->middleware('permission:bookings,create')->name('bookings.unit-availability');
+        Route::post('/bookings/exclusive', [WebBookingController::class, 'storeExclusive'])->middleware('permission:bookings,create')->name('bookings.exclusive-store');
+        Route::put('/bookings/{booking}/exclusive', [WebBookingController::class, 'updateExclusive'])->middleware('permission:bookings,edit')->name('bookings.exclusive-update');
+        Route::put('/bookings/{booking}', [WebBookingController::class, 'update'])->middleware('permission:bookings,edit')->name('bookings.update');
+        Route::delete('/bookings/{booking}', [WebBookingController::class, 'destroy'])->middleware('permission:bookings,delete')->name('bookings.destroy');
         Route::patch('/bookings/{booking}/status', [WebBookingController::class, 'updateStatus'])->middleware('permission:bookings,confirm')->name('bookings.update-status');
+        Route::post('/bookings/{booking}/approve-special', [WebBookingController::class, 'approveSpecialBooking'])->middleware('permission:bookings,confirm')->name('bookings.approve-special');
+        Route::post('/bookings/{booking}/reject-special', [WebBookingController::class, 'rejectSpecialBooking'])->middleware('permission:bookings,confirm')->name('bookings.reject-special');
 
         // Payments
         Route::get('/payments', [WebPaymentController::class, 'index'])->middleware('permission:payments,view')->name('payments.index');
         Route::get('/payments/{payment}', [WebPaymentController::class, 'show'])->middleware('permission:payments,view')->name('payments.show');
         Route::post('/payments/{payment}/approve', [WebPaymentController::class, 'approvePayment'])->middleware('permission:payments,verify')->name('payments.approve');
         Route::post('/payments/{payment}/reject', [WebPaymentController::class, 'rejectPayment'])->middleware('permission:payments,verify')->name('payments.reject');
+        Route::post('/payments/{payment}/refund', [WebPaymentController::class, 'refundPayment'])->middleware('permission:payments,refund')->name('payments.refund');
+        Route::post('/payments/{payment}/collect-balance', [WebPaymentController::class, 'collectBalance'])->middleware('permission:payments,verify')->name('payments.collect-balance');
 
         // Reviews & Feedback Moderation
         Route::get('/reviews', [WebReviewController::class, 'index'])->middleware('permission:reviews,view')->name('reviews.index');
@@ -98,10 +118,23 @@ Route::middleware('auth')->group(function () {
 
         // Accommodations management
         Route::get('/accommodations', [WebAccommodationController::class, 'index'])->middleware('permission:accommodations,view')->name('accommodations.index');
+        Route::get('/accommodations/cottages', [WebAccommodationController::class, 'cottages'])->middleware('permission:accommodations,view')->name('accommodations.cottages');
         Route::post('/accommodations', [WebAccommodationController::class, 'store'])->middleware('permission:accommodations,create')->name('accommodations.store');
         Route::put('/accommodations/{accommodation}', [WebAccommodationController::class, 'update'])->middleware('permission:accommodations,edit')->name('accommodations.update');
         Route::delete('/accommodations/{accommodation}', [WebAccommodationController::class, 'destroy'])->middleware('permission:accommodations,delete')->name('accommodations.destroy');
         Route::post('/accommodations/{accommodation}/toggle-availability', [WebAccommodationController::class, 'toggleAvailability'])->middleware('permission:accommodations,toggle_availability')->name('accommodations.toggle-availability');
+
+        Route::get('/reports', [WebReportController::class, 'index'])->middleware('permission:reports,view')->name('reports.index');
+        Route::get('/reports/export-pdf', [WebReportController::class, 'exportPdf'])->middleware('permission:reports,export')->name('reports.export-pdf');
+        Route::get('/reports/export-excel', [WebReportController::class, 'exportExcel'])->middleware('permission:reports,export')->name('reports.export-excel');
+
+        Route::get('/chatbot', [WebChatbotController::class, 'index'])->middleware('permission:chatbot,view')->name('chatbot.index');
+        Route::post('/chatbot/settings', [WebChatbotController::class, 'updateSettings'])->middleware('permission:chatbot,manage')->name('chatbot.settings.update');
+        Route::delete('/chatbot/logs', [WebChatbotController::class, 'clearLogs'])->middleware('permission:chatbot,manage')->name('chatbot.logs.clear');
+        Route::delete('/chatbot/logs/{log}', [WebChatbotController::class, 'destroyLog'])->middleware('permission:chatbot,manage')->name('chatbot.logs.destroy');
+        Route::post('/chatbot/intents', [WebChatbotController::class, 'store'])->middleware('permission:chatbot,manage')->name('chatbot.intents.store');
+        Route::put('/chatbot/intents/{intent}', [WebChatbotController::class, 'update'])->middleware('permission:chatbot,manage')->name('chatbot.intents.update');
+        Route::delete('/chatbot/intents/{intent}', [WebChatbotController::class, 'destroy'])->middleware('permission:chatbot,manage')->name('chatbot.intents.destroy');
     });
 
     // Admin-only System Admin routes
@@ -116,19 +149,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/staff-roster', fn() => redirect()->route('tasks.staff'));
 
         // User Accounts in System Settings
-        Route::get('/users', fn() => redirect()->route('settings.index', ['tab' => 'users']))->name('users.index');
-        Route::get('/users/create', fn() => redirect()->route('settings.index', ['tab' => 'users', 'action' => 'create']))->name('users.create');
+        Route::get('/users', fn() => redirect()->route('maintenance.section', 'accounts'))->name('users.index');
+        Route::get('/users/create', fn() => redirect()->route('maintenance.section', ['section' => 'accounts', 'action' => 'create']))->name('users.create');
         Route::patch('/users/{user}/toggle-status', [WebUserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::post('/users/{user}/reset-password', [WebUserController::class, 'adminResetPassword'])->name('users.reset-password');
         Route::resource('users', WebUserController::class)->except(['index', 'create']);
-
-        // AI Chatbot Operations & Knowledge Base
-        Route::get('/chatbot', [WebChatbotController::class, 'index'])->name('chatbot.index');
-        Route::post('/chatbot/settings', [WebChatbotController::class, 'updateSettings'])->name('chatbot.settings.update');
-        Route::delete('/chatbot/logs', [WebChatbotController::class, 'clearLogs'])->name('chatbot.logs.clear');
-        Route::post('/chatbot/intents', [WebChatbotController::class, 'store'])->name('chatbot.intents.store');
-        Route::put('/chatbot/intents/{intent}', [WebChatbotController::class, 'update'])->name('chatbot.intents.update');
-        Route::delete('/chatbot/intents/{intent}', [WebChatbotController::class, 'destroy'])->name('chatbot.intents.destroy');
 
         // Tour Assets Management
         Route::get('/tour-manage', [WebTourController::class, 'index'])->name('tour.manage');
@@ -136,26 +161,38 @@ Route::middleware('auth')->group(function () {
         Route::put('/tour-manage/{asset}', [WebTourController::class, 'update'])->name('tour.manage.update');
         Route::delete('/tour-manage/{asset}', [WebTourController::class, 'destroy'])->name('tour.manage.destroy');
 
-        // Reports
-        Route::get('/reports', [WebReportController::class, 'index'])->name('reports.index');
-        Route::get('/reports/export-pdf', [WebReportController::class, 'exportPdf'])->name('reports.export-pdf');
-        Route::get('/reports/export-excel', [WebReportController::class, 'exportExcel'])->name('reports.export-excel');
-
-        // Special Booking Approvals (admin only)
-        Route::post('/bookings/{booking}/approve-special', [WebBookingController::class, 'approveSpecialBooking'])->name('bookings.approve-special');
-        Route::post('/bookings/{booking}/reject-special', [WebBookingController::class, 'rejectSpecialBooking'])->name('bookings.reject-special');
-
         // Settings
+        Route::get('/activities-manage', [WebActivityController::class, 'index'])->name('activities.manage');
+        Route::post('/activities-manage', [WebActivityController::class, 'store'])->name('activities.store');
+        Route::put('/activities-manage/{activity}', [WebActivityController::class, 'update'])->name('activities.update');
+        Route::delete('/activities-manage/{activity}', [WebActivityController::class, 'destroy'])->name('activities.destroy');
+
+        Route::get('/file-maintenance', [WebFileMaintenanceController::class, 'index'])->name('maintenance.index');
+        Route::post('/file-maintenance/payments/install', [WebFileMaintenanceController::class, 'installPayments'])->name('maintenance.payments.install');
+        Route::get('/file-maintenance/{section}', [WebFileMaintenanceController::class, 'section'])->name('maintenance.section');
+        Route::post('/file-maintenance/{section}', [WebFileMaintenanceController::class, 'store'])->name('maintenance.store');
+        Route::put('/file-maintenance/{section}/{id}', [WebFileMaintenanceController::class, 'update'])->name('maintenance.update');
+        Route::delete('/file-maintenance/{section}/{id}', [WebFileMaintenanceController::class, 'destroy'])->name('maintenance.destroy');
+
         Route::get('/settings', [WebSettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [WebSettingsController::class, 'update'])->name('settings.save');
+        Route::post('/settings/gallery', [WebSettingsController::class, 'storeGallery'])->name('settings.gallery.store');
+        Route::put('/settings/gallery/{photo}', [WebSettingsController::class, 'updateGallery'])->name('settings.gallery.update');
+        Route::delete('/settings/gallery/{photo}', [WebSettingsController::class, 'destroyGallery'])->name('settings.gallery.destroy');
         Route::post('/settings/chatbot', [WebSettingsController::class, 'updateChatbot'])->name('settings.chatbot.save');
         Route::post('/settings/chatbot/test-connection', [WebSettingsController::class, 'testAiConnection'])->name('settings.chatbot.test');
     });
 
+    // Guest pages an admin or staff member can open to preview the virtual tour.
+    Route::middleware('role:tourist,admin,staff')->prefix('tourist')->name('tourist.')->group(function () {
+        Route::get('/dashboard', [WebTouristPortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('/accommodations', [WebAccommodationController::class, 'guestIndex'])->name('accommodations');
+        Route::get('/accommodations/{unit}', [WebAccommodationController::class, 'guestDetail'])->name('accommodations.detail');
+        Route::get('/accommodations/{unit}/check-availability', [WebTouristPortalController::class, 'checkAvailability'])->name('accommodations.check-availability');
+    });
+
     // Dashboard - Tourist
     Route::middleware('role:tourist')->prefix('tourist')->name('tourist.')->group(function () {
-        Route::get('/dashboard', [WebTouristPortalController::class, 'dashboard'])->name('dashboard');
-
         // My Bookings
         Route::get('/bookings', [WebTouristPortalController::class, 'bookings'])->name('bookings');
         Route::post('/bookings', [WebTouristPortalController::class, 'storeBooking'])->name('bookings.store');
@@ -165,11 +202,6 @@ Route::middleware('auth')->group(function () {
 
         // Payments
         Route::post('/payments/{payment}/upload-proof', [WebTouristPortalController::class, 'uploadPaymentProof'])->name('payments.upload-proof');
-
-        // Accommodations Browse (tourists)
-        Route::get('/accommodations', [WebAccommodationController::class, 'guestIndex'])->name('accommodations');
-        Route::get('/accommodations/{unit}', [WebAccommodationController::class, 'guestDetail'])->name('accommodations.detail');
-        Route::get('/accommodations/{unit}/check-availability', [WebTouristPortalController::class, 'checkAvailability'])->name('accommodations.check-availability');
 
         // Reviews
         Route::get('/reviews', [WebTouristPortalController::class, 'reviews'])->name('reviews');

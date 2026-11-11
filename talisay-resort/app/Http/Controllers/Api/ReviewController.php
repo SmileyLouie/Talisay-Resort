@@ -11,7 +11,7 @@ class ReviewController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'booking_id' => 'required|exists:bookings,id',
+            'booking_id' => 'bail|required|integer|exists:bookings,id',
             'rating' => 'required|integer|between:1,5',
             'comment' => 'nullable|string|max:1000',
         ]);
@@ -33,16 +33,13 @@ class ReviewController extends Controller
 
         $hasProfanity = Review::containsProfanity($request->comment);
 
-        $review = Review::create([
-            'user_id'            => $request->user()->id,
-            'booking_id'         => $request->booking_id,
-            'rating'             => $request->rating,
-            'comment'            => $request->comment,
-            'is_approved'        => true,
-            'is_comment_blocked' => $hasProfanity,
-            'block_reason'       => $hasProfanity ? 'Automatically blocked: Inappropriate language / profanity detected' : null,
-            'comment_blocked_at' => $hasProfanity ? now() : null,
-        ]);
+        $review = Review::create(array_merge([
+            'user_id'     => $request->user()->id,
+            'booking_id'  => $request->booking_id,
+            'rating'      => $request->rating,
+            'comment'     => $request->comment,
+            'is_approved' => true,
+        ], Review::blockedAttributes($request->comment)));
 
         $message = $hasProfanity
             ? 'Review rating published. Note: Your comment was hidden due to inappropriate words.'

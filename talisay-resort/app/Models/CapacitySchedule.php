@@ -67,6 +67,14 @@ class CapacitySchedule extends Model
      * @param  string|\Carbon\Carbon $date The date to look up (YYYY-MM-DD or Carbon)
      * @return static                      The CapacitySchedule record for that date
      */
+    /** The resort capacity edited in File Maintenance → Booking rules. */
+    public static function visitorCap(): int
+    {
+        $cap = (int) setting('daily_visitor_cap', 100);
+
+        return $cap > 0 ? $cap : 100;
+    }
+
     public static function getCapacityForDate($date): self
     {
         $formattedDate = $date instanceof \Carbon\CarbonInterface
@@ -74,15 +82,20 @@ class CapacitySchedule extends Model
             : \Carbon\Carbon::parse($date)->format('Y-m-d');
 
         $record = static::whereDate('date', $formattedDate)->first();
+        $max = static::visitorCap();
 
         if ($record) {
-            return $record;
+            if ((int) $record->max_capacity !== $max) {
+                $record->update(['max_capacity' => $max]);
+            }
+
+            return $record->fresh();
         }
 
         try {
             return static::create([
                 'date'          => $formattedDate,
-                'max_capacity'  => (int) setting('daily_visitor_cap', 100),
+                'max_capacity'  => $max,
                 'current_count' => 0,
             ]);
         } catch (\Illuminate\Database\UniqueConstraintViolationException) {

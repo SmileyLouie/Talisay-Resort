@@ -135,7 +135,14 @@
                 @if($booking->status === 'pending')
                 <div class="bg-amber-50 rounded-xl p-3 border border-amber-200 text-xs text-amber-900 mb-3">
                     <p class="font-bold mb-1"><i class="bi bi-clock-history me-1"></i>Payment Pending</p>
-                    <p class="mb-2 text-slate-600">Please send payment via GCash or pay at front desk.</p>
+                    @php $payMethod = $booking->payment ? \App\Models\PaymentMethod::lookup($booking->payment->gateway) : null; @endphp
+                    @if($payMethod && \App\Models\PaymentMethod::needsProof($booking->payment->gateway) && $payMethod->receivingNumber() !== '')
+                    <p class="mb-1 text-slate-700">Send the payment to this {{ $payMethod->name }} account:</p>
+                    <p class="mb-0 font-black text-slate-900">{{ $payMethod->receivingName() !== '' ? $payMethod->receivingName() : 'Talisay Beach Resort' }}</p>
+                    <p class="mb-2 font-black text-ocean-800">{{ $payMethod->receivingNumber() }}</p>
+                    @else
+                    <p class="mb-2 text-slate-600">Finish the payment from your booking, or pay at the front desk.</p>
+                    @endif
                     <a href="{{ route('tourist.bookings') }}" class="btn btn-warning btn-sm font-bold text-xs rounded-lg w-full">
                         View Payment &amp; Receipt
                     </a>
@@ -163,7 +170,7 @@
                 <p class="text-sm text-slate-500 mb-0">Choose your accommodation and reserve your stay online instantly</p>
             </div>
             <a href="{{ route('tourist.accommodations') }}" class="text-xs font-bold text-ocean-600 hover:text-ocean-800 no-underline flex items-center gap-1">
-                View All 20 Units <i class="bi bi-arrow-right"></i>
+                View All {{ $openUnitCount }} {{ $openUnitCount === 1 ? 'Unit' : 'Units' }} <i class="bi bi-arrow-right"></i>
             </a>
         </div>
 
@@ -208,7 +215,7 @@
                         <a href="{{ route('tourist.accommodations.detail', $unit->id) }}" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl text-center no-underline transition flex items-center justify-center gap-1">
                             <i class="bi bi-eye"></i>Details
                         </a>
-                        <button @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: {{ Js::from($unit->unit_number) }}, unitPrice: {{ $unit->price_per_night }}, maxCap: {{ $unit->max_occupancy }} })" class="flex-1 bg-ocean-600 hover:bg-ocean-800 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
+                        <button @click="$dispatch('open-booking-modal', { unitId: {{ $unit->id }}, unitName: {{ Js::from($unit->unit_number) }}, unitPrice: {{ $unit->price_per_night }}, hourPrice: {{ $unit->hourlyRate() }}, maxCap: {{ $unit->max_occupancy }} })" class="flex-1 bg-ocean-600 hover:bg-ocean-800 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
                             <i class="bi bi-calendar-plus"></i>Book Now
                         </button>
                     </div>
@@ -244,14 +251,39 @@
         unitId: '',
         unitName: '',
         unitPrice: 0,
+        hourPrice: 0,
         maxCap: 10,
         guests: 1,
+        guestNotice: '',
+        stayType: 'night',
+        hours: 1,
+        hourStart: '14:00',
         date: '{{ date('Y-m-d') }}',
         checkOut: '{{ date('Y-m-d', strtotime('+1 day')) }}',
         nights: 1,
         isAvailable: true,
         checkingAvailability: false,
         conflictMessage: '',
+        activityExtra: 0,
+        syncActivities(event) {
+            let extra = 0;
+            event.target.closest('form')?.querySelectorAll('.js-activity-addon:checked').forEach((box) => {
+                extra += Number(box.dataset.price || 0);
+            });
+            this.activityExtra = extra;
+        },
+
+        roomCap() {
+            return Math.max(1, parseInt(this.maxCap, 10) || 1);
+        },
+        noteGuests(event) {
+            const cap = this.roomCap();
+            const typed = parseInt(event?.target?.value ?? this.guests, 10);
+            if (Number.isFinite(typed)) this.guests = typed;
+            this.guestNotice = Number.isFinite(typed) && typed > cap
+                ? 'This room only allows ' + cap + ' guests.'
+                : '';
+        },
 
         init() {
             this.recalculate();
@@ -274,10 +306,14 @@
         },
 
         async verifyAvailability() {
-            if (!this.unitId || !this.date || !this.checkOut) return;
+            if (!this.unitId || !this.date) return;
+            if (this.stayType !== 'hour' && !this.checkOut) return;
             this.checkingAvailability = true;
+            const query = this.stayType === 'hour'
+                ? `check_in=${this.date}&stay_type=hour&hour_start=${this.hourStart}&hours=${this.hours}`
+                : `check_in=${this.date}&check_out=${this.checkOut}`;
             try {
-                const res = await fetch(`/tourist/accommodations/${this.unitId}/check-availability?check_in=${this.date}&check_out=${this.checkOut}`);
+                const res = await fetch(`/tourist/accommodations/${this.unitId}/check-availability?${query}`);
                 const data = await res.json();
                 this.isAvailable = data.available;
                 this.conflictMessage = data.available ? '' : (data.conflict_message || 'This unit is already booked on the selected dates. Please choose different dates.');
@@ -294,8 +330,10 @@
         unitId = $event.detail.unitId;
         unitName = $event.detail.unitName;
         unitPrice = $event.detail.unitPrice;
+        hourPrice = $event.detail.hourPrice ?? Math.round(unitPrice / 12 * 100) / 100;
         maxCap = $event.detail.maxCap;
         guests = 1;
+        guestNotice = '';
         recalculate();
     "
     x-show="open"
@@ -311,20 +349,11 @@
             <button @click="open = false" class="text-slate-400 hover:text-slate-700"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <form action="{{ route('tourist.bookings.store') }}" method="POST" class="space-y-4" data-loading>
+        <form action="{{ route('tourist.bookings.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4" data-loading @submit="noteGuests(); if (guestNotice) $event.preventDefault()" onsubmit="return prepareResortPayment(this)">
             @csrf
             <input type="hidden" name="accommodation_unit_id" :value="unitId">
 
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Check-in Date</label>
-                    <input type="date" name="booking_date" x-model="date" @change="recalculate()" min="{{ date('Y-m-d') }}" class="w-full form-control rounded-xl text-sm" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Check-out Date</label>
-                    <input type="date" name="check_out_date" x-model="checkOut" @change="recalculate()" :min="date" class="w-full form-control rounded-xl text-sm" required>
-                </div>
-            </div>
+            @include('partials.guest-stay-choice')
 
             {{-- Real-time Availability Feedback Badge --}}
             <div x-show="checkingAvailability" class="text-xs text-slate-500 flex items-center gap-1.5 py-1">
@@ -339,13 +368,14 @@
             </div>
             <div x-show="!checkingAvailability && isAvailable" class="bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 rounded-xl text-xs flex items-center gap-2">
                 <i class="bi bi-check-circle-fill text-emerald-600 text-sm"></i>
-                <span>Unit is <strong>available</strong> for your <span x-text="nights"></span>-night stay!</span>
+                <span>Unit is <strong>available</strong> for your <span x-text="stayType === 'hour' ? (hours + (hours === 1 ? ' hour' : ' hours')) : (nights + (nights === 1 ? ' night' : ' nights'))"></span>!</span>
             </div>
 
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Number of Guests (Pax)</label>
-                <input type="number" name="guests_count" x-model="guests" min="1" :max="maxCap" class="w-full form-control rounded-xl text-sm" required>
+                <input type="number" name="guests_count" min="1" x-model.number="guests" @input="noteGuests($event)" class="w-full form-control rounded-xl text-sm" required>
                 <p class="text-xs text-slate-400 mt-1">Maximum occupancy for this unit is <span x-text="maxCap"></span> guests.</p>
+                <p x-show="guestNotice" x-text="guestNotice" class="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mt-2 mb-0"></p>
             </div>
 
             <div>
@@ -353,22 +383,22 @@
                 <textarea name="special_requests" rows="2" class="w-full form-control rounded-xl text-sm" placeholder="e.g. Extra pillows, early arrival..."></textarea>
             </div>
 
+            <div @change="syncActivities($event)">
+                @include('partials.activity-addon-picks')
+            </div>
+
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">Payment Method</label>
-                <select name="payment_method" class="w-full form-select text-sm rounded-xl" required>
-                    <option value="gcash">GCash (Online Receipt Verification)</option>
-                    <option value="cash">Cash on Arrival (Pay at Front Desk)</option>
-                    <option value="paypal">PayPal</option>
-                    <option value="card">Credit / Debit Card</option>
-                </select>
+                @include('partials.payment-method-select')
+                @include('partials.guest-payment-fields')
             </div>
 
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
                 <div>
-                    <span class="text-xs font-bold text-slate-600 block">Total Stay Cost (<span x-text="nights + ' Night' + (nights > 1 ? 's' : '')"></span>):</span>
-                    <span class="text-[11px] text-slate-400" x-text="'₱' + unitPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' / night'"></span>
+                    <span class="text-xs font-bold text-slate-600 block" x-text="stayType === 'hour' ? ('Total for ' + hours + (hours === 1 ? ' hour' : ' hours')) : ('Total Stay Cost (' + nights + (nights === 1 ? ' Night' : ' Nights') + ')')"></span>
+                    <span class="text-[11px] text-slate-400" x-text="stayType === 'hour' ? ('₱' + Number(hourPrice).toLocaleString(undefined, {minimumFractionDigits: 2}) + ' / hour') : ('₱' + unitPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' / night')"></span>
                 </div>
-                <span class="text-xl font-black text-ocean-900" x-text="'₱' + (unitPrice * nights).toLocaleString(undefined, {minimumFractionDigits: 2})"></span>
+                <span class="text-xl font-black text-ocean-900 js-stay-total" x-text="'₱' + ((stayType === 'hour' ? Number(hourPrice) * hours : unitPrice * nights) + activityExtra).toLocaleString(undefined, {minimumFractionDigits: 2})"></span>
             </div>
 
             <div class="flex gap-2 pt-2">

@@ -70,7 +70,7 @@ class DashboardController extends WebControllers
             $data['paymentStats'] = [
                 'pending_count'   => Payment::where('status', 'pending')->count(),
                 'verified_today'  => Payment::where('status', 'success')->whereDate('updated_at', today())->count(),
-                'today_collected' => Payment::where('status', 'success')->whereDate('updated_at', today())->sum('amount'),
+                'today_collected' => Payment::revenueBetween(today(), now()->endOfDay()),
             ];
         }
 

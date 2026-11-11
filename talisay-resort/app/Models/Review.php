@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 // Import base Eloquent Model class
 use Illuminate\Database\Eloquent\Model;
+use App\Support\ProfanityFilter;
 
 // Declare which columns can be safely mass-assigned
 #[Fillable([
@@ -51,6 +52,21 @@ class Review extends Model
 {
     // Enable factory support for generating test/seed reviews
     use HasFactory;
+
+    public const AUTO_BLOCK_REASON = 'Automatically blocked: offensive language detected';
+
+    protected static function booted(): void
+    {
+        static::saving(function (Review $review) {
+            if (!$review->isDirty('comment') || !self::containsProfanity($review->comment)) {
+                return;
+            }
+
+            $review->is_comment_blocked = true;
+            $review->block_reason = self::AUTO_BLOCK_REASON;
+            $review->comment_blocked_at ??= now();
+        });
+    }
 
     /**
      * Define type casts for model attributes.
@@ -91,8 +107,9 @@ class Review extends Model
      */
     public function booking()
     {
-        // Each review is tied to a single completed booking
-        return $this->belongsTo(Booking::class);
+        // Each review is tied to a single completed booking.
+        // A booking removed from the list still shows on its review.
+        return $this->belongsTo(Booking::class)->withTrashed();
     }
 
     // ──────────────────────────────────────────────────────────
@@ -100,41 +117,72 @@ class Review extends Model
     // ──────────────────────────────────────────────────────────
 
     /**
-     * List of common offensive words / profanities in English and Tagalog/Filipino.
+     * Offensive words the automatic check looks for, in the languages the site can show.
      */
     public static function profanityWords(): array
     {
+        return ProfanityFilter::words();
+    }
+
+    /**
+     * Check if a text contains offensive words in any supported language.
+     */
+    public static function containsProfanity(?string $text): bool
+    {
+        return ProfanityFilter::contains($text);
+    }
+
+    /**
+     * Fields to save when a new comment is stored.
+     * A clean comment stays visible. An offensive one is hidden immediately.
+     *
+     * @return array{is_comment_blocked: bool, block_reason: string|null, comment_blocked_at: \Carbon\Carbon|null}
+     */
+    public static function blockedAttributes(?string $comment): array
+    {
+        $blocked = self::containsProfanity($comment);
+
         return [
-            // Tagalog / Filipino profanities
-            'putang', 'puta', 'tangina', 'tang ina', 'gago', 'gaga', 'tarantado', 'tarantada',
-            'ulol', 'ogag', 'bobo', 'inutil', 'leche', 'letse', 'pakshet', 'pakyu', 'hayop ka',
-            'peste', 'bwisit', 'punyeta', 'kantot', 'iyot', 'kupal', 'hudas',
-            // English profanities
-            'fuck', 'fucking', 'fucker', 'shit', 'shitty', 'bullshit', 'bitch', 'asshole',
-            'bastard', 'cunt', 'dick', 'pussy', 'cock', 'motherfucker', 'whore', 'slut',
-            'dumbass', 'jackass', 'retard', 'nigger', 'faggot',
+            'is_comment_blocked' => $blocked,
+            'block_reason' => $blocked ? self::AUTO_BLOCK_REASON : null,
+            'comment_blocked_at' => $blocked ? now() : null,
         ];
     }
 
     /**
-     * Check if a text contains offensive / bad words.
+     * Hide older comments that were saved before this check, or that a new word now catches.
+     * A comment an admin has already unblocked is left alone until the text changes.
      */
-    public static function containsProfanity(?string $text): bool
+    public static function sweepOpenComments(): void
     {
-        if (empty($text)) {
-            return false;
+        static $done = false;
+        if ($done) {
+            return;
         }
+        $done = true;
 
-        $lower = strtolower($text);
+        self::query()
+            ->where('is_comment_blocked', false)
+            ->where(function ($query) {
+                $query->whereNull('block_reason')->orWhere('block_reason', '');
+            })
+            ->whereNotNull('comment')
+            ->where('comment', '!=', '')
+            ->select(['id', 'comment'])
+            ->orderBy('id')
+            ->chunkById(100, function ($reviews) {
+                foreach ($reviews as $review) {
+                    if (!self::containsProfanity($review->comment)) {
+                        continue;
+                    }
 
-        foreach (self::profanityWords() as $badWord) {
-            $pattern = '/\b' . preg_quote($badWord, '/') . '\b/i';
-            if (preg_match($pattern, $lower)) {
-                return true;
-            }
-        }
-
-        return false;
+                    self::whereKey($review->id)->update([
+                        'is_comment_blocked' => true,
+                        'block_reason' => self::AUTO_BLOCK_REASON,
+                        'comment_blocked_at' => now(),
+                    ]);
+                }
+            });
     }
 
     /**
@@ -145,7 +193,7 @@ class Review extends Model
     public function getDisplayCommentAttribute(): string
     {
         if ($this->is_comment_blocked) {
-            return '[This comment has been blocked by the admin for inappropriate language. Star rating preserved.]';
+            return '[This comment was hidden automatically because it contains offensive language. The star rating is still counted.]';
         }
 
         return $this->comment ?? '';

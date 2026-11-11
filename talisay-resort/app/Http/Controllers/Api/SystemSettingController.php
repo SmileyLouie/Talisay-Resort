@@ -16,12 +16,22 @@ class SystemSettingController extends Controller
 
     public function update(Request $request)
     {
-        $request->validate([
-            'settings' => 'required|array',
-        ]);
+        $request->validate(SystemSetting::validationRules(), SystemSetting::validationMessages());
 
         foreach ($request->settings as $key => $value) {
+            if ($value === null) {
+                continue;
+            }
+            if ($key === 'ui_locale' && ! \App\Support\UiLocales::allows((string) $value)) {
+                continue;
+            }
             SystemSetting::set($key, $value);
+        }
+
+        if (array_key_exists('daily_visitor_cap', $request->settings)) {
+            \App\Models\CapacitySchedule::query()->update([
+                'max_capacity' => \App\Models\CapacitySchedule::visitorCap(),
+            ]);
         }
 
         return response()->json(['message' => 'Settings updated successfully.']);
